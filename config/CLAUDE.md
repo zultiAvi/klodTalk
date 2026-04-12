@@ -28,7 +28,7 @@ Runtime state files live in `.klodTalk/state/` (gitignored). The `config/` folde
 ```yaml
 server:
   host: "0.0.0.0"    # bind address
-  port: 9000          # WebSocket port
+  port: 3174          # WebSocket port
   docker: true        # start agent containers on boot
   ssl_cert: ""        # Path to server.crt — leave empty for plain ws://
   ssl_key: ""         # Path to server.key — leave empty for plain ws://

@@ -12,8 +12,8 @@ Thanks for your interest in contributing! Here's how to get started.
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/klod_talk.git
-cd klod_talk
+git clone https://github.com/YOUR_USERNAME/klodTalk.git
+cd klodTalk
 
 # Create a Python virtual environment
 python3 -m venv .venv
@@ -37,7 +37,7 @@ python helpers/add_project.py add myagent -u myuser -d "Test project" -f /path/t
 ./helpers/linux/run_server.sh
 ```
 
-The server starts on `0.0.0.0:9000` by default (configured in `config/server_config.yaml`).
+The server starts on `0.0.0.0:3174` by default (configured in `config/server_config.yaml`).
 
 ## Building the Android APK
 

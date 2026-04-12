@@ -12,8 +12,8 @@ If SSL is not configured, the server falls back to plain `ws://` (unencrypted).
 
 ## Recommendations
 
-- **Do not expose port 9000 to the internet.** Use a firewall or VPN if you need remote access.
-- **Enable WSS** by generating a certificate (`helpers/generate_cert.sh`) and configuring `ssl_cert`/`ssl_key` in `config/server_config.yaml`.
+- **Do not expose the server port to the internet.** The default port is 3174 (configured in `config/server_config.yaml`). Use a firewall or VPN if you need remote access.
+- **Enable WSS** by generating a certificate (`helpers/linux/generate_cert.sh` or `helpers\windows\generate_cert.bat`) and configuring `ssl_cert`/`ssl_key` in `config/server_config.yaml`.
 - Run the server only on trusted local networks.
 - Use strong, unique passwords for each user account.
 
