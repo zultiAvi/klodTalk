@@ -37,5 +37,5 @@ The Android app requires an APK build, a phone, and installation. The web client
 
 - Web Speech API requires Chrome or Edge for reliable operation.
 - No background notifications when the tab isn't active.
-- WebSocket uses `wss://` (TLS-encrypted) with a self-signed certificate. The user must trust the cert in the browser first by visiting `https://<server-ip>:9000`.
+- WebSocket uses `wss://` (TLS-encrypted) with a self-signed certificate. The user must trust the cert in the browser first by visiting `https://<server-ip>:3174`.
 - The server does not serve this file. You open it separately or host it with any static file server.

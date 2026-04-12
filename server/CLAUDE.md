@@ -10,7 +10,7 @@ The WebSocket server and Docker agent runtime. This is the brain of the system â
 
 **Docker containers for isolation.** Each project's folder is mounted into a container that stays alive (idle) waiting for `docker exec` calls.
 
-**Two modes:** "read back" (confirm/summarize) and "start working" (execute).
+**Three modes:** "Read Back" (confirm/summarize), "Start Working" (execute), and "BTW" (side-channel message to a running agent).
 
 ## Files
 

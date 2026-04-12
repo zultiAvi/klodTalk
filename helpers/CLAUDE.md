@@ -6,7 +6,7 @@ CLI tools and scripts that manage the system from the outside. Nothing here runs
 
 The server itself has no admin UI. Instead of building web-based admin panels or embedding management commands into the server process, we keep administration as standalone scripts. This means:
 
-- You can add users and agents without the server running.
+- You can add users and projects without the server running.
 - Config files are the single source of truth, and these scripts are just convenient editors for them.
 - No admin endpoints to secure on the WebSocket server.
 
