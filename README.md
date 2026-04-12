@@ -1,58 +1,42 @@
-# KlodTalk - My favorite way to talk to Claude.
+# KlodTalk
 
-A multi-agent system built on Claude Code CLI. Define teams of Claude agents with different roles (Planner, Coder, Reviewer, etc.), assign them to projects, and let them collaborate on tasks — all running inside Docker containers on your local machine.
+### My favorite way to talk to Claude.
 
-## Why KlodTalk?
+You talk. Claude codes. Your entire team of AI agents — Planner, Coder, Reviewer — works together inside isolated Docker containers while you watch the progress from your phone or browser. When they're done, you review the diff, approve or revert changes, and move on.
 
-- **Configurable teams** — define pipelines in Markdown files. Swap roles, models, and review loops without touching code.
-- **Docker-isolated** — every session runs in its own container. Each task gets a dedicated git branch. Your host system stays clean.
-- **Multi-user, multi-session** — multiple people can use the system concurrently, each with their own projects and sessions.
-- **Confirm vs. execute modes** — ask Claude to confirm what it understood before it starts coding, or go straight to execution.
-- **Full work logging** — every team step is logged with plans, code changes, reviews, and progress updates. Easy to inspect and audit.
-- **Web and Android clients** — connect from a browser or the native Android app. iOS contributions welcome.
-- **HTTP/HTTPS and WS/WSS** — supports both plain and TLS-encrypted connections.
-- **Speech-to-text option** — both clients support voice input for hands-free interaction.
-- **Linux and Windows** — installers and helper scripts for both. macOS contributions welcome.
+No terminal. No copy-pasting. Just say what you want built.
 
-## How It Works
+---
 
-```
-Client (Web / Android)
-     │  text or speech-to-text
-     │
-     ▼
-WebSocket (ws:// or wss://)
-     │
-     ▼
-Server (Python asyncio)
-     │
-     ├── Authenticates user (users.json)
-     ├── Routes message to the correct session
-     ├── Starts a Docker container for the session
-     ├── Runs the team pipeline (or single agent) inside the container
-     ├── Streams progress updates back to the client
-     └── Returns the final result
-     │
-     ▼
-Docker Container
-     │
-     ├── Claude Code CLI (with your team pipeline)
-     ├── Git branch per task
-     └── Logged output at every step
-```
+## What Makes This Different
 
-## Installation
+Most AI coding tools give you one agent in one window. KlodTalk gives you a **team** — a configurable pipeline of specialized Claude agents that plan, implement, review, and even run your code. Everything happens in Docker, on a fresh git branch, so your codebase stays safe.
+
+- **Teams of agents, not just one** — a Planner designs the approach, a Coder writes the code, a Reviewer catches mistakes. You pick the team, or build your own.
+- **Easy to configure** — teams and roles are just Markdown files. Add a new team, tweak a role's instructions, or change which model a role uses — no code changes, no restarts.
+- **Docker-isolated** — every session runs in its own container with its own git branch. Nothing touches your working tree until you say so.
+- **Diff window** — when Claude finishes, you see exactly what changed. Review every hunk, revert what you don't like, keep what you do.
+- **Read Back / Start Working / BTW** — tell Claude to summarise what it understood before coding, kick off execution when ready, or send a "BTW" with extra context while it's mid-task.
+- **Auto-learning** — KlodTalk automatically reviews its own sessions and writes CLAUDE.md skill files into your project, so Claude gets smarter about your codebase over time.
+- **Voice or text** — speak into your phone or type in the browser. Both clients support speech-to-text.
+- **Multi-user, multi-project** — your team can share projects or have private ones. Multiple sessions run in parallel.
+- **Web and Android clients** — same protocol, same features. iOS contributions welcome.
+- **Linux and Windows** — installers for both. macOS contributions welcome.
+
+---
+
+## Getting Started
+
+**The easiest way to learn KlodTalk is to ask Claude.** The entire repo is documented with `CLAUDE.md` files in every directory — Claude already knows how everything works. Once you're set up, just ask it.
 
 ### Prerequisites
 
 - **Docker** — agent containers run here
 - **Python 3.9+** — the server runtime
 - **Git** — workspace management
-- **Claude Code CLI** — the AI agent engine (see [Claude Code setup](#claude-code-setup) below)
+- **Claude Code CLI** — the AI engine ([setup instructions below](#claude-code-setup))
 
 ### Quick Install
-
-## Ask Claude to do it...
 
 **Linux:**
 
@@ -70,144 +54,138 @@ cd klodTalk
 helpers\windows\install.bat
 ```
 
-Both installers handle Docker installation, Python venv setup, example config copying, and Docker image build. They are idempotent — safe to re-run.
-
-### Manual Setup (alternative)
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r server/requirements.txt
-cp config/projects.json.example config/projects.json
-cp config/users.json.example config/users.json
-```
+Both installers handle Docker, Python venv, config files, and the Docker image. Idempotent — safe to re-run.
 
 ### Claude Code Setup
 
-KlodTalk uses Claude Code CLI as the AI engine inside Docker containers. You need it authenticated on the host machine — the server mounts the session into containers.
+KlodTalk uses Claude Code CLI inside Docker containers. You need it authenticated on the host — the server mounts the session into containers.
 
-1. **Install Claude Code CLI:**
+1. **Install:**
 
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
 
-2. **Authenticate** (two options):
+2. **Authenticate** (pick one):
 
-   - **OAuth session** (default) — run `claude` once on the host, complete the browser login, then close it. The session token is stored in `~/.claude/` and mounted into containers automatically.
-
-   - **API key** — set the `ANTHROPIC_API_KEY` environment variable and change `config/server_config.yaml`:
+   - **OAuth session** (default) — run `claude` once, complete the browser login, close it. Done.
+   - **API key** — set `ANTHROPIC_API_KEY` and change `config/server_config.yaml`:
 
 ```yaml
 claude:
   auth_method: "api_key"
 ```
 
-The server checks for a valid Claude session on startup and re-authenticates if needed.
-
-## Configuration
-
-### Users (`config/users.json`)
-
-Users authenticate to the server with a username and password hash. Manage users with the CLI helper:
+### Add Users and Projects
 
 ```bash
-# Add a user (prompts for password)
 python helpers/add_user.py add alice
 
-# List users
-python helpers/add_user.py list
-
-# Interactive mode
-python helpers/add_user.py
-```
-
-Passwords are SHA-256 hashed client-side before transmission. The server stores and compares hashes, never plaintext.
-
-### Projects (`config/projects.json`)
-
-Each project maps to a workspace folder on your machine. A project defines who can access it, which team pipeline to use, and what branch to base work on.
-
-```bash
-# Add a project
 python helpers/add_project.py add my_project \
     --users alice \
-    --description "Backend API work" \
+    --description "Backend API" \
     --folder /home/alice/projects/backend
-
-# Add a shared project for multiple users
-python helpers/add_project.py add shared_project \
-    --users alice bob \
-    --description "Shared frontend project" \
-    --folder /home/alice/projects/frontend
 ```
 
-Key project fields in `config/projects.json`:
+See `config/projects.json.example` for all available options.
 
-| Field | Description |
-|-------|-------------|
-| `name` | Project identifier |
-| `users` | List of usernames allowed to use this project |
-| `folder` | Absolute path to the project workspace on the host |
-| `base_branch` | Branch merged before each task (default: `"main"`) |
-| `team` | Team pipeline name (e.g. `"plan-code-review"`) or `null` for single-agent mode |
-| `docker_commit` | Whether to auto-commit inside the container |
-| `docker_socket` | Whether to mount the Docker socket into the container |
-| `allowed_external_paths` | Additional host paths to mount into the container (read-only or read-write) |
-
-See `config/projects.json.example` for a full example.
-
-## Starting the Server
-
-**Linux:**
+### Start the Server
 
 ```bash
-./helpers/linux/run_server.sh
-```
-
-**Windows:**
-
-```
-helpers\windows\run_server.bat
+./helpers/linux/run_server.sh          # Linux
+helpers\windows\run_server.bat         # Windows
 ```
 
 The server binds to `0.0.0.0:3174` by default (configurable in `config/server_config.yaml`).
 
-## Connecting Clients
+### Connect
 
-**Web client** — open `clients/web/index.html` in a browser on the same network, or serve it with any static file server. Enter the server IP, port, username, and password.
+**Web** — open `clients/web/index.html` in a browser on the same network.
 
-**Android app** — build the APK and install it:
+**Android** — build and install the APK:
 
 ```bash
-./helpers/linux/compile_apk.sh        # debug APK → build/
+./helpers/linux/compile_apk.sh
 ```
 
-Open the app, enter your server connection details, and tap Connect.
+---
 
-## Team Pipelines
+## How It Works
 
-Teams are the core of KlodTalk. A team is a Markdown file that defines a pipeline of Claude agents with different roles.
+```
+You (Web / Android)
+     │
+     ├── Log in to your server
+     ├── Open a session for one of your projects
+     ├── Pick the right team for your task
+     ├── Ask Claude to do some work
+     │
+     ▼
+Server
+     │
+     ├── Spins up a Docker container
+     ├── Clones your repo into /workspace
+     ├── Creates a fresh git branch
+     ├── Runs the team pipeline (Planner → Coder → Reviewer → ...)
+     ├── Streams progress updates back to you
+     ├── Commits code changes to the branch
+     │
+     ▼
+You
+     │
+     ├── Review the diff — approve or revert individual changes
+     ├── Send follow-up messages or corrections
+     ├── Close the session when done
+```
 
-### Available Teams
+---
 
-| Team | Description |
+## Interaction Modes
+
+| Mode | What Happens |
 |------|-------------|
-| `plan-code-review` | Default balanced pipeline: Planner → Coder → Reviewer (with optional execution, validation, and security review) |
-| `plan-code` | Fast two-role path: Planner → Coder, no review step |
-| `plan-code-review-execute` | Five-role pipeline with execution and validation after review |
-| `tdd` | Test-driven development with red-green-refactor methodology |
-| `unit-test` | Write unit tests for existing code without modifying implementation |
-| `refactor` | Two-phase refactoring: refactor code, then validate with tests |
-| `security` | Security-focused — uses Opus throughout for deeper threat analysis |
-| `optimizer` | Iterative optimization loop for tuning configuration or code against a metric |
-| `super-planner` | Ideation-only team that generates and refines plans without writing code |
+| **Read Back** | Claude summarises what it understood from your messages. No code changes. Use this to verify understanding or ask questions before committing to execution. |
+| **Start Working** | Claude runs the full team pipeline on your request. |
+| **BTW** | Send a side-channel message while Claude is already working — add context, corrections, or clarifications without interrupting the pipeline. |
 
-### Creating a Custom Team
+**Typical flow:**
 
-Create a Markdown file in `teams/teams/`:
+1. Send your request (one or more messages, text or voice).
+2. Hit **Read Back** — Claude tells you what it understood.
+3. If it got it right, hit **Start Working**. If not, correct and Read Back again.
+4. While Claude is working, use **BTW** if you forgot something.
 
-# Team: My Team
+---
+
+## Teams
+
+Teams are the heart of KlodTalk. Each team is a simple Markdown file that defines a pipeline of agents.
+
+### Built-in Teams
+
+| Team | What It Does |
+|------|-------------|
+| `plan-code-review` | The default. Planner → Coder → Reviewer, with optional execution and security review. |
+| `plan-code` | Fast path. Planner → Coder, no review. |
+| `plan-code-review-execute` | Full pipeline with execution and validation after review. |
+| `tdd` | Test-driven development — red, green, refactor. |
+| `unit-test` | Writes unit tests for existing code. Doesn't touch implementation. |
+| `refactor` | Refactors code, then validates with tests. |
+| `security` | Security-focused. Uses Opus throughout for deeper analysis. |
+| `optimizer` | Iterative optimization loop against a metric. |
+| `super-planner` | Ideation only — generates and refines plans, writes no code. |
+
+You can switch the team for any message in the client interface.
+
+### Create Your Own
+
+Teams and roles are just Markdown files — no code, no config syntax. Want a new team? Drop a `.md` file. Want to change how the Reviewer behaves? Edit `teams/roles/reviewer.md`. Want the Coder to use a cheaper model? Change one word in the Members table. No restarts needed.
+
+# New Team ?
+
+Drop a Markdown file in `teams/teams/`:
+
+## Team: My_Team
 
 A description of what this team does.
 
@@ -224,144 +202,102 @@ A description of what this team does.
 1. **coder**: Implements the plan.
 2. **reviewer**: Reviews the implementation.
    - Review loop: fix_role=coder, max_iterations=2
-3. **runner**: Execute the implementation if orchestrator thinks it is needed.
+3. **runner**: Execute the implementation if team's orchestrator thinks it is needed.
 
-Assign it to a project by setting `"team": "my-team"` in `config/projects.json`. See `docs/add_team.md` for the full guide.
+Assign it to a project with `"team": "my-team"` in `config/projects.json`. See `docs/add_team.md` for the full format.
 
-**You can always change the team for each message in the client's interface.**
 ### Available Models
 
-- **`opus`** (claude-opus-4-6) — most capable, highest cost
-- **`sonnet`** (claude-sonnet-4-6) — balanced capability and speed
+- **`opus`** (claude-opus-4-6) — most capable
+- **`sonnet`** (claude-sonnet-4-6) — balanced
 - **`haiku`** (claude-haiku-4-5-20251001) — fastest and cheapest
 
-## Confirm vs. Execute Modes
 
-KlodTalk has two interaction modes to prevent premature execution:
+# New role ?
 
-| Mode | What Happens |
-|------|-------------|
-| **Confirm** | Claude reads the accumulated messages and summarises what it understood. No code changes. |
-| **Execute** | Claude runs the full team pipeline (or single agent) on the request. |
+Drop a Markdown file in `teams/roles/`:
 
-## Work Logging
+### Role: New_role
 
-Every team pipeline run produces detailed logs:
+Describe new_role **statement**, **Responsibilities**, **Required Output Files** and process. 
 
-- **Progress updates** — real-time step-by-step progress (e.g. "Step 2/4: Coder implementing...") pushed to the client as the pipeline runs.
-- **Plan** — the planner's full implementation plan, visible before coding starts.
-- **Coder output** — summary of what was implemented and which files changed.
-- **Review results** — the reviewer's findings, displayed in a separate Reviews tab.
-- **Orchestrator log** — full verbatim output from every sub-agent, written to `.klodTalk/history/orchestrator_log.md` in the workspace.
-- **Changed files** — list of all modified files, written to `.klodTalk/changed_files.txt`.
+---
 
-## TLS / WSS Setup (Optional)
 
-KlodTalk supports encrypted connections using self-signed TLS certificates. Both plain (`ws://`, `http://`) and encrypted (`wss://`, `https://`) modes work.
 
-### Generate a Certificate
+## Key Features
 
-**Linux:**
+### Diff Window
+
+After Claude finishes working, you get a full diff of every file it changed. Review each hunk individually — keep what looks good, revert what doesn't. You stay in control of what actually lands on the branch.
+
+### Auto-Learning
+
+KlodTalk automatically reviews its own sessions and writes `CLAUDE.md` skill files into your project when it identifies useful patterns. Over time, Claude gets better at understanding your codebase, your conventions, and your preferences — without you having to maintain documentation manually.
+
+### Work Logging
+
+Every pipeline run is fully logged:
+
+- **Progress updates** — real-time status pushed to the client as each step runs.
+- **Plan** — the planner's implementation plan, visible before coding starts.
+- **Coder output** — what was implemented and which files changed.
+- **Review results** — the reviewer's findings in a dedicated Reviews tab.
+- **Full log** — verbatim sub-agent output in `.klodTalk/history/orchestrator_log.md`.
+
+---
+
+## TLS / WSS (Optional)
+
+KlodTalk supports encrypted connections with self-signed TLS certificates.
 
 ```bash
-./helpers/linux/generate_cert.sh
-# Enter your server's LAN IP when prompted
-# Generates server.crt and server.key in ~/.KlodTalk/certs/
+./helpers/linux/generate_cert.sh       # Linux
+helpers\windows\generate_cert.bat      # Windows
 ```
 
-**Windows:**
+Then configure `ssl_cert` and `ssl_key` in `config/server_config.yaml`. See the [full TLS guide](docs/install.md) for client setup.
 
-```
-helpers\windows\generate_cert.bat
-```
-
-### Configure the Server
-
-Edit `config/server_config.yaml`:
-
-```yaml
-server:
-  host: "0.0.0.0"
-  port: 3174
-  docker: true
-  ssl_cert: "/home/youruser/.KlodTalk/certs/server.crt"
-  ssl_key: "/home/youruser/.KlodTalk/certs/server.key"
-```
-
-### Trust the Certificate on Clients
-
-**Web browser:** navigate to `https://<server-ip>:<port>` and accept the self-signed cert, then switch the web client to `wss://`.
-
-**Android:** install the `server.crt` as a CA certificate on the device (Settings → Security → Install a certificate), then select `wss://` in the app settings.
-
-WSS is recommended if your LAN has untrusted devices, but not required. On a trusted home network, `ws://` works fine.
+---
 
 ## Project Structure
 
 ```
 klodTalk/
 ├── config/                        # Server config, user/project definitions
-│   ├── server_config.yaml
-│   ├── projects.json.example
-│   └── users.json.example
 ├── server/                        # WebSocket server & Docker agent runtime
-│   ├── server.py                  # Main WebSocket server
-│   ├── session_manager.py         # Session lifecycle & container management
-│   ├── run_agent.py               # Agent executor (runs inside container)
-│   ├── run_agent.sh               # Shell-based agent executor
-│   ├── Dockerfile.agent           # Agent container image
-│   ├── agent_entrypoint.sh        # Container entrypoint
-│   ├── history_store.py           # Session history (JSONL)
-│   ├── token_store.py             # Token usage tracking
-│   ├── unread_state.py            # Per-user unread markers
-│   ├── copy_tree.py               # Git-aware directory copy
-│   └── utils/                     # Shared utilities (file, git, docker, etc.)
-├── teams/                         # Multi-agent team orchestration
-│   ├── orchestrator.md            # Master orchestration instructions
-│   ├── run_claude_team.sh         # Entry point (shell → Claude)
-│   ├── teams/                     # Team pipeline definitions (Markdown)
-│   │   ├── plan-code-review.md
-│   │   ├── plan-code.md
-│   │   ├── tdd.md
-│   │   └── ...
-│   └── roles/                     # Role instruction files (Markdown)
-│       ├── planner.md
-│       ├── coder.md
-│       ├── reviewer.md
-│       └── ...
+├── teams/                         # Team pipeline definitions & role prompts
+│   ├── teams/                     # One Markdown file per team
+│   └── roles/                     # One Markdown file per role
 ├── clients/
-│   ├── web/
-│   │   └── index.html             # Browser client (vanilla JS, zero deps)
+│   ├── web/                       # Browser client (vanilla JS, zero deps)
 │   ├── android/                   # Android app (Kotlin / Jetpack Compose)
 │   └── ios/                       # Placeholder — contributions welcome
-├── helpers/
-│   ├── add_user.py                # User management CLI
-│   ├── add_project.py             # Project management CLI
-│   ├── linux/                     # Linux scripts (install, run, build, certs)
-│   └── windows/                   # Windows scripts (install, run, build, certs)
+├── helpers/                       # CLI tools & install/run scripts
 ├── tests/                         # Unit tests (pytest)
 ├── docs/                          # Documentation
-└── CLAUDE.md
+└── CLAUDE.md                      # Start here — Claude knows the rest
 ```
 
-## Privacy Policy
+---
 
-KlodTalk runs entirely on your local network. The Android app and web client connect only to your self-hosted server — no data is sent to external services.
+## Privacy
+
+KlodTalk runs entirely on your local network. No data leaves your machine.
 
 - No analytics, tracking, or advertising SDKs.
-- No audio is recorded or transmitted. The microphone is used solely for Android's on-device speech recognizer; only the resulting text is sent to your server.
+- No audio recorded or transmitted — only transcribed text.
 - No crash reporting to external services.
-- Connection settings are stored locally on the device and never leave it.
 
-Full privacy policy: `docs/privacy_policy.html`
+Full policy: `docs/privacy_policy.html`
 
 ## Security
 
-KlodTalk is a local-network tool. Do not expose the server port to the internet. See `SECURITY.md` for the full threat model and recommendations.
+Local-network tool. Do not expose to the internet. See `SECURITY.md` for details.
 
 ## Contributing
 
-Contributions welcome — especially macOS support and an iOS client. See `CONTRIBUTING.md` for setup instructions and guidelines.
+Contributions welcome — especially macOS and iOS. See `CONTRIBUTING.md`.
 
 ## License
 
