@@ -1,0 +1,30 @@
+[
+  {
+    "name": "my_project",
+    "users": ["alice"],
+    "description": "My first project",
+    "folder": "/path/to/my/project",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "docker_commit": true,
+    "docker_socket": false,
+    "allowed_external_paths": [
+      {"path": "/home/alice/KlodTalk/in/designs", "writable": false},
+      {"path": "/home/alice/KlodTalk/out/designs", "writable": true, "results": true},
+      "/home/alice/legacy"
+    ],
+    "created": "2026-01-01T00:00:00.000000"
+  },
+  {
+    "name": "my_other_project",
+    "users": ["alice", "bob"],
+    "description": "Shared project for two users",
+    "folder": "/path/to/another/project",
+    "base_branch": "main",
+    "team": null,
+    "allowed_external_paths": [],
+    "docker_commit": true,
+    "docker_socket": true,
+    "created": "2026-01-01T00:00:00.000000"
+  }
+]

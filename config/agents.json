@@ -1,0 +1,168 @@
+[
+  {
+    "name": "Google Play Test",
+    "users": ["Avi", "Play"],
+    "description": "Google Play Test",
+    "folder": "/home/avi/git/private/google-play-test",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "docker_socket": false,
+    "docker_commit": false,
+    "created": "2026-03-07T16:23:15.367250"
+  },
+
+  {
+    "name": "climbing_show",
+    "users": ["Avi", "Avi-comp"],
+    "description": "climbing show 1",
+    "folder": "/home/avi/git/private/climbing_show/",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/climbing_show/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/climbing_show/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-07T16:23:15.367250"
+  },
+  {
+    "name": "home_finder",
+    "users": ["Avi", "Avi-comp"],
+    "description": "home finder",
+    "folder": "/home/avi/git/private/home_finder/",
+    "base_branch": "master",
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/home_finder/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/home_finder/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-07T16:24:22.193123"
+  },
+  {
+    "name": "excel_debugger",
+    "users": ["Avi", "Avi-comp"],
+    "description": "Excel debugger",
+    "folder": "/home/avi/git/private/excel_debugger/",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/excel_debugger/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/excel_debugger/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-07T16:24:22.193123"
+  },
+  {
+    "name": "klod_talk",
+    "users": ["Avi", "Avi-comp", "Work"],
+    "description": "klod talk",
+    "folder": "/home/avi/git/private/klod_talk",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/klod_talk/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/klod_talk/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-07T16:23:38.650121"
+  },
+  {
+    "name": "cartica_conversions",
+    "users": ["Avi", "Work"],
+    "description": "cartica conversions and utils",
+    "folder": "/home/avi/git/cartica/",
+    "repos": [
+      { "path": "Cartica-Conversions", "base_branch": "dev" },
+      { "path": "Cartica-Releases",    "base_branch": "dev" },
+      { "path": "Cartica-Services",    "base_branch": "dev" },
+      { "path": "Cartica-Utils",       "base_branch": "dev" }
+    ],
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/cartica_conversions/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/cartica_conversions/out", "writable": true, "results": true},
+      {"path": "/home/avi/data", "writable": true}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  },
+  {
+    "name": "cartica_releases",
+    "users": ["Avi", "Work"],
+    "description": "cartica release",
+    "folder": "/home/avi/git/cartica/",
+    "repos": [
+      { "path": "Cartica-Releases", "base_branch": "dev" },
+      { "path": "Cartica-Utils",       "base_branch": "dev" }
+    ],
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/cartica_releases/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/cartica_releases/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  },
+  {
+    "name": "cartica_Autobrains-Networks",
+    "users": ["Avi", "Work"],
+    "description": "cartica Autobrains-Networks",
+    "folder": "/home/avi/git/cartica/",
+    "repos": [
+      { "path": "AutoBrains-Networks",  "base_branch": "dev" },
+      { "path": "Cartica-Conversions",  "base_branch": "dev" },
+      { "path": "Cartica-Utils",        "base_branch": "dev" }
+    ],
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/cartica_Autobrains-Networks/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/cartica_Autobrains-Networks/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  },
+  {
+    "name": "cartica_Renesas",
+    "users": ["Avi", "Work"],
+    "description": "cartica Renesas",
+    "folder": "/home/avi/git/cartica/",
+    "repos": [
+      { "path": "Cartica-Renesas",              "base_branch": "dev" },
+      { "path": "Cartica-Conversions",          "base_branch": "dev" },
+      { "path": "Cartica-Utils",                "base_branch": "dev" }
+    ],
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/cartica_Renesas/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/cartica_Renesas/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  },
+  {
+    "name": "ab-netron",
+    "users": ["Avi", "Work"],
+    "description": "ab-netron",
+    "folder": "/home/avi/git/cartica/ab-netron",
+    "base_branch": "main",
+    "team": "plan-code-review",
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/ab-netron/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/ab-netron/out", "writable": true, "results": true}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  },
+  {
+    "name": "ti",
+    "users": ["Avi", "Work"],
+    "description": "ti",
+    "folder": "/home/avi/git/ti/10.1",
+    "repos": [
+      { "path": "ti-firmware-builder-am62axx-evm-10_01_00_04", "base_branch": "master" },
+      { "path": "Cartica-Conversions", "base_branch": "dev" },
+      { "path": "Cartica-Utils",       "base_branch": "dev" }
+    ],
+    "team": "plan-code-review-execute",
+    "docker_socket": false,
+    "allowed_external_paths": [
+      {"path": "/home/avi/Documents/KlodTalk/ti/in", "writable": false},
+      {"path": "/home/avi/Documents/KlodTalk/ti/out", "writable": true, "results": true},
+      {"path": "/home/avi/data", "writable": true},
+      {"path": "/home/avi/git/ti/10.1/edgeai-tidl-tools/", "writable": false}
+    ],
+    "created": "2026-03-12T16:24:22.193123"
+  }
+]

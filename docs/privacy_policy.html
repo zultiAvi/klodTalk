@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KlodTalk — Privacy Policy</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: #fff;
+        }
+        h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+        h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #ddd; padding-bottom: 0.3rem; }
+        p, li { font-size: 0.95rem; }
+        ul { padding-left: 1.25rem; }
+        .updated { color: #666; font-size: 0.85rem; margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+    <h1>KlodTalk — Privacy Policy</h1>
+    <p class="updated">Last updated: March 20, 2026</p>
+
+    <h2>Introduction</h2>
+    <p>KlodTalk is a voice-first interface for communicating with AI agents running on your own local network. This policy explains how the app handles your data.</p>
+
+    <h2>Microphone &amp; Speech Recognition</h2>
+    <p>KlodTalk requests the <strong>RECORD_AUDIO</strong> (microphone) permission solely to power Android's built-in speech-to-text engine (<code>SpeechRecognizer</code> API). Specifically:</p>
+    <ul>
+        <li><strong>No audio is recorded or stored.</strong> The microphone stream is consumed entirely by Android's on-device speech recognizer.</li>
+        <li><strong>No audio is transmitted.</strong> Neither raw audio nor any audio-derived data is sent to any server, third party, or external service.</li>
+        <li>Only the <strong>resulting transcribed text</strong> is used by the app.</li>
+    </ul>
+
+    <h2>Network Communication</h2>
+    <p>The transcribed text is sent over a <strong>WebSocket connection to a server on your own local network</strong>, configured entirely by you (IP address and port). KlodTalk does not connect to any external or cloud-based servers. No data leaves your local network through the app.</p>
+
+    <h2>Data Collection</h2>
+    <p>KlodTalk does <strong>not</strong> collect, store, or transmit any personal data. In particular:</p>
+    <ul>
+        <li>No analytics or usage tracking.</li>
+        <li>No advertising or ad-related SDKs.</li>
+        <li>No third-party SDKs that collect user data.</li>
+        <li>No crash reporting sent to external services.</li>
+    </ul>
+    <p>Connection settings (server address, username) are stored locally on your device using Android's SharedPreferences and never leave the device.</p>
+
+    <h2>Third-Party Services</h2>
+    <p>KlodTalk does not integrate with any third-party services. The only network communication is the WebSocket connection to your self-hosted local server.</p>
+
+    <h2>Children's Privacy</h2>
+    <p>KlodTalk is not directed at children under 13 and does not knowingly collect data from children.</p>
+
+    <h2>Changes to This Policy</h2>
+    <p>Updates to this privacy policy will be posted on this page with a revised "Last updated" date.</p>
+
+    <h2>Contact</h2>
+    <p>If you have questions about this privacy policy, contact: <strong>[YOUR EMAIL]</strong></p>
+</body>
+</html>

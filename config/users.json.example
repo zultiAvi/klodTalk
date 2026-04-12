@@ -1,0 +1,6 @@
+{
+  "alice": {
+    "password_hash": "<sha256 hex — set via helpers/add_user.py>",
+    "created": "2026-01-01T00:00:00.000000"
+  }
+}

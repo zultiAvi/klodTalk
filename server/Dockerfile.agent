@@ -1,0 +1,59 @@
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install host CA certificates early (includes corporate CA for SSL inspection).
+# host-ca-certificates.crt is copied from the build host by docker_build.sh.
+COPY server/host-ca-certificates.crt /usr/local/share/ca-certificates/host-ca.crt
+RUN update-ca-certificates
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-yaml \
+    git \
+    curl \
+    wget \
+    ca-certificates \
+    openssh-client \
+    jq \
+    inotify-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI from Ubuntu repos (avoids external curl/SSL issues on corporate networks)
+RUN apt-get update && apt-get install -y docker.io docker-compose \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20 LTS (Ubuntu's default nodejs is too old for Claude Code)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @anthropic-ai/claude-code
+
+RUN git config --global --add safe.directory '*'
+
+RUN mkdir -p /workspace /agent \
+    && useradd -m -u 1000 -s /bin/bash agent \
+    && chown -R agent:agent /workspace /agent
+
+RUN chmod 666 /etc/passwd && chmod 666 /etc/group && chmod 777 /home/agent
+
+COPY server/agent_entrypoint.sh /agent/entrypoint.sh
+COPY server/run_agent.sh /agent/run_agent.sh
+COPY server/run_agent.py /agent/run_agent.py
+# Strip Windows CRLF line endings that break shebangs on Linux, then set permissions
+RUN find /agent \( -name "*.sh" -o -name "*.py" \) -exec sed -i 's/\r$//' {} \; \
+    && chmod +x /agent/entrypoint.sh /agent/run_agent.sh /agent/run_agent.py
+
+RUN chown -R agent:agent /workspace /agent
+
+WORKDIR /workspace
+
+ENV PYTHONPATH=/agent
+ENV HOME=/home/agent
+
+USER agent
+
+ENTRYPOINT ["/agent/entrypoint.sh"]

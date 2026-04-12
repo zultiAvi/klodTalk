@@ -1,0 +1,59 @@
+# Docker build temp files
+server/host-ca-certificates.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+.env
+
+# Android
+*.iml
+.gradle/
+local.properties
+# Release signing (KlodTalk project root)
+clients/android/keystore.properties
+*.jks
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+clients/android/**/build/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+.cursor/
+
+# Credentials
+config/users.json
+config/projects.json
+keystore.properties
+
+# Runtime state (inside .klodTalk/state/, covered by .klodTalk/ pattern)
+# Legacy locations kept for safety
+.klodTalk/
+
+# Runtime temp files
+/tmp/klodtalk/
+
+# OS
+.DS_Store
+Thumbs.db
+
+

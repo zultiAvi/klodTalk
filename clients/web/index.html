@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KlodTalk</title>
+<style>
+  :root {
+    --green: #4CAF50; --red: #F44336; --blue: #1976D2; --amber: #FF8C00;
+    --bg: #121212; --surface: #1e1e1e; --surface2: #252525; --text: #e0e0e0; --muted: #888;
+    --radius: 12px;
+    --msg-user: #1a3d1a;
+    --msg-agent: #1a2a3d;
+    --msg-system: #252525;
+    --msg-review: #2a1a3d;
+    --msg-progress: #1e1e1e;
+    --msg-planner: #2a1e0a;
+    --msg-coder: #0a2a2a;
+    --msg-idea: #2a1e0a;
+    --msg-idea_review: #2a1a3d;
+    --msg-final_plan: #2a1e0a;
+    --msg-idea_history: #0a2a2a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+  }
+  header {
+    background: #1a1a2e; color: #fff; padding: 12px 20px 8px;
+    display: flex; flex-direction: column; gap: 6px;
+    position: sticky; top: 0; z-index: 10; border-bottom: 1px solid #333;
+  }
+  .header-main-row { display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 20px; font-weight: 600; cursor: pointer; }
+  .header-title-block { display: flex; flex-direction: column; gap: 0; }
+  .header-user-label { font-size: 11px; color: rgba(255,255,255,0.55); }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .header-btn {
+    background: none; border: none; color: #fff; cursor: pointer;
+    font-size: 20px; padding: 6px 10px; border-radius: 6px;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.15); }
+  .badge {
+    position: absolute; top: -4px; right: -4px; background: var(--red);
+    color: #fff; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px;
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    padding: 0 3px;
+  }
+  .header-btn { position: relative; }
+  .page { flex: 1; display: flex; flex-direction: column; }
+  .page.hidden { display: none !important; }
+
+  /* ── Settings ── */
+  #page-settings { padding: 24px 20px; overflow-y: auto; }
+  .settings-form { max-width: 400px; margin: 0 auto; }
+  .settings-form label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--muted); text-align: left; }
+  .settings-form input {
+    width: 100%; padding: 10px 14px; border: 1px solid #444; border-radius: var(--radius);
+    font-size: 15px; margin-bottom: 14px; background: var(--surface); color: var(--text);
+    text-align: left;
+  }
+  .settings-title { font-size: 22px; font-weight: 700; margin-bottom: 24px; text-align: left; }
+  .wss-hint {
+    background: #2a2000; border: 1px solid var(--amber); border-radius: var(--radius);
+    padding: 10px 14px; font-size: 13px; line-height: 1.5; margin-bottom: 14px; color: #e0c060;
+  }
+  .wss-hint.hidden { display: none; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 22px; border: none; border-radius: var(--radius); cursor: pointer;
+    font-size: 15px; font-weight: 500; color: #fff; transition: opacity 0.15s;
+    text-align: left;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-green { background: var(--green); }
+  .btn-red { background: var(--red); }
+  .btn-blue { background: var(--blue); }
+  .btn-amber { background: var(--amber); }
+  .btn-outline { background: none; border: 1.5px solid #555; color: var(--text); }
+  .btn-full { width: 100%; }
+  .btn-small { padding: 7px 14px; font-size: 13px; }
+
+  /* ── Sessions screen ── */
+  #page-sessions { padding: 16px 0; overflow-y: auto; }
+  .sessions-header { padding: 0 16px 12px; display: flex; align-items: center; gap: 10px; }
+  .sessions-title { font-size: 18px; font-weight: 600; flex: 1; text-align: left; }
+  .btn-add-session {
+    background: var(--green); color: #fff; border: none; border-radius: 50%;
+    width: 40px; height: 40px; font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .session-item {
+    padding: 14px 16px; border-bottom: 1px solid #2a2a2a; cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    transition: background 0.15s;
+    position: relative; z-index: 1;
+    background: var(--bg, #1a1a1a);
+  }
+  .session-item:hover { background: var(--surface); }
+  .session-item.unread-active { background: rgba(255, 193, 7, 0.07); }
+  .session-item.unread-active:hover { background: rgba(255, 193, 7, 0.12); }
+  .session-item.unread-closed { background: rgba(255, 193, 7, 0.22); }
+  .session-item.unread-closed:hover { background: rgba(255, 193, 7, 0.28); }
+  .session-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .session-dot.closed { background: #222; border: 1.5px solid #555; }
+  .session-dot.working { background: #2196F3; }
+  .session-dot.unread { background: #FFC107; }
+  .session-info { flex: 1; min-width: 0; text-align: left; }
+  .session-name { font-weight: 600; font-size: 14px; text-align: left; }
+  .session-name.unread { color: #fff; }
+  .session-branch { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: left; }
+  .session-time { font-size: 11px; color: var(--muted); text-align: left; }
+  .session-tokens { font-size: 11px; color: var(--muted); text-align: left; }
+  .session-close-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 18px; padding: 4px 8px; border-radius: 6px;
+  }
+  .session-close-btn:hover { background: #333; color: var(--red); }
+  .session-delete-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 6px;
+  }
+  .session-delete-btn:hover { background: #333; color: var(--red); }
+  .session-reopen-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 0.85rem; font-weight: bold; padding: 4px 8px; border-radius: 6px;
+  }
+  .session-reopen-btn:hover { background: #333; color: #2196F3; }
+  .unread-badge {
+    background: var(--red); color: #fff; font-size: 10px; font-weight: 700;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
+  }
+
+  /* ── History screen ── */
+  #page-history { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+  .history-topbar {
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid #333;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .history-back { background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+  .history-session-info { flex: 1; text-align: left; }
+  .history-project-name { font-weight: 600; font-size: 14px; text-align: left; }
+  .history-branch { font-size: 11px; color: var(--muted); text-align: left; }
+  .history-status { font-size: 11px; text-align: left; }
+  .history-status.active { color: var(--green); }
+  .history-status.closed { color: #888; }
+  .history-tokens { font-size: 11px; color: var(--muted); text-align: left; }
+  .history-times { font-size: 11px; color: var(--muted); text-align: left; }
+  .history-close-btn {
+    background: none; border: none; color: var(--muted); font-size: 18px;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px; flex-shrink: 0;
+  }
+  .history-close-btn:hover { color: var(--red); background: rgba(244,67,54,0.1); }
+  .messages-list {
+    flex: 1; overflow-y: auto; padding: 4px 0; min-height: 0;
+  }
+  .msg-row {
+    padding: 4px 8px; display: flex; align-items: baseline; gap: 8px;
+  }
+  .msg-row.user      { margin-left: 0; }
+  .msg-row.progress  { margin-left: 10ch; }
+  .msg-row.planner   { margin-left: 15ch; }
+  .msg-row.agent     { margin-left: 20ch; }
+  .msg-row.coder     { margin-left: 20ch; }
+  .msg-row.idea      { margin-left: 15ch; }
+  .msg-row.review    { margin-left: 25ch; }
+  .msg-row.idea_review { margin-left: 25ch; }
+  .msg-row.final_plan  { margin-left: 15ch; }
+  .msg-row.idea_history { margin-left: 20ch; }
+  .msg-row.system    { margin-left: 10ch; }
+  .msg-row.msg-hidden { display: none; }
+  .msg-bubble {
+    flex: 1; min-width: 0; padding: 2px 8px; border-radius: 6px;
+    font-size: 13px; line-height: 1.4; text-align: left; word-break: break-word;
+    white-space: pre-wrap; margin-bottom: 2px;
+  }
+  .msg-row.user .msg-bubble { background: var(--msg-user); color: #c8e6c9; border-left: 3px solid #388e3c; }
+  .msg-row.agent .msg-bubble { background: var(--msg-agent); color: #bbdefb; border-left: 3px solid #1565c0; }
+  .msg-row.review .msg-bubble { background: var(--msg-review); color: #e1bee7; border-left: 3px solid #7b1fa2; }
+  .msg-row.progress .msg-bubble { background: var(--msg-progress); font-size: 12px; color: #9e9e9e; }
+  .msg-row.system .msg-bubble { background: var(--msg-system); font-size: 12px; color: #9e9e9e; }
+  .msg-row.planner .msg-bubble { background: var(--msg-planner); color: #ffe0b2; border-left: 3px solid #e65100; }
+  .msg-row.coder .msg-bubble { background: var(--msg-coder); color: #b2dfdb; border-left: 3px solid #00695c; }
+  .msg-row.idea .msg-bubble { background: var(--msg-idea); color: #ffe0b2; border-left: 3px solid #e65100; }
+  .msg-row.idea_review .msg-bubble { background: var(--msg-idea_review); color: #e1bee7; border-left: 3px solid #7b1fa2; }
+  .msg-row.final_plan .msg-bubble { background: var(--msg-final_plan); color: #ffe0b2; border-left: 3px solid #e65100; }
+  .msg-row.idea_history .msg-bubble { background: var(--msg-idea_history); color: #b2dfdb; border-left: 3px solid #00695c; }
+  .msg-copy-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 4px;
+    opacity: 0.5; color: inherit; vertical-align: middle; margin-left: 6px; display: inline;
+  }
+  .msg-copy-btn:hover { opacity: 1; }
+  .msg-copy-btn.copied svg { stroke: #4caf50; }
+  .msg-meta-col { flex-shrink: 0; display: flex; gap: 4px; align-items: baseline; }
+  .msg-meta-col.team-meta { flex-direction: column; align-items: flex-start; gap: 0; }
+  .msg-role-label { font-size: 11px; font-weight: 700; }
+  .msg-role-label.user { color: #66bb6a; }
+  .msg-role-label.agent { color: #64b5f6; }
+  .msg-role-label.review { color: #ce93d8; }
+  .msg-role-label.progress { color: #757575; }
+  .msg-role-label.system { color: #757575; }
+  .msg-role-label.planner { color: #ffb74d; }
+  .msg-role-label.coder { color: #4db6ac; }
+  .msg-role-label.idea { color: #ffb74d; }
+  .msg-role-label.idea_review { color: #ce93d8; }
+  .msg-role-label.final_plan { color: #ffb74d; }
+  .msg-role-label.idea_history { color: #4db6ac; }
+  .msg-time { font-size: 10px; color: #555; }
+  .msg-time-team { font-size: 10px; color: #666; margin-top: 1px; }
+  .msg-collapse-btn { cursor: pointer; font-size: 10px; color: #555; user-select: none; padding: 0 2px; }
+  .msg-collapse-btn:hover { color: #aaa; }
+
+  .history-input-area {
+    padding: 10px 12px; background: var(--surface); border-top: 1px solid #333;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .history-textarea {
+    width: 100%; padding: 10px 12px; background: var(--surface2); color: var(--text);
+    border: 1px solid #444; border-radius: 10px; font-size: 14px; resize: none;
+    min-height: calc(3 * 1.4em + 20px); max-height: calc(10 * 1.4em + 20px);
+    line-height: 1.4; font-family: inherit; text-align: left; overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .history-textarea:focus { outline: none; border-color: var(--blue); }
+  .history-btn-row { display: flex; gap: 8px; align-items: center; }
+  .mic-btn {
+    background: var(--surface2); border: 1px solid #444; color: var(--text);
+    border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 18px;
+  }
+  .mic-btn.listening { background: var(--red); color: #fff; border-color: var(--red); }
+  .session-closed-notice {
+    text-align: left; color: var(--muted); font-size: 13px; padding: 12px 0;
+  }
+
+  /* ── Diff panel ── */
+  .diff-btn {
+    background: none; border: none; color: var(--muted); font-size: 14px;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px; flex-shrink: 0;
+  }
+  .diff-btn:hover { color: var(--blue); background: rgba(25,118,210,0.1); }
+  .diff-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .diff-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; flex-direction: column; z-index: 200;
+  }
+  .diff-overlay.hidden { display: none; }
+  .diff-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #1a1a2e; border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  .diff-header-title { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; }
+  .diff-toolbar {
+    display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end;
+  }
+  .diff-toolbar-btn {
+    background: none; border: 1px solid #555; color: #ccc; font-size: 12px;
+    padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  }
+  .diff-toolbar-btn:hover { background: rgba(255,255,255,0.1); }
+  #diff-file-count { font-size: 12px; color: var(--muted); margin-right: 8px; }
+  .diff-commit-btn {
+    background: var(--green); color: #fff; border: none; font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 6px; cursor: pointer;
+  }
+  .diff-commit-btn:hover { opacity: 0.85; }
+  .diff-commit-btn.hidden { display: none; }
+  .diff-close-btn {
+    background: none; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; padding: 4px 10px; border-radius: 6px; flex-shrink: 0;
+  }
+  .diff-close-btn:hover { background: rgba(255,255,255,0.15); }
+  .diff-content {
+    flex: 1; overflow-y: auto; padding: 12px; background: #0d0d0d;
+  }
+  .diff-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; font-family: inherit; }
+
+  /* Per-file boxes */
+  .diff-file-box {
+    border: 1px solid #333; border-radius: 8px; margin-bottom: 12px; overflow: hidden;
+    background: #111;
+  }
+  .diff-file-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; background: #1a1a2e; cursor: pointer; user-select: none;
+  }
+  .diff-file-header.viewed { opacity: 0.45; }
+  .diff-file-path {
+    flex: 1; font-family: 'Menlo', 'Consolas', monospace; font-size: 13px; color: #e0e0e0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .diff-file-toggle {
+    font-size: 12px; color: var(--muted); background: none; border: 1px solid #555;
+    padding: 2px 8px; border-radius: 4px; cursor: pointer; white-space: nowrap;
+  }
+  .diff-file-toggle:hover { color: #fff; border-color: #888; }
+  .diff-file-body { overflow-x: auto; }
+  .diff-file-body.collapsed { display: none; }
+
+  /* Side-by-side table */
+  .diff-table {
+    width: 100%; border-collapse: collapse;
+    font-family: 'Menlo', 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.5;
+    table-layout: fixed;
+  }
+  .diff-table td { padding: 0 6px; vertical-align: top; white-space: pre-wrap; word-break: break-all; }
+  .diff-line-num {
+    width: 44px; min-width: 44px; text-align: right; color: #555; padding-right: 8px;
+    user-select: none; border-right: 1px solid #2a2a2a;
+  }
+  .diff-cell-old, .diff-cell-new { width: calc(50% - 44px); }
+  .diff-cell-old { border-right: 1px solid #2a2a2a; }
+  .diff-cell-del { background: rgba(244,67,54,0.12); color: #f88; }
+  .diff-cell-add { background: rgba(76,175,80,0.12); color: #8d8; }
+  .diff-cell-ctx { color: #888; }
+  .diff-cell-empty { background: #0a0a0a; }
+  .diff-hunk-header {
+    background: rgba(100,181,246,0.08); color: #64b5f6; font-weight: 600; font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Revert button */
+  .diff-hunk-row { position: relative; }
+  .diff-revert-btn {
+    display: none; position: absolute; left: 4px; top: 2px;
+    background: var(--red); color: #fff; border: none; font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 4px; cursor: pointer; z-index: 5;
+  }
+  .diff-hunk-row:hover .diff-revert-btn { display: inline-block; }
+  .diff-hunk-reverted { opacity: 0.3; pointer-events: none; }
+  .diff-hunk-reverted .diff-revert-btn { display: none; }
+
+  /* ── Agent picker modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal-box {
+    background: var(--surface); border-radius: var(--radius); padding: 24px 20px;
+    width: 90%; max-width: 360px;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; text-align: left; }
+  .modal-project-list { max-height: 260px; overflow-y: auto; }
+  .modal-project-item {
+    padding: 12px 14px; border-radius: 8px; cursor: pointer; margin-bottom: 6px;
+    background: var(--surface2); text-align: left;
+  }
+  .modal-project-item:hover { background: #333; }
+  .modal-project-name { font-weight: 600; font-size: 14px; text-align: left; }
+  .modal-project-desc { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: left; }
+  .modal-cancel { margin-top: 12px; width: 100%; }
+
+  /* ── Status/empty states ── */
+  .empty-state {
+    text-align: left; padding: 40px 24px; color: var(--muted); font-size: 14px;
+  }
+  .status-bar {
+    text-align: left; font-size: 12px; color: var(--muted); padding: 6px 16px;
+    border-bottom: 1px solid #222;
+  }
+  .status-bar.connected { color: var(--green); }
+  .status-bar.error { color: var(--red); }
+
+  /* ── Session preparing / just-created states ── */
+  .session-item.preparing {
+    opacity: 0.65;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .session-dot.preparing-spin {
+    background: transparent;
+    border: 2px solid #666;
+    border-top-color: #ccc;
+    animation: dot-spin 0.8s linear infinite;
+  }
+  @keyframes dot-spin {
+    to { transform: rotate(360deg); }
+  }
+  /* ── Session closing state ── */
+  .session-item.closing {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .session-dot.closing-spin {
+    background: transparent;
+    border: 2px solid #666;
+    border-top-color: #ccc;
+    animation: dot-spin 0.8s linear infinite;
+  }
+  .session-dot.just-created {
+    background: #00ff88;
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7);
+    animation: glow-pulse 1.5s ease-out forwards;
+  }
+  @keyframes glow-pulse {
+    0%   { box-shadow: 0 0 10px 5px rgba(0, 255, 136, 0.7); }
+    100% { box-shadow: 0 0 4px 1px rgba(0, 255, 136, 0.2); }
+  }
+
+  /* ── Confirm dialog ── */
+  .confirm-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center; z-index: 200;
+  }
+  .confirm-overlay.hidden { display: none; }
+  .confirm-box {
+    background: var(--surface); border-radius: var(--radius); padding: 24px 20px;
+    width: 90%; max-width: 340px;
+  }
+  .confirm-msg { font-size: 15px; margin-bottom: 20px; text-align: left; }
+  .confirm-btns { display: flex; gap: 10px; justify-content: flex-end; }
+  .spinner { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* ── Swipe-to-delete for closed sessions ── */
+  .session-item-wrapper {
+    position: relative;
+    overflow: hidden;
+  }
+  .session-item-wrapper .delete-bg {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 1.2rem;
+    color: white;
+    font-size: 0.85rem;
+    font-weight: bold;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .session-item.swiping {
+    transition: none;
+  }
+  .session-item.swipe-exit {
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+
+  /* ── Token usage bars ── */
+  .session-token-bar {
+    display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    padding: 5px 16px; background: rgba(0,0,0,0.25); border-bottom: 1px solid #2a2a3e;
+    font-size: 12px; color: var(--muted);
+  }
+  .session-token-bar b { color: var(--text); }
+  #weekly-usage-bar { width: 100%; }
+  .usage-bar-track {
+    height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; width: 100%;
+  }
+  .usage-bar-fill {
+    height: 100%; border-radius: 3px; width: 0%;
+    transition: width 0.4s ease, background-color 0.4s ease;
+  }
+  .usage-bar-labels {
+    display: flex; justify-content: space-between; font-size: 10px;
+    color: rgba(255,255,255,0.45); margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-main-row">
+    <div class="header-title-block">
+      <h1 onclick="goToSessions()">KlodTalk</h1>
+      <span id="header-user" class="header-user-label"></span>
+    </div>
+    <div class="header-actions">
+      <button class="header-btn" id="btn-refresh" onclick="refreshHistory()" title="Refresh">↻</button>
+      <button class="header-btn" id="btn-settings" onclick="showPage('settings')" title="Settings">⚙</button>
+    </div>
+  </div>
+  <div id="weekly-usage-bar" style="display:none;">
+    <div class="usage-bar-track">
+      <div id="usage-fill" class="usage-bar-fill"></div>
+    </div>
+    <div class="usage-bar-labels">
+      <span id="usage-label"></span>
+      <span id="usage-reset"></span>
+    </div>
+  </div>
+  <div id="all-users-bar" style="display:none; font-size:11px; color:var(--muted); padding:2px 0 0;">
+    <div id="au-you-row">You: <span id="au-you-in">—</span> in / <span id="au-you-out">—</span> out · <span id="au-you-cost">—</span></div>
+    <div id="au-all-row">All: <span id="au-all-in">—</span> in / <span id="au-all-out">—</span> out · <span id="au-all-cost">—</span></div>
+  </div>
+</header>
+
+<!-- Status bar -->
+<div class="status-bar" id="status-bar">Not connected</div>
+
+<!-- Settings page -->
+<div class="page hidden" id="page-settings">
+  <div style="padding: 24px 20px;">
+    <div class="settings-title">Settings</div>
+    <div class="settings-form">
+      <label>Server IP</label>
+      <input id="cfg-ip" type="text" placeholder="192.168.1.100" autocapitalize="none">
+      <label>Port</label>
+      <input id="cfg-port" type="number" placeholder="9000">
+      <label>Protocol</label>
+      <select id="cfg-proto" onchange="toggleWssHint()">
+        <option value="ws">ws:// (no SSL)</option>
+        <option value="wss">wss:// (SSL / self-signed cert)</option>
+      </select>
+      <div id="wss-hint" class="wss-hint hidden">
+        <strong>Before connecting with wss://:</strong> Open
+        <a id="wss-hint-link" href="#" target="_blank" style="color:var(--amber)">https://&lt;server-ip&gt;:9000</a>
+        in a new tab and click <em>Advanced → Proceed anyway</em> to trust the self-signed certificate.
+        Without this step, the browser will silently refuse the WSS connection.
+      </div>
+      <label>Username</label>
+      <input id="cfg-name" type="text" autocapitalize="none">
+      <label>Password</label>
+      <input id="cfg-pass" type="password">
+      <label>Weekly token budget (input tokens)</label>
+      <input id="cfg-weekly-limit" type="number" placeholder="1000000" onchange="onWeeklyLimitChange()">
+      <button class="btn btn-blue btn-full" onclick="saveAndConnect()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sessions page -->
+<div class="page hidden" id="page-sessions">
+  <div class="sessions-header">
+    <span class="sessions-title">Sessions</span>
+    <button class="btn-add-session" onclick="openProjectPicker()" title="New session">+</button>
+  </div>
+  <div id="sessions-list">
+    <div class="empty-state">No sessions yet. Tap + to start one.</div>
+  </div>
+</div>
+
+<!-- History page -->
+<div class="page hidden" id="page-history">
+  <div class="history-topbar">
+    <button class="history-back" onclick="goToSessions()">←</button>
+    <div class="history-session-info">
+      <div class="history-project-name" id="history-project-name">—</div>
+      <div class="history-branch" id="history-branch">—</div>
+      <div class="history-status" id="history-status">—</div>
+      <div class="history-times" id="history-times" style="display:none;">Created: <span id="ht-created">—</span> · Modified: <span id="ht-modified">—</span></div>
+      <div class="history-tokens" id="history-tokens" style="display:none;">In: <b id="st-in">—</b> · Out: <b id="st-out">—</b> · <b id="st-cost">—</b></div>
+    </div>
+    <button class="diff-btn" id="history-diff-btn" onclick="requestDiff()" title="Show Diff">Diff</button>
+    <button class="history-close-btn hidden" id="history-close-btn" onclick="promptCloseSession(currentSessionId)" title="Close session">✕</button>
+  </div>
+  <div class="messages-list" id="messages-list"></div>
+  <div class="history-input-area" id="history-input-area">
+    <textarea class="history-textarea" id="msg-input" placeholder="Type a message or use the mic..." spellcheck="true"></textarea>
+    <div class="history-btn-row">
+      <select id="team-select" onchange="onTeamSelect(this.value)" style="background:var(--surface2);color:var(--text);border:1px solid #444;border-radius:6px;padding:4px 8px;font-size:12px;max-width:160px;"></select>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()" title="Voice input">🎤</button>
+      <button class="btn btn-amber btn-small" id="btn-confirm" onclick="sendMsg('confirm')">Read Back</button>
+      <button class="btn btn-green btn-small" id="btn-execute" style="flex:1;" onclick="sendMsg('execute')">Start Working</button>
+    </div>
+  </div>
+</div>
+
+<!-- Agent picker modal -->
+<div class="modal-overlay hidden" id="project-picker">
+  <div class="modal-box">
+    <div class="modal-title">Choose a Project</div>
+    <div class="modal-project-list" id="project-picker-list"></div>
+    <button class="btn btn-outline modal-cancel" onclick="closeProjectPicker()">Cancel</button>
+  </div>
+</div>
+
+<!-- Diff panel overlay -->
+<div class="diff-overlay hidden" id="diff-panel">
+  <div class="diff-header">
+    <div class="diff-header-title" id="diff-panel-title">Diff</div>
+    <div class="diff-toolbar">
+      <span id="diff-file-count"></span>
+      <button class="diff-toolbar-btn" onclick="diffExpandAll()">Expand All</button>
+      <button class="diff-toolbar-btn" onclick="diffCollapseAll()">Collapse All</button>
+      <button class="diff-commit-btn hidden" id="diff-commit-btn" onclick="commitAndPush()">Commit &amp; Push</button>
+    </div>
+    <button class="diff-close-btn" onclick="closeDiffPanel()">&#10005;</button>
+  </div>
+  <div class="diff-content" id="diff-panel-content"></div>
+</div>
+
+<!-- Confirm close session dialog -->
+<div class="confirm-overlay hidden" id="confirm-close">
+  <div class="confirm-box">
+    <div class="confirm-msg" id="confirm-close-msg">Close this session?</div>
+    <div class="confirm-btns">
+      <button class="btn btn-outline btn-small" onclick="cancelConfirm()">Cancel</button>
+      <button class="btn btn-red btn-small" id="confirm-close-ok" onclick="confirmClose()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm stop agent dialog -->
+<div class="confirm-overlay hidden" id="confirm-stop">
+  <div class="confirm-box">
+    <div class="confirm-msg">Stop the process?</div>
+    <div class="confirm-btns">
+      <button class="btn btn-outline btn-small" onclick="cancelStopConfirm()">Cancel</button>
+      <button class="btn btn-red btn-small" onclick="doStop()">Stop</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let ws = null;
+let projects = [];
+let sessions = {}; // session_id → session object
+let sessionMessages = {}; // session_id → message[]
+let unreadSessions = new Set();
+let currentSessionId = null;
+let isConnected = false;
+let pendingCloseSessionId = null;
+let preparingSessions = {}; // temp_id → { project, tempId }
+let justCreatedSessions = new Set(); // session_ids with active glow
+
+let collapsedGroups = new Set();
+let workingSessions = new Set(); // session_ids currently being processed by the agent
+let projectTeams = {};      // agentName → {default: "plan-code-review", available: [{name, description}, ...]}
+let selectedTeam = {};    // sessionId → selected team name (empty = use default)
+
+let sessionTokens = {}; // session_id → { inputTokens, outputTokens, costUsd }
+let weeklyUsage = { weekStart: '', inputTokens: 0, outputTokens: 0, costUsd: 0 };
+let weeklyLimit = 1000000;
+let usageSummary = null; // { per_user: {...}, all_users: {...} } from server
+
+let speechRec = null;
+let isListening = false;
+let finalText = '';
+let partialText = '';
+
+// ── Persistence ────────────────────────────────────────────────────────────
+function savePref(k, v) { localStorage.setItem('kt_' + k, v); }
+function loadPref(k, d) { return localStorage.getItem('kt_' + k) || d; }
+
+function saveState() {
+  try {
+    localStorage.setItem('kt_sessions', JSON.stringify(sessions));
+    localStorage.setItem('kt_messages', JSON.stringify(sessionMessages));
+    localStorage.setItem('kt_unread', JSON.stringify([...unreadSessions]));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const s = localStorage.getItem('kt_sessions');
+    if (s) sessions = JSON.parse(s);
+    const m = localStorage.getItem('kt_messages');
+    if (m) sessionMessages = JSON.parse(m);
+    const u = localStorage.getItem('kt_unread');
+    if (u) unreadSessions = new Set(JSON.parse(u));
+  } catch(e) {}
+}
+
+// ── Time formatting helpers ───────────────────────────────────────────────
+function formatTime24(d) {
+  return String(d.getHours()).padStart(2,'0') + ':' +
+         String(d.getMinutes()).padStart(2,'0') + ':' +
+         String(d.getSeconds()).padStart(2,'0');
+}
+function formatDateTime24(d) {
+  return d.toLocaleDateString() + ' ' + formatTime24(d);
+}
+
+function saveTokenState() {
+  try {
+    localStorage.setItem('kt_session_tokens', JSON.stringify(sessionTokens));
+    localStorage.setItem('kt_weekly_usage', JSON.stringify(weeklyUsage));
+  } catch(e) {}
+}
+
+function loadTokenState() {
+  try {
+    const st = localStorage.getItem('kt_session_tokens');
+    if (st) sessionTokens = JSON.parse(st);
+    const wu = localStorage.getItem('kt_weekly_usage');
+    if (wu) weeklyUsage = JSON.parse(wu);
+    weeklyLimit = parseInt(loadPref('weekly_limit', '1000000'), 10) || 1000000;
+  } catch(e) {}
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.onload = function() {
+  loadState();
+  loadTokenState();
+  // Rebuild session tokens from stored messages (ensures accuracy after history updates)
+  Object.keys(sessionMessages).forEach(sid => rebuildSessionTokens(sid, false));
+  saveTokenState();
+
+  document.getElementById('cfg-ip').value = loadPref('ip', '');
+  document.getElementById('cfg-port').value = loadPref('port', '9000');
+  document.getElementById('cfg-proto').value = loadPref('proto', 'ws');
+  toggleWssHint();
+  document.getElementById('cfg-name').value = loadPref('name', '');
+  document.getElementById('cfg-pass').value = loadPref('pass', '');
+  document.getElementById('cfg-weekly-limit').value = weeklyLimit;
+
+  updateUsageBar();
+  setInterval(updateUsageBar, 60000); // refresh countdown every minute
+
+  const ip = loadPref('ip', '');
+  const name = loadPref('name', '');
+  if (ip && name) {
+    showPage('sessions');
+    renderSessionsList();
+    connect();
+  } else {
+    showPage('settings');
+  }
+};
+
+// ── Page navigation ────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.getElementById('page-' + name).classList.remove('hidden');
+}
+
+function goToSessions() {
+  currentSessionId = null;
+  showPage('sessions');
+  renderSessionsList();
+}
+
+function goToHistory(sessionId) {
+  currentSessionId = sessionId;
+  const s = sessions[sessionId];
+  if (!s) return;
+
+  document.getElementById('history-project-name').textContent = s.project + ' — ' + sessionId;
+  document.getElementById('history-branch').textContent = '🌿 ' + (s.branch || '—');
+  const statusEl = document.getElementById('history-status');
+  statusEl.textContent = s.status === 'active' ? '● Active' : '○ Closed';
+  statusEl.className = 'history-status ' + s.status;
+
+  const inputArea = document.getElementById('history-input-area');
+  inputArea.style.display = s.status === 'active' ? 'flex' : 'none';
+
+  // Created / last-modified times
+  const timesEl = document.getElementById('history-times');
+  const createdDate = s.created_at ? new Date(s.created_at) : null;
+  if (createdDate) {
+    document.getElementById('ht-created').textContent = formatDateTime24(createdDate);
+    const msgs = sessionMessages[sessionId] || [];
+    const lastMsg = msgs.length ? [...msgs].reverse().find(m => m.role === 'user') || msgs[msgs.length - 1] : null;
+    const modDate = lastMsg && lastMsg.timestamp ? new Date(lastMsg.timestamp) : null;
+    document.getElementById('ht-modified').textContent = modDate ? formatDateTime24(modDate) : '\u2014';
+    timesEl.style.display = '';
+  } else {
+    timesEl.style.display = 'none';
+  }
+
+  // Close button (only for active sessions)
+  const closeBtnEl = document.getElementById('history-close-btn');
+  if (s.status === 'active') {
+    closeBtnEl.classList.remove('hidden');
+  } else {
+    closeBtnEl.classList.add('hidden');
+  }
+
+  // Mark as read
+  if (unreadSessions.has(sessionId)) {
+    unreadSessions.delete(sessionId);
+    saveState();
+    renderSessionsList();
+    if (ws && isConnected) {
+      ws.send(JSON.stringify({ type: 'mark_read', session_id: sessionId }));
+    }
+  }
+
+  showPage('history');
+  renderMessages(sessionId);
+  updateTeamDropdown();
+  updateInputButtons();
+  const _ta = document.getElementById('msg-input');
+  _ta.value = '';
+  autoResizeTextarea(_ta);
+}
+
+// ── WSS hint ──────────────────────────────────────────────────────────────
+function toggleWssHint() {
+  const proto = document.getElementById('cfg-proto').value;
+  const hint = document.getElementById('wss-hint');
+  const link = document.getElementById('wss-hint-link');
+  if (proto === 'wss') {
+    const ip = document.getElementById('cfg-ip').value.trim() || loadPref('ip', '<server-ip>');
+    const port = document.getElementById('cfg-port').value.trim() || loadPref('port', '9000');
+    link.href = `https://${ip}:${port}`;
+    link.textContent = `https://${ip}:${port}`;
+    hint.classList.remove('hidden');
+  } else {
+    hint.classList.add('hidden');
+  }
+}
+
+// ── Connection ─────────────────────────────────────────────────────────────
+function saveAndConnect() {
+  const ip = document.getElementById('cfg-ip').value.trim();
+  const port = document.getElementById('cfg-port').value.trim();
+  const proto = document.getElementById('cfg-proto').value;
+  const name = document.getElementById('cfg-name').value.trim();
+  const pass = document.getElementById('cfg-pass').value;
+  savePref('ip', ip); savePref('port', port); savePref('proto', proto); savePref('name', name); savePref('pass', pass);
+  const wl = parseInt(document.getElementById('cfg-weekly-limit').value, 10);
+  if (wl > 0) { weeklyLimit = wl; savePref('weekly_limit', String(wl)); }
+  connect();
+  showPage('sessions');
+}
+
+function connect() {
+  const ip = loadPref('ip', '');
+  const port = loadPref('port', '9000');
+  const name = loadPref('name', '');
+  const pass = loadPref('pass', '');
+  if (!ip || !name) { setStatus('Not configured', 'error'); return; }
+
+  setStatus('Connecting...', '');
+
+  if (ws) { try { ws.close(); } catch(e) {} }
+
+  const proto = loadPref('proto', 'ws');
+  ws = new WebSocket(`${proto}://${ip}:${port}`);
+
+  ws.onopen = () => {
+    isConnected = true;
+    setStatus('Connected — authenticating...', 'connected');
+    sha256(pass).then(h => {
+      ws.send(JSON.stringify({ type: 'hello', name, password_hash: h }));
+    });
+  };
+
+  ws.onmessage = e => handleMessage(JSON.parse(e.data));
+
+  ws.onclose = ev => {
+    isConnected = false;
+    const msg = ev.code === 4001 ? 'Authentication failed' : 'Disconnected';
+    setStatus(msg, 'error');
+    document.getElementById('header-user').textContent = '';
+  };
+
+  ws.onerror = () => {
+    isConnected = false;
+    const proto = loadPref('proto', 'ws');
+    if (proto === 'wss') {
+      const ip = loadPref('ip', '');
+      const port = loadPref('port', '9000');
+      setStatus(`WSS connection failed — open https://${ip}:${port} in a new tab and accept the self-signed certificate, then retry`, 'error');
+    } else {
+      setStatus('Connection error', 'error');
+    }
+  };
+}
+
+// ── Message handling ───────────────────────────────────────────────────────
+function handleMessage(msg) {
+  switch(msg.type) {
+    case 'projects':
+      projects = msg.projects || [];
+      projects.forEach(a => {
+        projectTeams[a.name] = { default: a.team || '', available: a.available_teams || [] };
+      });
+      setStatus('Connected as ' + loadPref('name', ''), 'connected');
+      document.getElementById('header-user').textContent = 'Connected as ' + loadPref('name', '');
+      break;
+
+    case 'sessions':
+      {
+        const list = msg.sessions || [];
+        const serverIds = new Set(list.map(s => s.session_id));
+        Object.keys(sessions).forEach(id => { if (!serverIds.has(id)) delete sessions[id]; });
+        Object.keys(sessionMessages).forEach(id => { if (!serverIds.has(id)) delete sessionMessages[id]; });
+        Object.keys(sessionTokens).forEach(id => { if (!serverIds.has(id)) delete sessionTokens[id]; });
+        unreadSessions = new Set([...unreadSessions].filter(id => serverIds.has(id)));
+        workingSessions.clear();
+        list.forEach(s => {
+          sessions[s.session_id] = s;
+          if (!sessionMessages[s.session_id]) sessionMessages[s.session_id] = [];
+          if (s.working) workingSessions.add(s.session_id);
+        });
+        (msg.unread || []).forEach(id => unreadSessions.add(id));
+        if (currentSessionId && !serverIds.has(currentSessionId)) {
+          currentSessionId = null;
+          showPage('sessions');
+        }
+      }
+      saveState();
+      saveTokenState();
+      renderSessionsList();
+      updateInputButtons();
+      break;
+
+    case 'session_preparing':
+      preparingSessions[msg.temp_id] = { project: msg.project, tempId: msg.temp_id };
+      renderSessionsList();
+      break;
+
+    case 'session_created':
+      if (msg.temp_id && preparingSessions[msg.temp_id]) {
+        delete preparingSessions[msg.temp_id];
+      }
+      sessions[msg.session_id] = {
+        session_id: msg.session_id,
+        project: msg.project,
+        branch: msg.branch,
+        status: msg.status || 'active',
+        created_at: msg.created_at,
+      };
+      sessionMessages[msg.session_id] = [];
+      justCreatedSessions.add(msg.session_id);
+      setTimeout(() => {
+        justCreatedSessions.delete(msg.session_id);
+        renderSessionsList();
+      }, 3000);
+      saveState();
+      renderSessionsList();
+      goToHistory(msg.session_id);
+      break;
+
+    case 'session_closing':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].status = 'closing';
+        saveState();
+        renderSessionsList();
+      }
+      break;
+
+    case 'session_closed':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].status = 'closed';
+        saveState();
+        renderSessionsList();
+        if (currentSessionId === msg.session_id) {
+          document.getElementById('history-status').textContent = '○ Closed';
+          document.getElementById('history-status').className = 'history-status closed';
+          document.getElementById('history-input-area').style.display = 'none';
+          document.getElementById('history-close-btn').classList.add('hidden');
+        }
+      }
+      break;
+
+    case 'session_reopening':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].status = 'reopening';
+        saveState();
+        renderSessionsList();
+      }
+      break;
+
+    case 'session_reopened':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].status = 'active';
+        delete sessions[msg.session_id].closed_at;
+        saveState();
+        renderSessionsList();
+        if (currentSessionId === msg.session_id) {
+          document.getElementById('history-status').textContent = '● Active';
+          document.getElementById('history-status').className = 'history-status active';
+          document.getElementById('history-input-area').style.display = 'flex';
+          document.getElementById('history-close-btn').classList.remove('hidden');
+        }
+      }
+      break;
+
+    case 'new_message': {
+      const sid = msg.session_id;
+      if (!sessionMessages[sid]) sessionMessages[sid] = [];
+      const _entry = {
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp || new Date().toISOString(),
+      };
+      if (msg.model) _entry.model = msg.model;
+      if (msg.team) _entry.team = msg.team;
+      sessionMessages[sid].push(_entry);
+      // Token tracking — only for live messages (not history), only non-user roles carry token summaries
+      if (msg.role !== 'user') {
+        const tokens = parseTokenSummary(msg.content || '');
+        if (tokens) {
+          if (!sessionTokens[sid]) sessionTokens[sid] = { inputTokens: 0, outputTokens: 0, costUsd: 0 };
+          sessionTokens[sid].inputTokens += tokens.inputTokens;
+          sessionTokens[sid].outputTokens += tokens.outputTokens;
+          sessionTokens[sid].costUsd += tokens.costUsd;
+          addToWeekly(tokens); // addToWeekly calls saveTokenState + updateUsageBar
+        }
+      }
+      if (sid !== currentSessionId) {
+        unreadSessions.add(sid);
+        renderSessionsList();
+      } else {
+        renderMessages(sid);
+        updateSessionTokenBar();
+      }
+      saveState();
+      break;
+    }
+
+    case 'history': {
+      // Server sends the full list for this user — remove locals not on server (fixes stuck "closing…")
+      const list = msg.sessions || [];
+      const serverIds = new Set(list.map(s => s.session_id));
+      Object.keys(sessions).forEach(id => { if (!serverIds.has(id)) delete sessions[id]; });
+      Object.keys(sessionMessages).forEach(id => { if (!serverIds.has(id)) delete sessionMessages[id]; });
+      Object.keys(sessionTokens).forEach(id => { if (!serverIds.has(id)) delete sessionTokens[id]; });
+      unreadSessions = new Set(msg.unread || []);
+      workingSessions.clear();
+      list.forEach(s => {
+        sessions[s.session_id] = {
+          session_id: s.session_id,
+          project: s.project,
+          branch: s.branch,
+          status: s.status,
+          created_at: s.created_at,
+          closed_at: s.closed_at,
+        };
+        if (s.working) workingSessions.add(s.session_id);
+        sessionMessages[s.session_id] = s.messages || [];
+        rebuildSessionTokens(s.session_id, false); // rebuild without touching weekly usage
+      });
+      saveTokenState();
+      saveState();
+      renderSessionsList();
+      if (currentSessionId && !serverIds.has(currentSessionId)) {
+        currentSessionId = null;
+        showPage('sessions');
+      } else if (currentSessionId) {
+        renderMessages(currentSessionId);
+        updateSessionTokenBar();
+        const st = document.getElementById('history-status');
+        const cs = sessions[currentSessionId];
+        if (st && cs) {
+          st.textContent = cs.status === 'active' ? '● Active' : '○ Closed';
+          st.className = 'history-status ' + (cs.status === 'active' ? 'active' : 'closed');
+          document.getElementById('history-input-area').style.display = cs.status === 'active' ? 'flex' : 'none';
+          const cb = document.getElementById('history-close-btn');
+          if (cb) cs.status === 'active' ? cb.classList.remove('hidden') : cb.classList.add('hidden');
+        }
+      }
+      updateInputButtons();
+      break;
+    }
+
+    case 'session_working':
+      if (msg.working) workingSessions.add(msg.session_id);
+      else workingSessions.delete(msg.session_id);
+      updateInputButtons();
+      break;
+
+    case 'read_ack':
+      unreadSessions.delete(msg.session_id);
+      saveState();
+      renderSessionsList();
+      break;
+
+    case 'ack':
+      appendSystemMsg(msg.session_id || currentSessionId, msg.content || 'Working on it...');
+      break;
+
+    case 'usage_summary':
+      usageSummary = { per_user: msg.per_user || {}, all_users: msg.all_users || {} };
+      updateAllUsersBar();
+      break;
+
+    case 'diff_result':
+      showDiffPanel(msg.session_id, msg.files || [], msg.diff || '');
+      break;
+
+    case 'revert_result':
+      handleRevertResult(msg);
+      break;
+
+    case 'commit_push_result':
+      handleCommitPushResult(msg);
+      break;
+
+    case 'error':
+      console.error('Server error:', msg);
+      if (msg.session_id) appendSystemMsg(msg.session_id, '⚠ ' + (msg.message || 'Error'));
+      // Clear preparing sessions if session creation failed
+      if (!msg.session_id && Object.keys(preparingSessions).length > 0) {
+        preparingSessions = {};
+        renderSessionsList();
+      }
+      // Revert closing session to active on close failure
+      if (msg.reason === 'close_failed' && msg.session_id && sessions[msg.session_id] && sessions[msg.session_id].status === 'closing') {
+        sessions[msg.session_id].status = 'active';
+        saveState();
+        renderSessionsList();
+      }
+      // Revert reopening session to closed on reopen failure or workspace missing
+      if ((msg.reason === 'reopen_failed' || msg.reason === 'workspace_missing') && msg.session_id && sessions[msg.session_id] && sessions[msg.session_id].status === 'reopening') {
+        sessions[msg.session_id].status = 'closed';
+        saveState();
+        renderSessionsList();
+      }
+      break;
+  }
+}
+
+function appendSystemMsg(sessionId, content) {
+  if (!sessionId) return;
+  if (!sessionMessages[sessionId]) sessionMessages[sessionId] = [];
+  sessionMessages[sessionId].push({
+    role: 'system',
+    content,
+    timestamp: new Date().toISOString(),
+  });
+  if (currentSessionId === sessionId) renderMessages(sessionId);
+  saveState();
+}
+
+// ── Sessions list render ───────────────────────────────────────────────────
+function renderSessionsList() {
+  const container = document.getElementById('sessions-list');
+  const sessionArray = Object.values(sessions)
+    .sort((a, b) => {
+      const aActive = a.status !== 'closed' ? 1 : 0;
+      const bActive = b.status !== 'closed' ? 1 : 0;
+      if (aActive !== bActive) return bActive - aActive;
+      const aMsgs = sessionMessages[a.session_id] || [];
+      const bMsgs = sessionMessages[b.session_id] || [];
+      const aTime = aMsgs.length > 0 ? aMsgs[aMsgs.length - 1].timestamp : (a.created_at || '');
+      const bTime = bMsgs.length > 0 ? bMsgs[bMsgs.length - 1].timestamp : (b.created_at || '');
+      return (bTime || '').localeCompare(aTime || '');
+    });
+  const preparingArray = Object.values(preparingSessions);
+
+  if (sessionArray.length === 0 && preparingArray.length === 0) {
+    container.innerHTML = '<div class="empty-state">No sessions yet. Tap + to start one.</div>';
+    return;
+  }
+
+  const preparingHtml = preparingArray.map(p => `
+    <div class="session-item-wrapper">
+      <div class="session-item preparing">
+        <div class="session-dot preparing-spin"></div>
+        <div class="session-info">
+          <div class="session-name" style="opacity:0.6">${esc(p.project)}</div>
+          <div class="session-branch">Preparing…</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const sessionsHtml = sessionArray.map(s => {
+    const isUnread = unreadSessions.has(s.session_id);
+    const isActive = s.status === 'active';
+    const isClosing = s.status === 'closing';
+    const isReopening = s.status === 'reopening';
+    const isJustCreated = justCreatedSessions.has(s.session_id);
+    const dotClass = (isClosing || isReopening) ? 'closing-spin' : (isJustCreated ? 'just-created' : (isUnread ? 'unread' : (!isActive ? 'closed' : (s.working ? 'working' : ''))));
+    const nameClass = isUnread ? 'session-name unread' : 'session-name';
+    const created = s.created_at ? new Date(s.created_at).toLocaleString() : '';
+    const unreadBadge = isUnread ? '<span class="unread-badge">●</span>' : '';
+    const msgs = sessionMessages[s.session_id] || [];
+    const lastMsg = msgs.length > 0 ? [...msgs].reverse().find(m => !/^Team .+ completed with exit code \d+/.test(m.content)) || null : null;
+    let previewText = lastMsg ? lastMsg.content : '';
+    const summaryMatch = previewText.match(/^## Team\n[\s\S]*?\n## Summary\n([\s\S]*)/);
+    if (summaryMatch) previewText = summaryMatch[1].trim();
+    const preview = previewText ? previewText.slice(0, 60) + (previewText.length > 60 ? '…' : '') : '';
+    const st = sessionTokens[s.session_id];
+    const tokenLine = (st && (st.inputTokens > 0 || st.outputTokens > 0))
+      ? `<div class="session-tokens">In: ${fmtNum(st.inputTokens)} · Out: ${fmtNum(st.outputTokens)} · ${fmtCost(st.costUsd)}</div>`
+      : '';
+
+    const isClosed = s.status === 'closed';
+    const closingClass = isClosing ? ' closing' : '';
+    const swipeClass = isClosed ? ' closed-swipeable' : '';
+    const unreadClass = isUnread ? (isActive ? ' unread-active' : ' unread-closed') : '';
+    const branchStatus = isClosing ? 'Closing…' : (isReopening ? 'Reopening…' : (isJustCreated ? 'created' : s.status));
+
+    let actionButtons = '';
+    if (isActive) {
+      actionButtons = `<button class="session-close-btn" onclick="event.stopPropagation(); promptCloseSession('${s.session_id}')" title="Close session">✕</button>`;
+    } else if (isClosed) {
+      actionButtons = `<button class="session-reopen-btn" onclick="event.stopPropagation(); reopenSession('${s.session_id}')" title="Reopen session">↻ Reopen</button><button class="session-delete-btn" onclick="event.stopPropagation(); deleteSession('${s.session_id}')" title="Delete session">🗑 Delete</button>`;
+    }
+
+    const inner = `<div class="session-item${closingClass}${swipeClass}${unreadClass}" data-session-id="${s.session_id}" onclick="goToHistory('${s.session_id}')">
+      <div class="session-dot ${dotClass}"></div>
+      <div class="session-info">
+        <div class="${nameClass}">${esc(s.project)} ${unreadBadge}</div>
+        <div class="session-branch">${esc(s.branch || '')} · ${branchStatus}</div>
+        ${preview ? `<div class="session-time">${esc(preview)}</div>` : `<div class="session-time">${created}</div>`}
+        ${tokenLine}
+      </div>
+      ${actionButtons}
+    </div>`;
+
+    if (isClosed) {
+      return `<div class="session-item-wrapper" id="wrapper-${s.session_id}">
+        <div class="delete-bg">🗑 Delete</div>
+        ${inner}
+      </div>`;
+    }
+    return `<div class="session-item-wrapper">${inner}</div>`;
+  }).join('');
+
+  container.innerHTML = preparingHtml + sessionsHtml;
+  initSwipeToDelete();
+}
+
+// ── Messages render ────────────────────────────────────────────────────────
+function renderMessages(sessionId) {
+  const list = document.getElementById('messages-list');
+  const msgs = sessionMessages[sessionId] || [];
+  updateSessionTokenBar();
+
+  if (msgs.length === 0) {
+    list.innerHTML = '<div class="empty-state">No messages yet.</div>';
+    return;
+  }
+
+  const TEAM_ROLES_SET = new Set(['planner', 'coder', 'review', 'idea', 'idea_review', 'final_plan', 'idea_history']);
+  let lastUserIdx = -1;
+  list.innerHTML = msgs.map((m, i) => {
+    const role = m.role || 'system';
+    const roleLabel = { user: 'You', agent: 'Agent', review: 'Reviewer', progress: 'Progress', system: 'System', planner: 'Planner', coder: 'Coder', idea: 'Idea', idea_review: 'Idea Reviewer', final_plan: 'Final Plan', idea_history: 'Idea History' }[role] || role;
+    const isTeamRole = TEAM_ROLES_SET.has(role);
+    const modelShort = m.model || '';
+    const teamLabel = m.team ? ' [' + m.team + ']' : '';
+    const displayLabel = ((isTeamRole && modelShort) ? roleLabel + ' (' + modelShort + ')' : roleLabel) + (role === 'agent' ? teamLabel : '');
+
+    let timeStr = '';
+    if (m.timestamp) {
+      const d = new Date(m.timestamp);
+      if (isTeamRole) {
+        timeStr = formatTime24(d);
+      } else {
+        timeStr = d.toLocaleTimeString();
+      }
+    }
+
+    if (role === 'user') {
+      lastUserIdx = i;
+      const isCollapsed = collapsedGroups.has(i);
+      const toggle = '<span class="msg-collapse-btn" onclick="toggleGroup(' + i + ')">' + (isCollapsed ? '\u25b6' : '\u25bc') + '</span>';
+      return '<div class="msg-row ' + role + '">'
+        + '<div class="msg-meta-col">' + toggle + '<span class="msg-role-label ' + role + '">' + esc(displayLabel) + '</span><span class="msg-time">' + esc(timeStr) + '</span></div>'
+        + '<div class="msg-bubble">' + esc(m.content) + '</div>'
+        + '</div>';
+    } else {
+      const groupIdx = lastUserIdx;
+      const hiddenClass = groupIdx >= 0 && collapsedGroups.has(groupIdx) ? ' msg-hidden' : '';
+      const metaClass = isTeamRole ? 'msg-meta-col team-meta' : 'msg-meta-col';
+      const timeClass = isTeamRole ? 'msg-time msg-time-team' : 'msg-time';
+      const copyBtn = (role === 'agent' || role === 'review' || role === 'planner' || role === 'coder' || role === 'final_plan' || role === 'idea_history')
+        ? '<button class="msg-copy-btn" onclick="copyMsg(' + i + ', this)" title="Copy to clipboard"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>'
+        : '';
+      return '<div class="msg-row ' + role + hiddenClass + '" data-group="' + groupIdx + '">'
+        + '<div class="' + metaClass + '"><span class="msg-role-label ' + role + '">' + esc(displayLabel) + '</span><span class="' + timeClass + '">' + esc(timeStr) + '</span></div>'
+        + '<div class="msg-bubble">' + esc(m.content) + copyBtn + '</div>'
+        + '</div>';
+    }
+  }).join('');
+
+  list.scrollTop = list.scrollHeight;
+}
+
+function copyMsg(index, btn) {
+  const msgs = sessionMessages[currentSessionId] || [];
+  if (index < msgs.length) {
+    navigator.clipboard.writeText(msgs[index].content).then(() => {
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 1500);
+    });
+  }
+}
+
+function toggleGroup(idx) {
+  if (collapsedGroups.has(idx)) collapsedGroups.delete(idx);
+  else collapsedGroups.add(idx);
+  renderMessages(currentSessionId);
+}
+
+// ── Project picker ─────────────────────────────────────────────────────────
+function openProjectPicker() {
+  if (!isConnected) { alert('Not connected to server'); return; }
+  const listEl = document.getElementById('project-picker-list');
+  if (projects.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:14px;text-align:left;">No projects available</div>';
+  } else {
+    listEl.innerHTML = projects.map(a => `
+      <div class="modal-project-item" onclick="createSession('${esc(a.name)}')">
+        <div class="modal-project-name">${esc(a.name)}</div>
+        ${a.description ? `<div class="modal-project-desc">${esc(a.description)}</div>` : ''}
+      </div>`).join('');
+  }
+  document.getElementById('project-picker').classList.remove('hidden');
+}
+
+function closeProjectPicker() {
+  document.getElementById('project-picker').classList.add('hidden');
+}
+
+function createSession(projectName) {
+  closeProjectPicker();
+  if (!ws || !isConnected) return;
+  ws.send(JSON.stringify({ type: 'new_session', project: projectName }));
+}
+
+// ── Session close ──────────────────────────────────────────────────────────
+function promptCloseSession(sessionId) {
+  pendingCloseSessionId = sessionId;
+  const s = sessions[sessionId];
+  document.getElementById('confirm-close-msg').textContent =
+    `Close session "${s ? s.project + ' / ' + s.branch : sessionId}"?`;
+  document.getElementById('confirm-close').classList.remove('hidden');
+}
+
+function cancelConfirm() {
+  pendingCloseSessionId = null;
+  document.getElementById('confirm-close').classList.add('hidden');
+}
+
+function confirmClose() {
+  if (!pendingCloseSessionId) return;
+  const sessionId = pendingCloseSessionId;
+  cancelConfirm();
+  // Optimistic: mark as closing immediately before server responds
+  if (sessions[sessionId]) {
+    sessions[sessionId].status = 'closing';
+    renderSessionsList();
+  }
+  if (ws && isConnected) {
+    ws.send(JSON.stringify({ type: 'close_session', session_id: sessionId }));
+  }
+  if (!document.getElementById('page-history').classList.contains('hidden')) {
+    goToSessions();
+  }
+}
+
+// ── Diff panel ────────────────────────────────────────────────────────────
+let diffPending = false;
+let diffHasReverts = false;
+let diffCurrentSessionId = '';
+let _revertIdCounter = 0;
+let _pendingRevertsMap = {};  // { [request_id]: button }
+
+function requestDiff() {
+  if (!ws || !isConnected || !currentSessionId || diffPending) return;
+  diffPending = true;
+  const btn = document.getElementById('history-diff-btn');
+  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+  ws.send(JSON.stringify({ type: 'get_diff', session_id: currentSessionId }));
+}
+
+function showDiffPanel(sessionId, files, rawDiff) {
+  diffPending = false;
+  diffHasReverts = false;
+  diffCurrentSessionId = sessionId;
+  const btn = document.getElementById('history-diff-btn');
+  if (btn) { btn.textContent = 'Diff'; btn.disabled = false; }
+
+  const panel = document.getElementById('diff-panel');
+  const content = document.getElementById('diff-panel-content');
+  const title = document.getElementById('diff-panel-title');
+  const fileCount = document.getElementById('diff-file-count');
+  const commitBtn = document.getElementById('diff-commit-btn');
+  commitBtn.classList.add('hidden');
+
+  const s = sessions[sessionId];
+  title.textContent = s ? 'Diff — ' + s.project + ' / ' + (s.branch || sessionId) : 'Diff';
+
+  if (!files || files.length === 0) {
+    content.innerHTML = '<div class="diff-empty">No changes found</div>';
+    fileCount.textContent = '';
+  } else {
+    fileCount.textContent = files.length + ' file' + (files.length !== 1 ? 's' : '') + ' changed';
+    content.innerHTML = '';
+    files.forEach(function(file) {
+      content.appendChild(buildFileBox(file));
+    });
+  }
+  panel.classList.remove('hidden');
+}
+
+function buildFileBox(file) {
+  const box = document.createElement('div');
+  box.className = 'diff-file-box';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'diff-file-header';
+
+  const pathEl = document.createElement('span');
+  pathEl.className = 'diff-file-path';
+  pathEl.textContent = file.path;
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'diff-file-toggle';
+  toggleBtn.textContent = 'Mark as viewed';
+  toggleBtn.onclick = function(e) {
+    e.stopPropagation();
+    toggleFileViewed(box, toggleBtn);
+  };
+
+  header.appendChild(pathEl);
+  header.appendChild(toggleBtn);
+  header.onclick = function() {
+    const body = box.querySelector('.diff-file-body');
+    body.classList.toggle('collapsed');
+  };
+
+  // Body
+  const body = document.createElement('div');
+  body.className = 'diff-file-body';
+
+  // Check for binary files
+  if (file.diff_text.includes('Binary files') || file.diff_text.includes('GIT binary patch')) {
+    const binMsg = document.createElement('div');
+    binMsg.style.cssText = 'padding: 12px; color: var(--muted); font-style: italic; font-size: 13px;';
+    binMsg.textContent = 'Binary file differs';
+    body.appendChild(binMsg);
+  } else {
+    // Parse hunks and build side-by-side tables
+    const hunks = parseHunks(file.diff_text, file.path);
+    hunks.forEach(function(hunk) {
+      body.appendChild(buildHunkTable(hunk, file));
+    });
+  }
+
+  box.appendChild(header);
+  box.appendChild(body);
+  return box;
+}
+
+function parseHunks(diffText, filePath) {
+  const lines = diffText.split('\n');
+  const hunks = [];
+  let currentHunk = null;
+  let diffHeader = '';
+  let inHeader = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (inHeader) {
+      // Collect diff header lines (diff --git, index, ---, +++)
+      if (line.startsWith('@@')) {
+        inHeader = false;
+      } else {
+        diffHeader += line + '\n';
+        continue;
+      }
+    }
+    if (line.startsWith('@@')) {
+      if (currentHunk) hunks.push(currentHunk);
+      // Parse line numbers from @@ -old,len +new,len @@
+      const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)/);
+      currentHunk = {
+        headerLine: line,
+        oldStart: m ? parseInt(m[1]) : 1,
+        newStart: m ? parseInt(m[2]) : 1,
+        context: m ? m[3] : '',
+        lines: [],
+        diffHeader: diffHeader,
+        rawText: diffHeader + line + '\n',
+      };
+    } else if (currentHunk) {
+      currentHunk.lines.push(line);
+      currentHunk.rawText += line + '\n';
+    }
+  }
+  if (currentHunk) hunks.push(currentHunk);
+  return hunks;
+}
+
+function buildHunkTable(hunk, file) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'diff-hunk-row';
+
+  // Revert button
+  const revertBtn = document.createElement('button');
+  revertBtn.className = 'diff-revert-btn';
+  revertBtn.textContent = 'Revert';
+  revertBtn.setAttribute('data-file', file.path);
+  revertBtn.onclick = function(e) {
+    e.stopPropagation();
+    revertHunk(revertBtn, hunk, file);
+  };
+  wrapper.appendChild(revertBtn);
+
+  // Hunk header row
+  const hunkHeaderDiv = document.createElement('div');
+  hunkHeaderDiv.className = 'diff-hunk-header';
+  hunkHeaderDiv.textContent = hunk.headerLine;
+  wrapper.appendChild(hunkHeaderDiv);
+
+  // Build side-by-side pairs
+  const pairs = buildSideBySidePairs(hunk);
+
+  const table = document.createElement('table');
+  table.className = 'diff-table';
+
+  pairs.forEach(function(pair) {
+    const tr = document.createElement('tr');
+
+    // Old line number
+    const oldNumTd = document.createElement('td');
+    oldNumTd.className = 'diff-line-num';
+    oldNumTd.textContent = pair.oldNum || '';
+    tr.appendChild(oldNumTd);
+
+    // Old content
+    const oldTd = document.createElement('td');
+    oldTd.className = 'diff-cell-old ' + (pair.oldType === 'del' ? 'diff-cell-del' : pair.oldType === 'ctx' ? 'diff-cell-ctx' : 'diff-cell-empty');
+    oldTd.textContent = pair.oldText || '';
+    tr.appendChild(oldTd);
+
+    // New line number
+    const newNumTd = document.createElement('td');
+    newNumTd.className = 'diff-line-num';
+    newNumTd.textContent = pair.newNum || '';
+    tr.appendChild(newNumTd);
+
+    // New content
+    const newTd = document.createElement('td');
+    newTd.className = 'diff-cell-new ' + (pair.newType === 'add' ? 'diff-cell-add' : pair.newType === 'ctx' ? 'diff-cell-ctx' : 'diff-cell-empty');
+    newTd.textContent = pair.newText || '';
+    tr.appendChild(newTd);
+
+    table.appendChild(tr);
+  });
+
+  wrapper.appendChild(table);
+  return wrapper;
+}
+
+function buildSideBySidePairs(hunk) {
+  const pairs = [];
+  let oldNum = hunk.oldStart;
+  let newNum = hunk.newStart;
+  const lines = hunk.lines;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.startsWith('-')) {
+      // Collect consecutive deletions
+      const dels = [];
+      while (i < lines.length && lines[i].startsWith('-')) {
+        dels.push(lines[i].substring(1));
+        i++;
+      }
+      // Collect consecutive additions that follow
+      const adds = [];
+      while (i < lines.length && lines[i].startsWith('+')) {
+        adds.push(lines[i].substring(1));
+        i++;
+      }
+      // Pair them up
+      const maxLen = Math.max(dels.length, adds.length);
+      for (let j = 0; j < maxLen; j++) {
+        pairs.push({
+          oldNum: j < dels.length ? oldNum++ : '',
+          oldText: j < dels.length ? dels[j] : '',
+          oldType: j < dels.length ? 'del' : 'empty',
+          newNum: j < adds.length ? newNum++ : '',
+          newText: j < adds.length ? adds[j] : '',
+          newType: j < adds.length ? 'add' : 'empty',
+        });
+      }
+    } else if (line.startsWith('+')) {
+      // Pure additions (no preceding deletions)
+      const adds = [];
+      while (i < lines.length && lines[i].startsWith('+')) {
+        adds.push(lines[i].substring(1));
+        i++;
+      }
+      for (let j = 0; j < adds.length; j++) {
+        pairs.push({
+          oldNum: '', oldText: '', oldType: 'empty',
+          newNum: newNum++, newText: adds[j], newType: 'add',
+        });
+      }
+    } else if (line === '' && i === lines.length - 1) {
+      // Trailing empty line in hunk, skip
+      i++;
+    } else {
+      // Context line (or any other line)
+      pairs.push({
+        oldNum: oldNum++, oldText: line.startsWith(' ') ? line.substring(1) : line, oldType: 'ctx',
+        newNum: newNum++, newText: line.startsWith(' ') ? line.substring(1) : line, newType: 'ctx',
+      });
+      i++;
+    }
+  }
+  return pairs;
+}
+
+function toggleFileViewed(box, toggleBtn) {
+  const header = box.querySelector('.diff-file-header');
+  const body = box.querySelector('.diff-file-body');
+  const isViewed = header.classList.toggle('viewed');
+  if (isViewed) {
+    body.classList.add('collapsed');
+    toggleBtn.textContent = 'Viewed';
+  } else {
+    body.classList.remove('collapsed');
+    toggleBtn.textContent = 'Mark as viewed';
+  }
+}
+
+function diffExpandAll() {
+  document.querySelectorAll('.diff-file-body').forEach(function(b) { b.classList.remove('collapsed'); });
+  document.querySelectorAll('.diff-file-header').forEach(function(h) { h.classList.remove('viewed'); });
+  document.querySelectorAll('.diff-file-toggle').forEach(function(t) { t.textContent = 'Mark as viewed'; });
+}
+
+function diffCollapseAll() {
+  document.querySelectorAll('.diff-file-body').forEach(function(b) { b.classList.add('collapsed'); });
+  document.querySelectorAll('.diff-file-header').forEach(function(h) { h.classList.add('viewed'); });
+  document.querySelectorAll('.diff-file-toggle').forEach(function(t) { t.textContent = 'Viewed'; });
+}
+
+function revertHunk(button, hunk, file) {
+  if (!ws || !isConnected || !diffCurrentSessionId) return;
+  button.textContent = '...';
+  button.disabled = true;
+  var requestId = String(++_revertIdCounter);
+  ws.send(JSON.stringify({
+    type: 'revert_hunk',
+    session_id: diffCurrentSessionId,
+    file_path: file.path,
+    hunk_text: hunk.rawText,
+    request_id: requestId,
+  }));
+  // Store reference for callback keyed by request_id
+  button._hunkRow = button.closest('.diff-hunk-row');
+  button._filePath = file.path;
+  _pendingRevertsMap[requestId] = button;
+}
+
+function handleRevertResult(msg) {
+  var requestId = msg.request_id || '';
+  var pending = _pendingRevertsMap[requestId];
+  if (requestId) delete _pendingRevertsMap[requestId];
+  if (msg.success) {
+    if (pending && pending._hunkRow) {
+      pending._hunkRow.classList.add('diff-hunk-reverted');
+    }
+    diffHasReverts = true;
+    document.getElementById('diff-commit-btn').classList.remove('hidden');
+  } else {
+    if (pending) { pending.textContent = 'Revert'; pending.disabled = false; }
+    alert('Revert failed: ' + (msg.error || 'Unknown error'));
+  }
+}
+
+function commitAndPush() {
+  if (!ws || !isConnected || !diffCurrentSessionId) return;
+  const message = prompt('Commit message:', 'Manual changes via KlodTalk');
+  if (message === null) return; // cancelled
+  const commitBtn = document.getElementById('diff-commit-btn');
+  commitBtn.textContent = 'Pushing...';
+  commitBtn.disabled = true;
+  ws.send(JSON.stringify({
+    type: 'commit_and_push',
+    session_id: diffCurrentSessionId,
+    message: message || 'Manual changes via KlodTalk',
+  }));
+}
+
+function handleCommitPushResult(msg) {
+  const commitBtn = document.getElementById('diff-commit-btn');
+  commitBtn.disabled = false;
+  if (msg.success) {
+    commitBtn.textContent = 'Done!';
+    commitBtn.classList.add('hidden');
+    setTimeout(function() {
+      commitBtn.textContent = 'Commit & Push';
+      // Refresh the diff to show updated state
+      requestDiff();
+    }, 1500);
+  } else {
+    commitBtn.textContent = 'Commit & Push';
+    alert('Commit & Push failed: ' + (msg.message || 'Unknown error'));
+  }
+}
+
+function closeDiffPanel() {
+  document.getElementById('diff-panel').classList.add('hidden');
+  diffHasReverts = false;
+  _pendingRevertsMap = {};
+}
+
+// ── Team selection ─────────────────────────────────────────────────────────
+function onTeamSelect(teamName) {
+  if (currentSessionId) selectedTeam[currentSessionId] = teamName;
+  const sel = document.getElementById('team-select');
+  if (sel) {
+    const session = sessions[currentSessionId];
+    const info = projectTeams[session && session.project] || { available: [] };
+    sel.title = (info.available.find(t => t.name === teamName) || {}).description || '';
+  }
+}
+
+function updateTeamDropdown() {
+  const sel = document.getElementById('team-select');
+  if (!sel) return;
+  if (!currentSessionId) { sel.innerHTML = ''; return; }
+  const session = sessions[currentSessionId];
+  if (!session) { sel.innerHTML = ''; return; }
+  const info = projectTeams[session.project] || { default: '', available: [] };
+  if (info.available.length === 0) { sel.innerHTML = ''; sel.style.display = 'none'; return; }
+  sel.style.display = '';
+  const current = selectedTeam[currentSessionId] || info.default;
+  sel.innerHTML = info.available.map(t =>
+    '<option value="' + esc(t.name) + '"' + (t.name === current ? ' selected' : '') + (t.description ? ' title="' + esc(t.description) + '"' : '') + '>' + esc(t.name) + '</option>'
+  ).join('');
+  sel.title = (info.available.find(t => t.name === current) || {}).description || '';
+  if (!selectedTeam[currentSessionId]) selectedTeam[currentSessionId] = info.default;
+}
+
+// ── Send message ───────────────────────────────────────────────────────────
+function sendMsg(mode) {
+  const content = document.getElementById('msg-input').value.trim();
+  if (!content) return;
+  if (!currentSessionId) return;
+  if (!ws || !isConnected) { alert('Not connected'); return; }
+
+  const session = sessions[currentSessionId];
+  const defaultTeam = projectTeams[session?.project]?.default || '';
+  const team = selectedTeam[currentSessionId] || defaultTeam;
+  const msg = {
+    type: 'text',
+    session_id: currentSessionId,
+    content,
+    mode,
+  };
+  if (team && team !== defaultTeam) msg.team = team;
+  ws.send(JSON.stringify(msg));
+  const msgInput = document.getElementById('msg-input');
+  msgInput.value = '';
+  autoResizeTextarea(msgInput);
+}
+
+function updateInputButtons() {
+  const isWorking = currentSessionId && workingSessions.has(currentSessionId);
+  const confirmBtn = document.getElementById('btn-confirm');
+  const executeBtn = document.getElementById('btn-execute');
+  if (!confirmBtn || !executeBtn) return;
+  if (isWorking) {
+    confirmBtn.textContent = 'Stop';
+    confirmBtn.className = 'btn btn-red btn-small';
+    confirmBtn.onclick = () => confirmStop();
+    executeBtn.textContent = 'BTW';
+    executeBtn.className = 'btn btn-blue btn-small';
+    executeBtn.style.flex = '1';
+    executeBtn.onclick = () => sendBtw();
+  } else {
+    confirmBtn.textContent = 'Read Back';
+    confirmBtn.className = 'btn btn-amber btn-small';
+    confirmBtn.onclick = () => sendMsg('confirm');
+    executeBtn.textContent = 'Start Working';
+    executeBtn.className = 'btn btn-green btn-small';
+    executeBtn.style.flex = '1';
+    executeBtn.onclick = () => sendMsg('execute');
+  }
+}
+
+function confirmStop() {
+  document.getElementById('confirm-stop').classList.remove('hidden');
+}
+
+function cancelStopConfirm() {
+  document.getElementById('confirm-stop').classList.add('hidden');
+}
+
+function doStop() {
+  cancelStopConfirm();
+  sendStop();
+}
+
+function sendStop() {
+  if (!currentSessionId || !ws || !isConnected) return;
+  ws.send(JSON.stringify({ type: 'stop', session_id: currentSessionId }));
+}
+
+function sendBtw() {
+  const content = document.getElementById('msg-input').value.trim();
+  if (!content) return;
+  if (!currentSessionId || !ws || !isConnected) return;
+  ws.send(JSON.stringify({ type: 'btw', session_id: currentSessionId, content }));
+  const msgInput = document.getElementById('msg-input');
+  msgInput.value = '';
+  autoResizeTextarea(msgInput);
+}
+
+// ── Voice input ────────────────────────────────────────────────────────────
+function toggleMic() {
+  if (isListening) { stopMic(); return; }
+  startMic();
+}
+
+function startMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert('Speech recognition not supported in this browser.'); return; }
+
+  finalText = document.getElementById('msg-input').value;
+  partialText = '';
+  speechRec = new SR();
+  speechRec.lang = 'en-US';
+  speechRec.continuous = true;
+  speechRec.interimResults = true;
+
+  speechRec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) {
+        finalText += (finalText ? ' ' : '') + r[0].transcript;
+      } else {
+        interim = r[0].transcript;
+      }
+    }
+    partialText = interim;
+    const _msgInput = document.getElementById('msg-input');
+    _msgInput.value = finalText + (interim ? ' ' + interim : '');
+    autoResizeTextarea(_msgInput);
+  };
+
+  speechRec.onerror = () => stopMic();
+  speechRec.onend = () => { if (isListening) speechRec.start(); };
+
+  speechRec.start();
+  isListening = true;
+  document.getElementById('mic-btn').classList.add('listening');
+  document.getElementById('mic-btn').textContent = '⏹';
+}
+
+function stopMic() {
+  isListening = false;
+  speechRec?.stop();
+  speechRec = null;
+  document.getElementById('mic-btn').classList.remove('listening');
+  document.getElementById('mic-btn').textContent = '🎤';
+  // Merge partial into final
+  const input = document.getElementById('msg-input');
+  if (partialText) {
+    finalText += (finalText ? ' ' : '') + partialText;
+    input.value = finalText;
+    partialText = '';
+  }
+  autoResizeTextarea(input);
+}
+
+// ── Textarea auto-resize ────────────────────────────────────────────────────
+function autoResizeTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+document.getElementById('msg-input').addEventListener('input', function() {
+  autoResizeTextarea(this);
+});
+
+// ── Refresh history ────────────────────────────────────────────────────────
+function refreshHistory() {
+  if (ws && isConnected) {
+    ws.send(JSON.stringify({ type: 'get_history' }));
+  }
+}
+
+// ── Status bar ─────────────────────────────────────────────────────────────
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-bar');
+  el.textContent = msg;
+  el.className = 'status-bar ' + (cls || '');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Swipe-to-delete closed sessions ───────────────────────────────────────
+function reopenSession(sessionId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'reopen_session', session_id: sessionId }));
+  }
+}
+
+function deleteSession(sessionId) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'delete_session', session_id: sessionId }));
+  }
+  delete sessions[sessionId];
+  delete sessionMessages[sessionId];
+  unreadSessions.delete(sessionId);
+  saveState();
+  renderSessionsList();
+}
+
+function initSwipeToDelete() {
+  document.querySelectorAll('.closed-swipeable').forEach(el => {
+    const sessionId = el.dataset.sessionId;
+    if (!sessionId) return;
+
+    const wrapper = el.closest('.session-item-wrapper');
+    const deleteBg = wrapper ? wrapper.querySelector('.delete-bg') : null;
+
+    let startX = 0, startY = 0, deltaX = 0;
+    let dragging = false;
+    let directionLocked = false;
+    let isHorizontal = false;
+    let wasSwiped = false;
+
+    function getThreshold() { return window.innerWidth * 0.5; }
+
+    function updateDeleteBg() {
+      if (!deleteBg) return;
+      const threshold = getThreshold();
+      deleteBg.style.background = Math.abs(deltaX) >= threshold
+        ? 'rgba(211, 47, 47, 0.7)'
+        : 'rgba(76, 175, 80, 0.7)';
+    }
+
+    function onDragStart(clientX, clientY) {
+      startX = clientX;
+      startY = clientY;
+      deltaX = 0;
+      dragging = true;
+      directionLocked = false;
+      isHorizontal = false;
+      wasSwiped = false;
+      el.classList.add('swiping');
+    }
+
+    function onDragMove(clientX, clientY) {
+      if (!dragging) return;
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+
+      if (!directionLocked) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        directionLocked = true;
+        isHorizontal = Math.abs(dx) > Math.abs(dy);
+      }
+
+      if (!isHorizontal) return;
+
+      deltaX = dx;
+      el.style.transform = `translateX(${deltaX}px)`;
+      if (deleteBg && Math.abs(deltaX) > 10) deleteBg.style.opacity = '1';
+      updateDeleteBg();
+    }
+
+    function onDragEnd() {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('swiping');
+
+      if (!isHorizontal) return;
+
+      const threshold = getThreshold();
+      if (Math.abs(deltaX) > threshold) {
+        wasSwiped = true;
+        el.classList.add('swipe-exit');
+        el.addEventListener('transitionend', () => deleteSession(sessionId), { once: true });
+      } else {
+        if (Math.abs(deltaX) > 5) wasSwiped = true;
+        el.style.transition = 'transform 0.2s ease';
+        el.style.transform = 'translateX(0)';
+        if (deleteBg) { deleteBg.style.background = 'transparent'; deleteBg.style.opacity = '0'; }
+        el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+      }
+    }
+
+    // Suppress click after any meaningful swipe gesture
+    el.addEventListener('click', e => {
+      if (wasSwiped) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        wasSwiped = false;
+      }
+    }, true);
+
+    // Touch events
+    el.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      onDragStart(t.clientX, t.clientY);
+    }, { passive: true });
+
+    el.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      if (directionLocked && isHorizontal) e.preventDefault();
+      onDragMove(t.clientX, t.clientY);
+    }, { passive: false });
+
+    el.addEventListener('touchend', e => {
+      if (isHorizontal) e.preventDefault();
+      onDragEnd();
+    });
+    el.addEventListener('touchcancel', () => onDragEnd());
+
+    // Mouse events (desktop)
+    el.addEventListener('mousedown', e => {
+      onDragStart(e.clientX, e.clientY);
+
+      function onMouseMove(e) { onDragMove(e.clientX, e.clientY); }
+      function onMouseUp() {
+        onDragEnd();
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      }
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+  });
+}
+
+// ── Token tracking ─────────────────────────────────────────────────────────
+function parseTokenSummary(content) {
+  const m = content.match(/\[Tokens:\s*([\d,]+)\s*in.*?\/\s*([\d,]+)\s*out\s*\|\s*Cost:\s*\$([\d.]+)\]/);
+  if (!m) return null;
+  return {
+    inputTokens: parseInt(m[1].replace(/,/g, ''), 10),
+    outputTokens: parseInt(m[2].replace(/,/g, ''), 10),
+    costUsd: parseFloat(m[3]),
+  };
+}
+
+// Rebuild session token totals from stored messages.
+// Pass addToWeeklyFlag=false to skip incrementing weekly usage (used during history/reload).
+function rebuildSessionTokens(sessionId, addToWeeklyFlag) {
+  const msgs = sessionMessages[sessionId] || [];
+  let inputTokens = 0, outputTokens = 0, costUsd = 0;
+  msgs.forEach(m => {
+    const t = parseTokenSummary(m.content || '');
+    if (t) { inputTokens += t.inputTokens; outputTokens += t.outputTokens; costUsd += t.costUsd; }
+  });
+  if (inputTokens > 0 || outputTokens > 0) {
+    sessionTokens[sessionId] = { inputTokens, outputTokens, costUsd };
+  } else {
+    delete sessionTokens[sessionId];
+  }
+}
+
+function getWeekStart() {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diff));
+  return monday.toISOString().slice(0, 10);
+}
+
+function resetWeeklyIfNeeded() {
+  const weekStart = getWeekStart();
+  if (weeklyUsage.weekStart !== weekStart) {
+    weeklyUsage = { weekStart, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  }
+}
+
+function addToWeekly(tokens) {
+  resetWeeklyIfNeeded();
+  weeklyUsage.inputTokens += tokens.inputTokens;
+  weeklyUsage.outputTokens += tokens.outputTokens;
+  weeklyUsage.costUsd += tokens.costUsd;
+  saveTokenState();
+  updateUsageBar();
+}
+
+function fmtNum(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return String(Math.round(n));
+}
+
+function fmtCost(usd) {
+  if (usd === 0) return '$0.00';
+  if (usd < 0.001) return '$' + usd.toFixed(5);
+  if (usd < 0.01) return '$' + usd.toFixed(4);
+  return '$' + usd.toFixed(3);
+}
+
+function updateSessionTokenBar() {
+  const bar = document.getElementById('history-tokens');
+  if (!bar) return;
+  const t = currentSessionId ? sessionTokens[currentSessionId] : null;
+  if (!t || (t.inputTokens === 0 && t.outputTokens === 0)) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = '';
+  document.getElementById('st-in').textContent = fmtNum(t.inputTokens);
+  document.getElementById('st-out').textContent = fmtNum(t.outputTokens);
+  document.getElementById('st-cost').textContent = fmtCost(t.costUsd);
+}
+
+function updateUsageBar() {
+  resetWeeklyIfNeeded();
+  const bar = document.getElementById('weekly-usage-bar');
+  if (!bar) return;
+  if (weeklyUsage.inputTokens === 0 && weeklyUsage.costUsd === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = '';
+  const pct = Math.min(100, weeklyUsage.inputTokens / weeklyLimit * 100);
+  const fill = document.getElementById('usage-fill');
+  fill.style.width = pct + '%';
+  // hsl: 120=green → 0=red as pct goes 0→100
+  const hue = Math.round(120 - Math.min(pct, 100) * 1.2);
+  fill.style.backgroundColor = `hsl(${hue}, 75%, 45%)`;
+  document.getElementById('usage-label').textContent =
+    fmtNum(weeklyUsage.inputTokens) + ' in / ' + fmtNum(weeklyUsage.outputTokens) + ' out · ' + fmtCost(weeklyUsage.costUsd);
+  // Time until next Monday 00:00 UTC
+  const now = new Date();
+  const day = now.getUTCDay();
+  const daysUntilMonday = day === 0 ? 1 : 8 - day;
+  const nextMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday));
+  const msLeft = nextMonday - now;
+  const hoursLeft = Math.floor(msLeft / 3600000);
+  const daysLeft = Math.floor(hoursLeft / 24);
+  const hrsLeft = hoursLeft % 24;
+  document.getElementById('usage-reset').textContent =
+    daysLeft > 0 ? `Resets in ${daysLeft}d ${hrsLeft}h` : `Resets in ${hrsLeft}h`;
+}
+
+function updateAllUsersBar() {
+  const bar = document.getElementById('all-users-bar');
+  if (!bar) return;
+  if (!usageSummary) { bar.style.display = 'none'; return; }
+  const all = usageSummary.all_users || {};
+  if ((all.input_tokens || 0) === 0 && (all.cost_usd || 0) === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = '';
+  const myName = loadPref('name', '');
+  const me = (usageSummary.per_user || {})[myName] || {};
+  document.getElementById('au-you-in').textContent = fmtNum(me.input_tokens || 0);
+  document.getElementById('au-you-out').textContent = fmtNum(me.output_tokens || 0);
+  document.getElementById('au-you-cost').textContent = fmtCost(me.cost_usd || 0);
+  document.getElementById('au-all-in').textContent = fmtNum(all.input_tokens || 0);
+  document.getElementById('au-all-out').textContent = fmtNum(all.output_tokens || 0);
+  document.getElementById('au-all-cost').textContent = fmtCost(all.cost_usd || 0);
+}
+
+function onWeeklyLimitChange() {
+  const val = parseInt(document.getElementById('cfg-weekly-limit').value, 10);
+  if (val > 0) {
+    weeklyLimit = val;
+    savePref('weekly_limit', String(val));
+    updateUsageBar();
+  }
+}
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+</script>
+</body>
+</html>
