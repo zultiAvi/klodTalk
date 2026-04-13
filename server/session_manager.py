@@ -85,6 +85,7 @@ class Session:
     project_folder: str = ""  # original project folder
     docker_commit: bool = True
     docker_socket: bool = True
+    users: list = field(default_factory=list)
 
 
 class SessionManager:
@@ -225,6 +226,7 @@ class SessionManager:
             project_folder=folder,
             docker_commit=project_config.get("docker_commit", True),
             docker_socket=project_config.get("docker_socket", True),
+            users=[user_name],
         )
         self._sessions[session_id] = session
         self.save_sessions()
@@ -451,16 +453,48 @@ class SessionManager:
         return [s for s in self._sessions.values() if s.status == "active"]
 
     def get_user_sessions(self, user_name: str, project_configs: list[dict]) -> list[Session]:
-        """Return all sessions the user can access (own + allowed projects)."""
-        # User can see sessions for projects they're allowed on
-        allowed_projects: set[str] = set()
-        for pc in project_configs:
-            if user_name in pc.get("users", []):
-                allowed_projects.add(pc["name"])
+        """Return all sessions the user is registered on."""
         return [
             s for s in self._sessions.values()
-            if s.project_name in allowed_projects
+            if user_name in s.users
         ]
+
+    def add_user_to_session(self, session_id: str, user_name: str) -> bool:
+        """Add a user to a session's user list."""
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+        if user_name not in session.users:
+            session.users.append(user_name)
+            self.save_sessions()
+        return True
+
+    def remove_user_from_session(self, session_id: str, user_name: str) -> bool:
+        """Remove a user from a session's user list."""
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+        if user_name in session.users:
+            session.users.remove(user_name)
+            self.save_sessions()
+        return True
+
+    def migrate_sessions_add_users(self, project_configs: list[dict]):
+        """Backward compatibility: populate empty users lists from project config."""
+        project_map = {pc["name"]: pc for pc in project_configs}
+        migrated = 0
+        for session in self._sessions.values():
+            if session.users:
+                continue
+            pc = project_map.get(session.project_name)
+            if pc:
+                session.users = list(pc.get("users", []))
+            else:
+                session.users = [session.user_name]
+            migrated += 1
+        if migrated:
+            self.save_sessions()
+            log.info("Migrated %d session(s): populated users list", migrated)
 
     def get_archive_path(self, session: Session) -> str:
         """Return the archived history path for a closed session."""

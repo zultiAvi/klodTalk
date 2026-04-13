@@ -656,15 +656,13 @@ async def _notify_session_error(session_id: str, message: str):
     session = session_manager.get_session(session_id)
     if not session:
         return
-    project = get_project_record(session.project_name)
-    allowed_users = project.get("users", []) if project else [session.user_name]
     payload = json.dumps({
         "type": "error",
         "session_id": session_id,
         "project": session.project_name,
         "message": message
     })
-    for user in allowed_users:
+    for user in session.users:
         ws = connected_clients.get(user)
         if ws:
             try:
@@ -674,15 +672,13 @@ async def _notify_session_error(session_id: str, message: str):
 
 
 async def _broadcast_to_session_users(session_id: str, payload: dict):
-    """Send a message to all users who have access to the session's project."""
+    """Send a message to all users registered on the session."""
     session = session_manager.get_session(session_id)
     if not session:
         return
-    project = get_project_record(session.project_name)
-    allowed_users = project.get("users", []) if project else [session.user_name]
     msg = json.dumps(payload)
     sent_to: set[str] = set()
-    for user in allowed_users:
+    for user in session.users:
         if user in sent_to:
             continue
         ws = connected_clients.get(user)
@@ -1114,13 +1110,11 @@ async def watch_out_messages():
 
 
 def _mark_unread_for_others(session_id: str, triggering_user: str):
-    """Mark session unread for all users except the triggerer."""
+    """Mark session unread for all registered session users except the triggerer."""
     session = session_manager.get_session(session_id)
     if not session:
         return
-    project = get_project_record(session.project_name)
-    allowed_users = project.get("users", []) if project else [session.user_name]
-    others = [u for u in allowed_users if u != triggering_user]
+    others = [u for u in session.users if u != triggering_user]
     if others:
         unread_state.mark_unread(session_id, others)
 
@@ -1147,6 +1141,7 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "created_at": session.created_at,
         "closed_at": session.closed_at,
         "user_name": session.user_name,
+        "users": session.users,
         "working": session.session_id in running_sessions,
     }
     if include_messages:
@@ -1186,9 +1181,7 @@ async def handle_stop(ws, user_name: str, data: dict):
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
         return
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
         return
     if session_id not in running_sessions:
@@ -1234,9 +1227,7 @@ async def handle_btw(ws, user_name: str, data: dict):
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
         return
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
         return
     if session_id not in running_sessions:
@@ -1355,9 +1346,7 @@ async def handle_close_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
         return
 
@@ -1385,9 +1374,7 @@ async def handle_delete_session(ws, user_name: str, data: dict):
                                   "message": "Cannot delete an active session; close it first"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
         return
 
@@ -1417,13 +1404,13 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
                                   "message": "Session workspace no longer exists. Cannot reopen."}))
         return
 
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+        return
+
     project = get_project_record(session.project_name)
     if not project:
         await ws.send(json.dumps({"type": "error", "reason": "unknown_project", "message": f"Project '{session.project_name}' no longer configured"}))
-        return
-    allowed = project.get("users", [])
-    if user_name not in allowed:
-        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
         return
 
     if not docker_image_exists():
@@ -1469,9 +1456,7 @@ async def handle_text(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "session_closed", "message": "Session is closed"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
         return
 
@@ -1546,6 +1531,113 @@ async def handle_get_usage_summary(ws, user_name: str):
     await ws.send(json.dumps({"type": "usage_summary", **summary}))
 
 
+async def handle_add_user_to_session(ws, user_name: str, data: dict):
+    """Add another user to a session. Only the session owner (creator) can do this."""
+    session_id = data.get("session_id", "")
+    target_user = data.get("target_user", "").strip()
+    if not target_user:
+        await ws.send(json.dumps({"type": "error", "message": "target_user is required"}))
+        return
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    # Only the session owner can add users
+    if user_name != session.user_name:
+        await ws.send(json.dumps({"type": "error", "message": "Only the session owner can add users"}))
+        return
+
+    # Validate target user exists
+    users = load_users()
+    if target_user not in users:
+        await ws.send(json.dumps({"type": "error", "message": f"User '{target_user}' does not exist"}))
+        return
+
+    # Validate target user has access to the project
+    project = get_project_record(session.project_name)
+    if project and target_user not in project.get("users", []):
+        await ws.send(json.dumps({"type": "error", "message": f"User '{target_user}' does not have access to project '{session.project_name}'"}))
+        return
+
+    session_manager.add_user_to_session(session_id, target_user)
+
+    # Notify the caller
+    await ws.send(json.dumps({
+        "type": "session_user_added",
+        "session_id": session_id,
+        "target_user": target_user,
+        "users": session.users,
+    }))
+    log.info("User '%s' added '%s' to session '%s'", user_name, target_user, session_id)
+
+    # Notify the target user if connected
+    target_ws = connected_clients.get(target_user)
+    if target_ws and target_ws != ws:
+        try:
+            await target_ws.send(json.dumps({
+                "type": "session_user_added",
+                "session_id": session_id,
+                "target_user": target_user,
+                "users": session.users,
+            }))
+        except Exception:
+            pass
+
+
+async def handle_remove_user_from_session(ws, user_name: str, data: dict):
+    """Remove a user from a session. Only the session owner (creator) can do this."""
+    session_id = data.get("session_id", "")
+    target_user = data.get("target_user", "").strip()
+    if not target_user:
+        await ws.send(json.dumps({"type": "error", "message": "target_user is required"}))
+        return
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    # Only the session owner can remove users
+    if user_name != session.user_name:
+        await ws.send(json.dumps({"type": "error", "message": "Only the session owner can remove users"}))
+        return
+
+    # Owner cannot remove themselves
+    if target_user == session.user_name:
+        await ws.send(json.dumps({"type": "error", "message": "Cannot remove the session owner"}))
+        return
+
+    if target_user not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": f"User '{target_user}' is not in this session"}))
+        return
+
+    session_manager.remove_user_from_session(session_id, target_user)
+
+    # Notify the caller
+    await ws.send(json.dumps({
+        "type": "session_user_removed",
+        "session_id": session_id,
+        "target_user": target_user,
+        "users": session.users,
+    }))
+    log.info("User '%s' removed '%s' from session '%s'", user_name, target_user, session_id)
+
+    # Notify the target user if connected
+    target_ws = connected_clients.get(target_user)
+    if target_ws and target_ws != ws:
+        try:
+            await target_ws.send(json.dumps({
+                "type": "session_user_removed",
+                "session_id": session_id,
+                "target_user": target_user,
+                "users": session.users,
+            }))
+        except Exception:
+            pass
+
+
 MAX_DIFF_BYTES = 500_000  # 500 KB cap on diff output
 
 
@@ -1592,9 +1684,7 @@ async def handle_get_diff(ws, user_name: str, data: dict):
                                   "message": f"Session '{session_id}' not found"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden",
                                   "message": "You don't have access to this session"}))
         return
@@ -1695,9 +1785,7 @@ async def handle_revert_hunk(ws, user_name: str, data: dict):
                                   "success": False, "error": "Session not found"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "revert_result", "session_id": session_id,
                                   "request_id": request_id,
                                   "success": False, "error": "Access denied"}))
@@ -1761,9 +1849,7 @@ async def handle_commit_and_push(ws, user_name: str, data: dict):
                                   "success": False, "message": "Session not found"}))
         return
 
-    project = get_project_record(session.project_name)
-    allowed = project.get("users", []) if project else [session.user_name]
-    if user_name not in allowed:
+    if user_name not in session.users:
         await ws.send(json.dumps({"type": "commit_push_result", "session_id": session_id,
                                   "success": False, "message": "Access denied"}))
         return
@@ -1911,6 +1997,12 @@ async def handle_client(websocket):
             elif msg_type == "btw":
                 await handle_btw(websocket, client_name, msg)
 
+            elif msg_type == "add_user_to_session":
+                await handle_add_user_to_session(websocket, client_name, msg)
+
+            elif msg_type == "remove_user_from_session":
+                await handle_remove_user_from_session(websocket, client_name, msg)
+
             else:
                 log.warning("Unknown message type '%s' from %s", msg_type, remote[0])
 
@@ -1972,6 +2064,9 @@ async def main():
         session_manager.cleanup_orphaned_sessions()
     except Exception as e:
         log.warning("Session cleanup warning: %s", e)
+
+    # Migrate existing sessions: populate users list for backward compatibility
+    session_manager.migrate_sessions_add_users(projects)
 
     # TLS / WSS setup
     ssl_cert = cfg.get("ssl_cert", "")
