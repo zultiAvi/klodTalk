@@ -452,7 +452,7 @@ class SessionManager:
     def get_active_sessions(self) -> list[Session]:
         return [s for s in self._sessions.values() if s.status == "active"]
 
-    def get_user_sessions(self, user_name: str, project_configs: list[dict]) -> list[Session]:
+    def get_user_sessions(self, user_name: str) -> list[Session]:
         """Return all sessions the user is registered on."""
         return [
             s for s in self._sessions.values()
@@ -490,6 +490,8 @@ class SessionManager:
             if pc:
                 session.users = list(pc.get("users", []))
             else:
+                log.warning("Session '%s' references project '%s' not found in config; falling back to creator '%s'",
+                            session.session_id, session.project_name, session.user_name)
                 session.users = [session.user_name]
             migrated += 1
         if migrated:

@@ -1,0 +1,60 @@
+## Coder Output: Per-Session User List with Add/Remove and Scoped Broadcasting
+
+### Changes Implemented
+
+**server/session_manager.py:**
+- Added `users: list` field to the `Session` dataclass (default: empty list)
+- Updated `create_session()` to set `users=[user_name]` so the creator is the first registered user
+- Updated `get_user_sessions()` to filter by `session.users` instead of project-level access
+- Added `add_user_to_session()` method
+- Added `remove_user_from_session()` method
+- Added `migrate_sessions_add_users()` method for backward compatibility: populates empty `users` lists from project config at startup
+
+**server/server.py:**
+- Updated `_broadcast_to_session_users()` to use `session.users` instead of project users
+- Updated `_mark_unread_for_others()` to use `session.users` instead of project users
+- Updated `_notify_session_error()` to use `session.users` instead of project users
+- Updated `_session_to_dict()` to include `users` field in the returned dictionary
+- Updated permission checks in ALL handlers to use `session.users`:
+  - `handle_stop()`
+  - `handle_btw()`
+  - `handle_close_session()`
+  - `handle_delete_session()`
+  - `handle_reopen_session()`
+  - `handle_text()`
+  - `handle_get_diff()`
+  - `handle_revert_hunk()`
+  - `handle_commit_and_push()`
+- Kept project-level `users` check in `handle_new_session()` (session doesn't exist yet)
+- Added `handle_add_user_to_session()` handler:
+  - Only session owner (creator) can add users
+  - Validates target user exists and has project access
+  - Notifies both caller and target user
+- Added `handle_remove_user_from_session()` handler:
+  - Only session owner can remove users
+  - Owner cannot remove themselves
+  - Notifies both caller and target user
+- Added message routing for `add_user_to_session` and `remove_user_from_session` types
+- Added migration call at startup (`migrate_sessions_add_users`) after orphaned session cleanup
+
+### New WebSocket Message Types
+
+| Direction | Type | Fields |
+|-----------|------|--------|
+| Client → Server | `add_user_to_session` | `session_id`, `target_user` |
+| Server → Client | `session_user_added` | `session_id`, `target_user`, `users` |
+| Client → Server | `remove_user_from_session` | `session_id`, `target_user` |
+| Server → Client | `session_user_removed` | `session_id`, `target_user`, `users` |
+
+### Round 1 Review Fixes
+
+**Issue 3 — Dead `project_configs` parameter in `get_user_sessions`:**
+- Removed unused `project_configs: list[dict]` parameter from `get_user_sessions()` in `session_manager.py`
+- Updated the call site in `server.py` (`handle_get_history`) to no longer pass the `projects` argument
+
+**Issue 5 — Close/delete/reopen should be owner-only:**
+- Changed permission checks in `handle_close_session`, `handle_delete_session`, and `handle_reopen_session` from `user_name not in session.users` to `user_name != session.user_name` (owner check)
+- Updated error messages to indicate "Only the session owner can close/delete/reopen this session"
+
+**Issue 4 — Add log.warning for orphaned sessions in migration:**
+- Added `log.warning(...)` in `migrate_sessions_add_users` when a session's project is not found in config and falls back to just the creator

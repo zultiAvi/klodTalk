@@ -1346,8 +1346,8 @@ async def handle_close_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
-    if user_name not in session.users:
-        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+    if user_name != session.user_name:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "Only the session owner can close this session"}))
         return
 
     await ws.send(json.dumps({"type": "session_closing", "session_id": session_id}))
@@ -1374,8 +1374,8 @@ async def handle_delete_session(ws, user_name: str, data: dict):
                                   "message": "Cannot delete an active session; close it first"}))
         return
 
-    if user_name not in session.users:
-        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+    if user_name != session.user_name:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "Only the session owner can delete this session"}))
         return
 
     ok = session_manager.delete_session(session_id)
@@ -1404,8 +1404,8 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
                                   "message": "Session workspace no longer exists. Cannot reopen."}))
         return
 
-    if user_name not in session.users:
-        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+    if user_name != session.user_name:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "Only the session owner can reopen this session"}))
         return
 
     project = get_project_record(session.project_name)
@@ -1505,7 +1505,7 @@ async def handle_text(ws, user_name: str, data: dict):
 
 async def handle_get_history(ws, user_name: str):
     projects = load_projects()
-    sessions = session_manager.get_user_sessions(user_name, projects)
+    sessions = session_manager.get_user_sessions(user_name)
     unread = unread_state.get_unread(user_name)
 
     history = []
