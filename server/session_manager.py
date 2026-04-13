@@ -474,8 +474,13 @@ class SessionManager:
         session = self._sessions.get(session_id)
         if not session:
             return False
+        if user_name == session.user_name:
+            return False  # owner cannot be removed
         if user_name in session.users:
-            session.users.remove(user_name)
+            try:
+                session.users.remove(user_name)
+            except ValueError:
+                pass
             self.save_sessions()
         return True
 
@@ -489,6 +494,8 @@ class SessionManager:
             pc = project_map.get(session.project_name)
             if pc:
                 session.users = list(pc.get("users", []))
+                if session.user_name not in session.users:
+                    session.users.append(session.user_name)
             else:
                 log.warning("Session '%s' references project '%s' not found in config; falling back to creator '%s'",
                             session.session_id, session.project_name, session.user_name)

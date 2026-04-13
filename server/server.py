@@ -6,6 +6,7 @@ per-user unread markers, and explicit send-mode buttons (no trigger phrases).
 """
 
 import asyncio
+import hmac
 import json
 import logging
 import os
@@ -355,7 +356,7 @@ def get_project_record(project_name: str) -> dict | None:
 
 
 def verify_password(stored_hash: str, received_hash: str) -> bool:
-    return stored_hash == received_hash
+    return hmac.compare_digest(stored_hash, received_hash)
 
 
 # ── Message file helpers ──────────────────────────────────────────────────────
@@ -1522,6 +1523,10 @@ async def handle_get_history(ws, user_name: str):
 
 async def handle_mark_read(ws, user_name: str, data: dict):
     session_id = data.get("session_id", "")
+    session = session_manager.get_session(session_id)
+    if not session or user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
     unread_state.mark_read(session_id, user_name)
     await ws.send(json.dumps({"type": "read_ack", "session_id": session_id}))
 
@@ -1624,7 +1629,7 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
     }))
     log.info("User '%s' removed '%s' from session '%s'", user_name, target_user, session_id)
 
-    # Notify the target user if connected
+    # Notify the target user if connected (omit users list for the evicted user)
     target_ws = connected_clients.get(target_user)
     if target_ws and target_ws != ws:
         try:
@@ -1632,7 +1637,6 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
                 "type": "session_user_removed",
                 "session_id": session_id,
                 "target_user": target_user,
-                "users": session.users,
             }))
         except Exception:
             pass

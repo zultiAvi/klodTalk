@@ -58,3 +58,22 @@
 
 **Issue 4 — Add log.warning for orphaned sessions in migration:**
 - Added `log.warning(...)` in `migrate_sessions_add_users` when a session's project is not found in config and falls back to just the creator
+
+### Security Review Fixes
+
+**CRITICAL-1 — Timing attack in verify_password (server/server.py):**
+- Replaced `==` comparison with `hmac.compare_digest()` for constant-time hash comparison
+- Added `import hmac` to top-level imports
+
+**HIGH-1 — Removed user receives full users list (server/server.py):**
+- Omitted `users` field from the notification sent to the evicted user in `handle_remove_user_from_session`; only the caller (session owner) sees the updated users list
+
+**HIGH-2 — handle_mark_read has no session membership check (server/server.py):**
+- Added session lookup and `user_name in session.users` membership check before calling `mark_read`; returns `Forbidden` error if unauthorized
+
+**MEDIUM-1 — ValueError on double-remove (server/session_manager.py):**
+- Wrapped `session.users.remove()` in try/except ValueError in `remove_user_from_session`
+
+**MEDIUM-2 — Owner protection (server/session_manager.py):**
+- Added owner guard in `remove_user_from_session()`: returns False if attempting to remove the session owner
+- Added owner inclusion guard in `migrate_sessions_add_users()`: ensures `session.user_name` is in `session.users` after migration from project config
