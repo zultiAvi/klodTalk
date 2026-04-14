@@ -1699,6 +1699,7 @@ async def handle_get_diff(ws, user_name: str, data: dict):
                                   "diff": "(Workspace no longer exists)"}))
         return
 
+    project = get_project_record(session.project_name)
     loop = asyncio.get_event_loop()
 
     def compute_diff():
