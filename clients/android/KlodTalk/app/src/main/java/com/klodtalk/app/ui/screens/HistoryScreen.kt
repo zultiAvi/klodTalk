@@ -2,6 +2,7 @@ package com.klodtalk.app.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,7 +25,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -225,6 +228,18 @@ fun HistoryScreen(viewModel: MainViewModel) {
                 )
             }
 
+            // Session users bar
+            if (session != null && session.users.isNotEmpty()) {
+                SessionUsersBar(
+                    users = session.users,
+                    ownerName = session.userName ?: "",
+                    currentUser = viewModel.getCurrentUserName(),
+                    isOwner = viewModel.isSessionOwner(currentSessionId ?: ""),
+                    onAddUser = { viewModel.addUserToSession(currentSessionId ?: "", it) },
+                    onRemoveUser = { viewModel.removeUserFromSession(currentSessionId ?: "", it) },
+                )
+            }
+
             // Messages list
             if (messages.isEmpty()) {
                 Box(
@@ -289,6 +304,118 @@ fun HistoryScreen(viewModel: MainViewModel) {
                         .padding(16.dp),
                     textAlign = TextAlign.Start
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SessionUsersBar(
+    users: List<String>,
+    ownerName: String,
+    currentUser: String,
+    isOwner: Boolean,
+    onAddUser: (String) -> Unit,
+    onRemoveUser: (String) -> Unit,
+) {
+    var addText by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            users.forEach { user ->
+                val isThisOwner = user == ownerName
+                val chipColor = if (isThisOwner)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = chipColor,
+                    border = if (isThisOwner) BorderStroke(1.dp, Color(0xFF4CAF50)) else null,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = user,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (isThisOwner) {
+                            Text(
+                                text = "(owner)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                        if (isOwner && !isThisOwner) {
+                            IconButton(
+                                onClick = { onRemoveUser(user) },
+                                modifier = Modifier.size(18.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Remove $user",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (isOwner) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = addText,
+                    onValueChange = { addText = it },
+                    modifier = Modifier.weight(1f).height(44.dp),
+                    singleLine = true,
+                    placeholder = { Text("Type username...", style = MaterialTheme.typography.labelSmall) },
+                    textStyle = MaterialTheme.typography.labelSmall,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(
+                        onDone = {
+                            val t = addText.trim()
+                            if (t.isNotEmpty()) {
+                                onAddUser(t)
+                                addText = ""
+                            }
+                        }
+                    ),
+                )
+                Button(
+                    onClick = {
+                        val t = addText.trim()
+                        if (t.isNotEmpty()) {
+                            onAddUser(t)
+                            addText = ""
+                        }
+                    },
+                    modifier = Modifier.height(36.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                ) {
+                    Text("Add", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

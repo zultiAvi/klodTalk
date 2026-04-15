@@ -468,6 +468,34 @@
     display: flex; justify-content: space-between; font-size: 10px;
     color: rgba(255,255,255,0.45); margin-top: 2px;
   }
+
+  /* ── Session users bar ── */
+  .session-users-section {
+    padding: 6px 16px; background: var(--surface); border-bottom: 1px solid #333;
+  }
+  .session-users-bar {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  }
+  .user-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--surface2); border: 1px solid #444; border-radius: 14px;
+    padding: 2px 10px; font-size: 12px; color: var(--text);
+  }
+  .user-chip.owner { border-color: var(--green); }
+  .user-chip .owner-label { font-size: 10px; color: var(--green); }
+  .user-chip .remove-user-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 14px; padding: 0 2px; line-height: 1;
+  }
+  .user-chip .remove-user-btn:hover { color: var(--red); }
+  .add-user-row {
+    display: flex; gap: 6px; align-items: center; margin-top: 6px;
+  }
+  .add-user-row input {
+    flex: 1; padding: 5px 10px; background: var(--surface2); color: var(--text);
+    border: 1px solid #444; border-radius: 8px; font-size: 13px;
+  }
+  .add-user-row input:focus { outline: none; border-color: var(--blue); }
 </style>
 </head>
 <body>
@@ -556,6 +584,13 @@
     </div>
     <button class="diff-btn" id="history-diff-btn" onclick="requestDiff()" title="Show Diff">Diff</button>
     <button class="history-close-btn hidden" id="history-close-btn" onclick="promptCloseSession(currentSessionId)" title="Close session">✕</button>
+  </div>
+  <div class="session-users-section" id="session-users-section" style="display:none;">
+    <div class="session-users-bar" id="session-users-bar"></div>
+    <div class="add-user-row" id="add-user-row" style="display:none;">
+      <input type="text" id="add-user-input" placeholder="Type username..." autocomplete="off" onkeydown="if(event.key==='Enter')addUserToSession()">
+      <button class="btn btn-small btn-blue" onclick="addUserToSession()">Add</button>
+    </div>
   </div>
   <div class="messages-list" id="messages-list"></div>
   <div class="history-input-area" id="history-input-area">
@@ -783,6 +818,7 @@ function goToHistory(sessionId) {
 
   showPage('history');
   renderMessages(sessionId);
+  renderSessionUsers(sessionId);
   updateTeamDropdown();
   updateInputButtons();
   const _ta = document.getElementById('msg-input');
@@ -917,6 +953,8 @@ function handleMessage(msg) {
         branch: msg.branch,
         status: msg.status || 'active',
         created_at: msg.created_at,
+        users: [loadPref('name', '')],
+        user_name: loadPref('name', ''),
       };
       sessionMessages[msg.session_id] = [];
       justCreatedSessions.add(msg.session_id);
@@ -974,6 +1012,34 @@ function handleMessage(msg) {
       }
       break;
 
+    case 'session_user_added':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].users = msg.users;
+        if (currentSessionId === msg.session_id) renderSessionUsers(currentSessionId);
+        saveState();
+      }
+      break;
+
+    case 'session_user_removed':
+      if (sessions[msg.session_id]) {
+        if (msg.target_user === loadPref('name', '')) {
+          // We were removed from this session
+          delete sessions[msg.session_id];
+          delete sessionMessages[msg.session_id];
+          if (currentSessionId === msg.session_id) {
+            currentSessionId = null;
+            showPage('sessions');
+          }
+          saveState();
+          renderSessionsList();
+        } else {
+          sessions[msg.session_id].users = msg.users;
+          if (currentSessionId === msg.session_id) renderSessionUsers(currentSessionId);
+          saveState();
+        }
+      }
+      break;
+
     case 'new_message': {
       const sid = msg.session_id;
       if (!sessionMessages[sid]) sessionMessages[sid] = [];
@@ -1024,6 +1090,8 @@ function handleMessage(msg) {
           status: s.status,
           created_at: s.created_at,
           closed_at: s.closed_at,
+          users: s.users || [],
+          user_name: s.user_name || '',
         };
         if (s.working) workingSessions.add(s.session_id);
         sessionMessages[s.session_id] = s.messages || [];
@@ -1119,6 +1187,49 @@ function appendSystemMsg(sessionId, content) {
   });
   if (currentSessionId === sessionId) renderMessages(sessionId);
   saveState();
+}
+
+// ── Session users management ──────────────────────────────────────────────
+function renderSessionUsers(sessionId) {
+  const section = document.getElementById('session-users-section');
+  const bar = document.getElementById('session-users-bar');
+  const addRow = document.getElementById('add-user-row');
+  const s = sessions[sessionId];
+  if (!s || !s.users || s.users.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  const currentUser = loadPref('name', '');
+  const isOwner = s.user_name === currentUser;
+  addRow.style.display = isOwner ? 'flex' : 'none';
+  let html = '';
+  s.users.forEach(u => {
+    const isThisOwner = u === s.user_name;
+    const chipClass = isThisOwner ? 'user-chip owner' : 'user-chip';
+    const ownerLabel = isThisOwner ? ' <span class="owner-label">(owner)</span>' : '';
+    const removeBtn = (isOwner && !isThisOwner) ?
+      ` <button class="remove-user-btn" onclick="removeUserFromSession('${u.replace(/'/g, "\\'")}')" title="Remove">&times;</button>` : '';
+    html += `<span class="${chipClass}">${u}${ownerLabel}${removeBtn}</span>`;
+  });
+  bar.innerHTML = html;
+}
+
+function addUserToSession() {
+  const input = document.getElementById('add-user-input');
+  const val = input.value.trim();
+  if (!val || !currentSessionId) return;
+  if (ws && isConnected) {
+    ws.send(JSON.stringify({ type: 'add_user_to_session', session_id: currentSessionId, target_user: val }));
+  }
+  input.value = '';
+}
+
+function removeUserFromSession(targetUser) {
+  if (!currentSessionId) return;
+  if (ws && isConnected) {
+    ws.send(JSON.stringify({ type: 'remove_user_from_session', session_id: currentSessionId, target_user: targetUser }));
+  }
 }
 
 // ── Sessions list render ───────────────────────────────────────────────────

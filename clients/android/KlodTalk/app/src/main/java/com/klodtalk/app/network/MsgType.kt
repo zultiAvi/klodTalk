@@ -19,4 +19,6 @@ object MsgType {
     const val ERROR = "error"
     const val PROGRESS = "progress"
     const val SESSION_WORKING = "session_working"
+    const val SESSION_USER_ADDED = "session_user_added"
+    const val SESSION_USER_REMOVED = "session_user_removed"
 }

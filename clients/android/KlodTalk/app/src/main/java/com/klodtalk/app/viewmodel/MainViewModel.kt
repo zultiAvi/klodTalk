@@ -161,7 +161,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (session.tempId != null) {
                 _preparingSessions.value = _preparingSessions.value.filter { it.tempId != session.tempId }
             }
-            _sessions.value = _sessions.value + (session.sessionId to session)
+            val sessionWithUsers = if (session.users.isEmpty()) {
+                session.copy(users = listOf(clientName))
+            } else session
+            _sessions.value = _sessions.value + (session.sessionId to sessionWithUsers)
             _sessionHistories.value = _sessionHistories.value + (session.sessionId to SessionHistory(session, emptyList()))
             // Briefly mark as just-created for glow animation
             _justCreatedSessions.value = _justCreatedSessions.value + session.sessionId
@@ -255,6 +258,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _workingSessions.value + sessionId
             } else {
                 _workingSessions.value - sessionId
+            }
+        }
+
+        override fun onSessionUserAdded(sessionId: String, targetUser: String, users: List<String>) {
+            mainHandler.post {
+                val existing = _sessions.value[sessionId] ?: return@post
+                _sessions.value = _sessions.value + (sessionId to existing.copy(users = users))
+            }
+        }
+
+        override fun onSessionUserRemoved(sessionId: String, targetUser: String, users: List<String>) {
+            mainHandler.post {
+                if (targetUser == clientName) {
+                    // We were removed from this session
+                    _sessions.value = _sessions.value - sessionId
+                    _sessionHistories.value = _sessionHistories.value - sessionId
+                    _unreadSessions.value = _unreadSessions.value - sessionId
+                    if (_currentSessionId.value == sessionId) {
+                        _currentSessionId.value = null
+                        _screen.value = Screen.SESSIONS
+                    }
+                } else {
+                    val existing = _sessions.value[sessionId] ?: return@post
+                    _sessions.value = _sessions.value + (sessionId to existing.copy(users = users))
+                }
             }
         }
 
@@ -356,6 +384,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun goToSettings() {
         _screen.value = Screen.SETTINGS
     }
+
+    fun addUserToSession(sessionId: String, targetUser: String) {
+        wsClient.sendAddUserToSession(sessionId, targetUser.trim())
+    }
+
+    fun removeUserFromSession(sessionId: String, targetUser: String) {
+        wsClient.sendRemoveUserFromSession(sessionId, targetUser)
+    }
+
+    fun isSessionOwner(sessionId: String): Boolean {
+        val session = _sessions.value[sessionId] ?: return false
+        return session.userName == clientName
+    }
+
+    fun getCurrentUserName(): String = clientName
 
     fun selectTeam(sessionId: String, teamName: String) {
         _selectedTeam.value = _selectedTeam.value + (sessionId to teamName)
