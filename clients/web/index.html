@@ -489,7 +489,7 @@
   }
   .user-chip .remove-user-btn:hover { color: var(--red); }
   .add-user-row {
-    display: flex; gap: 6px; align-items: center; margin-top: 6px;
+    display: inline-flex; gap: 6px; align-items: center;
   }
   .add-user-row input {
     flex: 1; padding: 5px 10px; background: var(--surface2); color: var(--text);
@@ -587,10 +587,6 @@
   </div>
   <div class="session-users-section" id="session-users-section" style="display:none;">
     <div class="session-users-bar" id="session-users-bar"></div>
-    <div class="add-user-row" id="add-user-row" style="display:none;">
-      <input type="text" id="add-user-input" placeholder="Type username..." autocomplete="off" onkeydown="if(event.key==='Enter')addUserToSession()">
-      <button class="btn btn-small btn-blue" onclick="addUserToSession()">Add</button>
-    </div>
   </div>
   <div class="messages-list" id="messages-list"></div>
   <div class="history-input-area" id="history-input-area">
@@ -1193,7 +1189,6 @@ function appendSystemMsg(sessionId, content) {
 function renderSessionUsers(sessionId) {
   const section = document.getElementById('session-users-section');
   const bar = document.getElementById('session-users-bar');
-  const addRow = document.getElementById('add-user-row');
   const s = sessions[sessionId];
   if (!s || !s.users || s.users.length === 0) {
     section.style.display = 'none';
@@ -1202,9 +1197,13 @@ function renderSessionUsers(sessionId) {
   section.style.display = '';
   const currentUser = loadPref('name', '');
   const isOwner = s.user_name === currentUser;
-  addRow.style.display = isOwner ? 'flex' : 'none';
+  const sortedUsers = [...s.users].sort((a, b) => {
+    if (a === s.user_name) return -1;
+    if (b === s.user_name) return 1;
+    return 0;
+  });
   let html = '';
-  s.users.forEach(u => {
+  sortedUsers.forEach(u => {
     const escapedUser = esc(u);
     const isThisOwner = u === s.user_name;
     const chipClass = isThisOwner ? 'user-chip owner' : 'user-chip';
@@ -1214,6 +1213,9 @@ function renderSessionUsers(sessionId) {
       ` <button class="remove-user-btn" onclick="removeUserFromSession('${escapedUser}')" title="${u === currentUser ? 'Leave' : 'Remove'}">&times;</button>` : '';
     html += `<span class="${chipClass}">${escapedUser}${ownerLabel}${removeBtn}</span>`;
   });
+  if (isOwner) {
+    html += `<span class="add-user-row"><input type="text" id="add-user-input" placeholder="Type username..." autocomplete="off" onkeydown="if(event.key==='Enter')addUserToSession()"><button class="btn btn-small btn-blue" onclick="addUserToSession()">Add</button></span>`;
+  }
   bar.innerHTML = html;
 }
 
