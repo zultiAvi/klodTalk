@@ -51,6 +51,7 @@ interface KlodTalkWebSocketListener {
     fun onSessionWorking(sessionId: String, working: Boolean)
     fun onSessionUserAdded(sessionId: String, targetUser: String, users: List<String>)
     fun onSessionUserRemoved(sessionId: String, targetUser: String, users: List<String>)
+    fun onDisconnected(authFailed: Boolean)
 }
 
 class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
@@ -240,6 +241,7 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
                 isConnected = false
                 val status = if (code == 4001) "Authentication failed" else "Disconnected"
                 listener.onStatusChange(status)
+                listener.onDisconnected(code == 4001)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -248,6 +250,7 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
                 isConnecting = false
                 isConnected = false
                 listener.onStatusChange("Connection failed: ${t.message}")
+                listener.onDisconnected(false)
             }
         })
     }

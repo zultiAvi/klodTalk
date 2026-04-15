@@ -48,6 +48,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var reconnectRunnable: Runnable? = null
+    private var reconnectAttempt = 0
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val _screen = MutableStateFlow(Screen.SETTINGS)
     val screen: StateFlow<Screen> = _screen
@@ -135,6 +137,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         override fun onStatusChange(status: String) { _connectionStatus.value = status }
 
         override fun onProjectsReceived(projects: List<ProjectInfo>) {
+            mainHandler.post { cancelReconnect() }
             _projects.value = projects
             // Auto-navigate from settings to sessions on successful authentication
             if (_screen.value == Screen.SETTINGS) {
@@ -286,6 +289,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        override fun onDisconnected(authFailed: Boolean) {
+            if (!authFailed) {
+                mainHandler.post { scheduleReconnect() }
+            }
+        }
+
         override fun onErrorReceived(sessionId: String?, message: String) {
             _lastServerMessage.value = "Error: $message"
             Log.e(TAG, "Server error: $message")
@@ -336,7 +345,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connect() {
+        cancelReconnect()
         wsClient.connect(serverIp, serverPort, clientName, clientPassword, serverProtocol)
+    }
+
+    private fun scheduleReconnect() {
+        if (reconnectRunnable != null) return
+        val delaySec = if (reconnectAttempt == 0) 10L else 30L
+        reconnectAttempt++
+        _connectionStatus.value = "Reconnecting in ${delaySec}s..."
+        val runnable = Runnable {
+            reconnectRunnable = null
+            if (!wsClient.isConnected() && serverIp.isNotEmpty()) {
+                connect()
+            }
+        }
+        reconnectRunnable = runnable
+        mainHandler.postDelayed(runnable, delaySec * 1000)
+    }
+
+    private fun cancelReconnect() {
+        reconnectRunnable?.let { mainHandler.removeCallbacks(it) }
+        reconnectRunnable = null
+        reconnectAttempt = 0
     }
 
     fun requestHistory() {
@@ -537,6 +568,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onAppForegrounded() {
         _isAppInForeground.value = true
         if (!wsClient.isConnected() && serverIp.isNotEmpty()) {
+            cancelReconnect()
             connect()
         }
     }
@@ -594,6 +626,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        cancelReconnect()
         mainHandler.removeCallbacksAndMessages(null)
         speechRecognizer?.destroy()
         tts?.shutdown()
