@@ -139,12 +139,14 @@ class SessionManager:
         except Exception as e:
             log.error("Failed to save counters: %s", e)
 
-    def next_branch_name(self, project_name: str) -> str:
-        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', project_name).lower()
-        count = self._counters.get(project_name, 0) + 1
-        self._counters[project_name] = count
+    def next_branch_name(self, project_name: str, user_name: str) -> str:
+        safe_project = re.sub(r'[^a-zA-Z0-9_-]', '_', project_name).lower()
+        safe_user = re.sub(r'[^a-zA-Z0-9_-]', '_', user_name).lower()
+        counter_key = f"{safe_user}_{safe_project}"
+        count = self._counters.get(counter_key, 0) + 1
+        self._counters[counter_key] = count
         self.save_counters()
-        return f"{safe_name}_{count:03d}"
+        return f"KlodTalk_{safe_user}_{safe_project}_{count:03d}"
 
     def create_session(self, project_name: str, user_name: str, project_config: dict) -> Optional[Session]:
         """Create a new session: copy workspace, create branch, start container."""
@@ -154,7 +156,7 @@ class SessionManager:
             return None
 
         session_id = uuid.uuid4().hex[:8]
-        branch_name = self.next_branch_name(project_name)
+        branch_name = self.next_branch_name(project_name, user_name)
         temp_path = os.path.join(TEMP_BASE, session_id)
         cname = f"{CONTAINER_PREFIX}{session_id}"
 
