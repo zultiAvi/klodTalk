@@ -361,7 +361,7 @@ private fun SessionUsersBar(
                                 color = Color(0xFF4CAF50)
                             )
                         }
-                        if (isOwner && !isThisOwner) {
+                        if ((isOwner && !isThisOwner) || (!isOwner && user == currentUser)) {
                             IconButton(
                                 onClick = { onRemoveUser(user) },
                                 modifier = Modifier.size(18.dp)

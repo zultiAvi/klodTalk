@@ -1,0 +1,3 @@
+server/server.py
+clients/web/index.html
+clients/android/KlodTalk/app/src/main/java/com/klodtalk/app/ui/screens/HistoryScreen.kt

@@ -1,0 +1,30 @@
+## Coder Output
+
+### Summary
+Implemented permission changes for session user removal so that:
+- Non-owner users can remove themselves (leave a session)
+- The session owner can remove any other user but not themselves
+- No one can remove the owner
+
+### Changes Made
+
+#### Step 1: server/server.py - handle_remove_user_from_session()
+- Updated docstring to reflect new permission model
+- Moved the "owner cannot be removed" check earlier (before authorization), so it applies universally
+- Replaced the strict "only owner can remove" gate with two-part logic:
+  - If the target is the owner: always reject
+  - If the caller is not the owner and is not removing themselves: reject
+  - Otherwise: allow (owner removing others, or non-owner removing self)
+
+#### Step 2: clients/web/index.html - renderSessionUsers()
+- Changed the remove button visibility condition to also include non-owner self-removal
+- Added contextual tooltip: "Leave" for self-removal, "Remove" for owner removing others
+
+#### Step 3: clients/android/.../HistoryScreen.kt - SessionUsersBar
+- Changed the remove icon visibility condition to also show for non-owner users on their own chip
+
+### Decisions
+- No deviations from the plan
+
+### Known Limitations
+- None identified

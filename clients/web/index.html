@@ -1209,8 +1209,9 @@ function renderSessionUsers(sessionId) {
     const isThisOwner = u === s.user_name;
     const chipClass = isThisOwner ? 'user-chip owner' : 'user-chip';
     const ownerLabel = isThisOwner ? ' <span class="owner-label">(owner)</span>' : '';
-    const removeBtn = (isOwner && !isThisOwner) ?
-      ` <button class="remove-user-btn" onclick="removeUserFromSession('${escapedUser}')" title="Remove">&times;</button>` : '';
+    const canRemove = (isOwner && !isThisOwner) || (!isOwner && u === currentUser);
+    const removeBtn = canRemove ?
+      ` <button class="remove-user-btn" onclick="removeUserFromSession('${escapedUser}')" title="${u === currentUser ? 'Leave' : 'Remove'}">&times;</button>` : '';
     html += `<span class="${chipClass}">${escapedUser}${ownerLabel}${removeBtn}</span>`;
   });
   bar.innerHTML = html;
