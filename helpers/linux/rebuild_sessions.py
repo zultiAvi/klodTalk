@@ -84,10 +84,18 @@ def _git_branch_in(directory: str) -> str:
 
 
 def _branch_to_project_name(branch: str) -> str:
-    """Extract project name from branch name (format: <safe_name>_NNN)."""
+    """Extract project name from branch name.
+
+    Supports new format ``KlodTalk_{user}_{project}_{NNN}`` and
+    legacy format ``{project}_{NNN}``.
+    """
     if not branch:
         return "unknown"
-    # Strip trailing _NNN (1-3+ digits)
+    # New format: KlodTalk_{user}_{project}_{NNN}
+    m = re.match(r"^KlodTalk_[^_]+_(.+)_\d{3}$", branch)
+    if m:
+        return m.group(1)
+    # Legacy format: {project}_{NNN}
     m = re.match(r"^(.+)_\d{1,}$", branch)
     if m:
         return m.group(1)
