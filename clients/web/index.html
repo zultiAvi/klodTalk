@@ -655,6 +655,8 @@ let sessionMessages = {}; // session_id → message[]
 let unreadSessions = new Set();
 let currentSessionId = null;
 let isConnected = false;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
 let pendingCloseSessionId = null;
 let preparingSessions = {}; // temp_id → { project, tempId }
 let justCreatedSessions = new Set(); // session_ids with active glow
@@ -852,7 +854,24 @@ function saveAndConnect() {
   showPage('sessions');
 }
 
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  const delaySec = reconnectAttempt === 0 ? 10 : 30;
+  reconnectAttempt++;
+  setStatus(`Reconnecting in ${delaySec}s...`, 'error');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, delaySec * 1000);
+}
+
+function cancelReconnect() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempt = 0;
+}
+
 function connect() {
+  cancelReconnect();
   const ip = loadPref('ip', '');
   const port = loadPref('port', '9000');
   const name = loadPref('name', '');
@@ -868,6 +887,7 @@ function connect() {
 
   ws.onopen = () => {
     isConnected = true;
+    cancelReconnect();
     setStatus('Connected — authenticating...', 'connected');
     sha256(pass).then(h => {
       ws.send(JSON.stringify({ type: 'hello', name, password_hash: h }));
@@ -881,6 +901,9 @@ function connect() {
     const msg = ev.code === 4001 ? 'Authentication failed' : 'Disconnected';
     setStatus(msg, 'error');
     document.getElementById('header-user').textContent = '';
+    if (ev.code !== 4001) {
+      scheduleReconnect();
+    }
   };
 
   ws.onerror = () => {
@@ -893,6 +916,7 @@ function connect() {
     } else {
       setStatus('Connection error', 'error');
     }
+    scheduleReconnect();
   };
 }
 
