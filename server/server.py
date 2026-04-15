@@ -1592,7 +1592,12 @@ async def handle_add_user_to_session(ws, user_name: str, data: dict):
 
 
 async def handle_remove_user_from_session(ws, user_name: str, data: dict):
-    """Remove a user from a session. Only the session owner (creator) can do this."""
+    """Remove a user from a session.
+
+    Permissions:
+    - The session owner can remove any other user, but not themselves.
+    - Non-owner users can remove themselves (leave), but no one else.
+    """
     session_id = data.get("session_id", "")
     target_user = data.get("target_user", "").strip()
     if not target_user:
@@ -1604,14 +1609,17 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
         return
 
-    # Only the session owner can remove users
-    if user_name != session.user_name:
-        await ws.send(json.dumps({"type": "error", "message": "Only the session owner can remove users"}))
-        return
-
-    # Owner cannot remove themselves
+    # Owner cannot be removed (neither by themselves nor by others)
     if target_user == session.user_name:
         await ws.send(json.dumps({"type": "error", "message": "Cannot remove the session owner"}))
+        return
+
+    is_owner = user_name == session.user_name
+    is_self_removal = target_user == user_name
+
+    # Non-owners can only remove themselves
+    if not is_owner and not is_self_removal:
+        await ws.send(json.dumps({"type": "error", "message": "Only the session owner can remove other users"}))
         return
 
     if target_user not in session.users:

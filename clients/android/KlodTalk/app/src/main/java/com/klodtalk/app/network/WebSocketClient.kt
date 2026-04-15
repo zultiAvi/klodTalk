@@ -21,6 +21,7 @@ data class SessionInfo(
     val userName: String? = null,
     val tempId: String? = null,
     val working: Boolean = false,
+    val users: List<String> = emptyList(),
 )
 
 data class HistoryMessage(
@@ -48,6 +49,8 @@ interface KlodTalkWebSocketListener {
     fun onAckReceived(sessionId: String?, content: String)
     fun onErrorReceived(sessionId: String?, message: String)
     fun onSessionWorking(sessionId: String, working: Boolean)
+    fun onSessionUserAdded(sessionId: String, targetUser: String, users: List<String>)
+    fun onSessionUserRemoved(sessionId: String, targetUser: String, users: List<String>)
 }
 
 class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
@@ -195,6 +198,20 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
                                 working = json.optBoolean("working", false),
                             )
                         }
+                        MsgType.SESSION_USER_ADDED -> {
+                            listener.onSessionUserAdded(
+                                sessionId = json.optString("session_id", ""),
+                                targetUser = json.optString("target_user", ""),
+                                users = parseStringArray(json.optJSONArray("users")),
+                            )
+                        }
+                        MsgType.SESSION_USER_REMOVED -> {
+                            listener.onSessionUserRemoved(
+                                sessionId = json.optString("session_id", ""),
+                                targetUser = json.optString("target_user", ""),
+                                users = parseStringArray(json.optJSONArray("users")),
+                            )
+                        }
                         MsgType.RESPONSE -> {
                             // Legacy compat — treat as new_message with role=agent
                             listener.onNewMessage(
@@ -271,6 +288,14 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
         put("type", "btw"); put("session_id", sessionId); put("content", content)
     }
 
+    fun sendAddUserToSession(sessionId: String, targetUser: String): Boolean = send {
+        put("type", "add_user_to_session"); put("session_id", sessionId); put("target_user", targetUser)
+    }
+
+    fun sendRemoveUserFromSession(sessionId: String, targetUser: String): Boolean = send {
+        put("type", "remove_user_from_session"); put("session_id", sessionId); put("target_user", targetUser)
+    }
+
     fun disconnect() {
         webSocket?.close(1000, "Client disconnected")
         webSocket = null
@@ -299,6 +324,7 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
         userName = json.optString("user_name").ifEmpty { null },
         tempId = json.optString("temp_id").ifEmpty { null },
         working = json.optBoolean("working", false),
+        users = parseStringArray(json.optJSONArray("users")),
     )
 
     private fun parseSessionArray(arr: JSONArray?): List<SessionInfo> {
