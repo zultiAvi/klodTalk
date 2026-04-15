@@ -1205,12 +1205,13 @@ function renderSessionUsers(sessionId) {
   addRow.style.display = isOwner ? 'flex' : 'none';
   let html = '';
   s.users.forEach(u => {
+    const escapedUser = esc(u);
     const isThisOwner = u === s.user_name;
     const chipClass = isThisOwner ? 'user-chip owner' : 'user-chip';
     const ownerLabel = isThisOwner ? ' <span class="owner-label">(owner)</span>' : '';
     const removeBtn = (isOwner && !isThisOwner) ?
-      ` <button class="remove-user-btn" onclick="removeUserFromSession('${u.replace(/'/g, "\\'")}')" title="Remove">&times;</button>` : '';
-    html += `<span class="${chipClass}">${u}${ownerLabel}${removeBtn}</span>`;
+      ` <button class="remove-user-btn" onclick="removeUserFromSession('${escapedUser}')" title="Remove">&times;</button>` : '';
+    html += `<span class="${chipClass}">${escapedUser}${ownerLabel}${removeBtn}</span>`;
   });
   bar.innerHTML = html;
 }
