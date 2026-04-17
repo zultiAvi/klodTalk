@@ -503,6 +503,134 @@
     border: 1px solid #444; border-radius: 8px; font-size: 13px;
   }
   .add-user-row input:focus { outline: none; border-color: var(--blue); }
+
+  /* --- Logs overlay --- */
+  .logs-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; flex-direction: column; z-index: 200;
+  }
+  .logs-overlay.hidden { display: none; }
+  .logs-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #1a1a2e; border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  .logs-header-title { font-size: 15px; font-weight: 600; color: #fff; white-space: nowrap; }
+  .logs-close-btn {
+    background: none; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; margin-left: auto;
+  }
+  .logs-close-btn:hover { background: rgba(255,255,255,0.15); }
+  .logs-content {
+    flex: 1; overflow-y: auto; padding: 12px; background: #0d0d0d;
+  }
+  .logs-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
+  .logs-session-block { margin-bottom: 16px; border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+  .logs-session-header {
+    background: #1a1a2e; padding: 8px 12px; font-size: 13px; color: #ccc;
+    display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+  }
+  .logs-session-header:hover { background: #222240; }
+  .logs-token-summary { font-size: 12px; color: var(--muted); }
+  .logs-events { max-height: 500px; overflow-y: auto; }
+  .log-event {
+    padding: 6px 12px; border-bottom: 1px solid #1a1a1a; font-size: 13px;
+    display: flex; gap: 8px; align-items: flex-start; cursor: pointer;
+  }
+  .log-event:hover { background: rgba(255,255,255,0.03); }
+  .log-event.expanded .log-event-full { display: block; }
+  .log-event-full { display: none; white-space: pre-wrap; color: #ccc; margin-top: 6px; font-size: 12px; max-height: 300px; overflow-y: auto; }
+  .log-role-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+    white-space: nowrap; flex-shrink: 0; min-width: 60px; text-align: center;
+  }
+  .log-role-badge.user { background: var(--msg-user); color: #8f8; }
+  .log-role-badge.assistant { background: var(--msg-agent); color: #8af; }
+  .log-role-badge.tool { background: var(--msg-coder); color: #8ff; }
+  .log-role-badge.system { background: var(--msg-system); color: #aaa; }
+  .log-role-badge.hook { background: var(--msg-review); color: #c8a; }
+  .log-role-badge.unknown { background: #333; color: #888; }
+  .log-event-preview { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .log-tokens { font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+  .log-subagent-link { color: var(--blue); cursor: pointer; font-size: 11px; text-decoration: underline; margin-left: 6px; }
+  .log-subagent-link:hover { color: #4a9eff; }
+  .log-compaction-marker {
+    background: #3a2a00; border-left: 3px solid var(--amber); padding: 6px 12px;
+    font-size: 12px; color: var(--amber); font-style: italic;
+  }
+
+  /* --- Token breakdown overlay --- */
+  .tokens-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; flex-direction: column; z-index: 200;
+  }
+  .tokens-overlay.hidden { display: none; }
+  .tokens-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #1a1a2e; border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  .tokens-header-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .tokens-close-btn {
+    background: none; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; margin-left: auto;
+  }
+  .tokens-close-btn:hover { background: rgba(255,255,255,0.15); }
+  .tokens-content { flex: 1; overflow-y: auto; padding: 20px; background: #0d0d0d; }
+  .tokens-table { width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; }
+  .tokens-table th, .tokens-table td {
+    padding: 8px 16px; text-align: right; font-size: 14px; border-bottom: 1px solid #333;
+  }
+  .tokens-table th { color: var(--muted); font-weight: 600; text-align: right; }
+  .tokens-table th:first-child, .tokens-table td:first-child { text-align: left; }
+  .tokens-table .total-row { font-weight: 700; border-top: 2px solid #555; }
+  .tokens-role-planner { color: #e8a040; }
+  .tokens-role-coder { color: #40c8c8; }
+  .tokens-role-reviewer { color: #c080e0; }
+  .tokens-role-unknown { color: var(--muted); }
+  .tokens-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
+
+  /* --- Analysis overlay --- */
+  .analysis-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; flex-direction: column; z-index: 200;
+  }
+  .analysis-overlay.hidden { display: none; }
+  .analysis-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: #1a1a2e; border-bottom: 1px solid #333;
+    flex-shrink: 0;
+  }
+  .analysis-header-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .analysis-close-btn {
+    background: none; border: none; color: #fff; font-size: 22px;
+    cursor: pointer; padding: 4px 10px; border-radius: 6px; flex-shrink: 0; margin-left: auto;
+  }
+  .analysis-close-btn:hover { background: rgba(255,255,255,0.15); }
+  .analysis-content { flex: 1; overflow-y: auto; padding: 20px; background: #0d0d0d; }
+  .analysis-loading { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
+  .analysis-task-card {
+    background: var(--surface); border: 1px solid #333; border-radius: 8px;
+    margin-bottom: 12px; overflow: hidden;
+  }
+  .analysis-task-header {
+    padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  }
+  .analysis-task-header:hover { background: rgba(255,255,255,0.03); }
+  .analysis-task-title { font-weight: 600; color: var(--text); font-size: 14px; }
+  .analysis-task-toggle { color: var(--muted); font-size: 12px; }
+  .analysis-task-body { padding: 10px 14px; border-top: 1px solid #333; display: none; }
+  .analysis-task-body.expanded { display: block; }
+  .analysis-task-objective { color: #aaa; font-size: 13px; margin-bottom: 8px; }
+  .analysis-task-assessment { color: var(--text); font-size: 13px; margin-bottom: 8px; }
+  .analysis-suggestion { color: #8af; font-size: 13px; padding: 3px 0; }
+  .analysis-overall {
+    background: var(--surface); border: 1px solid #333; border-radius: 8px;
+    padding: 14px; margin-top: 16px;
+  }
+  .analysis-overall-title { font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .analysis-team-rec { color: var(--amber); font-size: 13px; margin-top: 10px; }
+  .analysis-raw { white-space: pre-wrap; color: #ccc; font-size: 13px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -591,6 +719,9 @@
       <div class="history-tokens" id="history-tokens" style="display:none;">In: <b id="st-in">—</b> · Out: <b id="st-out">—</b> · <b id="st-cost">—</b></div>
     </div>
     <button class="diff-btn" id="history-diff-btn" onclick="requestDiff()" title="Show Diff">Diff</button>
+    <button class="diff-btn" id="history-logs-btn" onclick="requestAgentLogs()" title="Agent Logs">Logs</button>
+    <button class="diff-btn" id="history-tokens-btn" onclick="requestSessionTokens()" title="Token Breakdown">Tokens</button>
+    <button class="diff-btn" id="history-analyze-btn" onclick="requestAnalyzeSession()" title="Analyze Session">Analyze</button>
     <button class="history-close-btn hidden" id="history-close-btn" onclick="promptCloseSession(currentSessionId)" title="Close session">✕</button>
     <button class="history-reopen-btn hidden" id="history-reopen-btn" onclick="reopenSession(currentSessionId)" title="Reopen session">↻</button>
   </div>
@@ -631,6 +762,33 @@
     <button class="diff-close-btn" onclick="closeDiffPanel()">&#10005;</button>
   </div>
   <div class="diff-content" id="diff-panel-content"></div>
+</div>
+
+<!-- Agent Logs overlay -->
+<div class="logs-overlay hidden" id="logs-panel">
+  <div class="logs-header">
+    <div class="logs-header-title" id="logs-panel-title">Agent Logs</div>
+    <button class="logs-close-btn" onclick="closeLogsPanel()">&#10005;</button>
+  </div>
+  <div class="logs-content" id="logs-panel-content"></div>
+</div>
+
+<!-- Token Breakdown overlay -->
+<div class="tokens-overlay hidden" id="tokens-panel">
+  <div class="tokens-header">
+    <div class="tokens-header-title" id="tokens-panel-title">Token Breakdown</div>
+    <button class="tokens-close-btn" onclick="closeTokensPanel()">&#10005;</button>
+  </div>
+  <div class="tokens-content" id="tokens-panel-content"></div>
+</div>
+
+<!-- Session Analysis overlay -->
+<div class="analysis-overlay hidden" id="analysis-panel">
+  <div class="analysis-header">
+    <div class="analysis-header-title" id="analysis-panel-title">Session Analysis</div>
+    <button class="analysis-close-btn" onclick="closeAnalysisPanel()">&#10005;</button>
+  </div>
+  <div class="analysis-content" id="analysis-panel-content"></div>
 </div>
 
 <!-- Confirm close session dialog -->
@@ -1215,6 +1373,22 @@ function handleMessage(msg) {
 
     case 'commit_push_result':
       handleCommitPushResult(msg);
+      break;
+
+    case 'agent_logs':
+      showAgentLogs(msg);
+      break;
+
+    case 'subagent_logs':
+      showSubagentLogs(msg);
+      break;
+
+    case 'session_tokens':
+      showSessionTokens(msg);
+      break;
+
+    case 'session_analysis':
+      showSessionAnalysis(msg);
       break;
 
     case 'error':
@@ -2350,6 +2524,326 @@ function onWeeklyLimitChange() {
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Agent Logs ──────────────────────────────────────────────────────────────
+
+function requestAgentLogs() {
+  if (!currentSessionId || !ws) return;
+  var btn = document.getElementById('history-logs-btn');
+  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+  ws.send(JSON.stringify({ type: 'get_agent_logs', session_id: currentSessionId }));
+}
+
+function showAgentLogs(msg) {
+  var btn = document.getElementById('history-logs-btn');
+  if (btn) { btn.textContent = 'Logs'; btn.disabled = false; }
+
+  var panel = document.getElementById('logs-panel');
+  var content = document.getElementById('logs-panel-content');
+  var title = document.getElementById('logs-panel-title');
+
+  var s = sessions[msg.session_id];
+  title.textContent = s ? 'Agent Logs — ' + s.project : 'Agent Logs';
+
+  if (!msg.sessions || msg.sessions.length === 0) {
+    content.innerHTML = '<div class="logs-empty">' + (msg.message || 'No Claude JSONL logs found.') + '</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  content.innerHTML = '';
+  msg.sessions.forEach(function(cs) {
+    var block = document.createElement('div');
+    block.className = 'logs-session-block';
+
+    var header = document.createElement('div');
+    header.className = 'logs-session-header';
+    var tokenStr = cs.tokens
+      ? 'In: ' + (cs.tokens.input || 0).toLocaleString() + ' / Out: ' + (cs.tokens.output || 0).toLocaleString()
+      : '';
+    header.innerHTML = '<span>Session: ' + cs.claude_session_id + ' (' + cs.event_count + ' events)</span><span class="logs-token-summary">' + tokenStr + '</span>';
+
+    var eventsDiv = document.createElement('div');
+    eventsDiv.className = 'logs-events';
+    eventsDiv.style.display = 'none';
+
+    header.onclick = function() {
+      eventsDiv.style.display = eventsDiv.style.display === 'none' ? 'block' : 'none';
+    };
+
+    renderLogEvents(cs.events || [], eventsDiv, msg.session_id, cs.claude_session_id, cs.subagent_ids || []);
+
+    block.appendChild(header);
+    block.appendChild(eventsDiv);
+    content.appendChild(block);
+  });
+
+  panel.classList.remove('hidden');
+}
+
+function renderLogEvents(events, container, sessionId, parentSessionId, subagentIds) {
+  events.forEach(function(evt) {
+    if (evt.is_compaction_boundary) {
+      var marker = document.createElement('div');
+      marker.className = 'log-compaction-marker';
+      marker.textContent = '--- Conversation compacted ---';
+      container.appendChild(marker);
+      return;
+    }
+
+    var row = document.createElement('div');
+    row.className = 'log-event';
+
+    var badge = document.createElement('span');
+    badge.className = 'log-role-badge ' + (evt.role_type || 'unknown');
+    badge.textContent = evt.role_type || 'unknown';
+
+    var contentText = '';
+    if (typeof evt.content === 'string') {
+      contentText = evt.content;
+    } else if (evt.message && evt.message.content) {
+      contentText = typeof evt.message.content === 'string'
+        ? evt.message.content
+        : JSON.stringify(evt.message.content).substring(0, 200);
+    }
+
+    var preview = document.createElement('span');
+    preview.className = 'log-event-preview';
+    preview.textContent = contentText.substring(0, 200);
+
+    var tokenInfo = document.createElement('span');
+    tokenInfo.className = 'log-tokens';
+    if (evt.tokens && (evt.tokens.input > 0 || evt.tokens.output > 0)) {
+      tokenInfo.textContent = evt.tokens.input + '/' + evt.tokens.output;
+    }
+
+    row.appendChild(badge);
+    row.appendChild(preview);
+    row.appendChild(tokenInfo);
+
+    // Sub-agent link
+    if (evt.subagent_id && subagentIds.indexOf(evt.subagent_id) >= 0) {
+      var saLink = document.createElement('span');
+      saLink.className = 'log-subagent-link';
+      saLink.textContent = 'sub-agent';
+      saLink.onclick = function(e) {
+        e.stopPropagation();
+        loadSubagentLogs(sessionId, parentSessionId, evt.subagent_id);
+      };
+      row.appendChild(saLink);
+    }
+
+    // Expand/collapse full content
+    var fullDiv = document.createElement('div');
+    fullDiv.className = 'log-event-full';
+    fullDiv.textContent = contentText || JSON.stringify(evt, null, 2);
+
+    row.onclick = function() {
+      row.classList.toggle('expanded');
+    };
+
+    row.appendChild(fullDiv);
+    container.appendChild(row);
+  });
+}
+
+function loadSubagentLogs(sessionId, parentSessionId, agentId) {
+  if (!ws) return;
+  ws.send(JSON.stringify({
+    type: 'get_subagent_logs',
+    session_id: sessionId,
+    parent_session_id: parentSessionId,
+    agent_id: agentId,
+  }));
+}
+
+function showSubagentLogs(msg) {
+  var panel = document.getElementById('logs-panel');
+  var content = document.getElementById('logs-panel-content');
+  var title = document.getElementById('logs-panel-title');
+
+  title.textContent = 'Sub-Agent: ' + (msg.agent_id || 'unknown');
+
+  if (!msg.events || msg.events.length === 0) {
+    content.innerHTML = '<div class="logs-empty">No events found for this sub-agent.</div>';
+  } else {
+    content.innerHTML = '';
+    var tokenStr = msg.tokens
+      ? '<div class="logs-token-summary" style="padding:8px 12px;">In: ' + (msg.tokens.input || 0).toLocaleString() + ' / Out: ' + (msg.tokens.output || 0).toLocaleString() + '</div>'
+      : '';
+    content.innerHTML = tokenStr;
+    var eventsDiv = document.createElement('div');
+    eventsDiv.className = 'logs-events';
+    eventsDiv.style.display = 'block';
+    renderLogEvents(msg.events, eventsDiv, msg.session_id, '', []);
+    content.appendChild(eventsDiv);
+  }
+
+  panel.classList.remove('hidden');
+}
+
+function closeLogsPanel() {
+  document.getElementById('logs-panel').classList.add('hidden');
+}
+
+// ── Token Breakdown ─────────────────────────────────────────────────────────
+
+function requestSessionTokens() {
+  if (!currentSessionId || !ws) return;
+  var btn = document.getElementById('history-tokens-btn');
+  if (btn) { btn.textContent = 'Loading...'; btn.disabled = true; }
+  ws.send(JSON.stringify({ type: 'get_session_tokens', session_id: currentSessionId }));
+}
+
+function showSessionTokens(msg) {
+  var btn = document.getElementById('history-tokens-btn');
+  if (btn) { btn.textContent = 'Tokens'; btn.disabled = false; }
+
+  var panel = document.getElementById('tokens-panel');
+  var content = document.getElementById('tokens-panel-content');
+  var title = document.getElementById('tokens-panel-title');
+
+  var s = sessions[msg.session_id];
+  title.textContent = s ? 'Token Breakdown — ' + s.project : 'Token Breakdown';
+
+  var bd = msg.breakdown || {};
+  var steps = bd.steps || {};
+  var stepNames = Object.keys(steps);
+
+  if (stepNames.length === 0) {
+    content.innerHTML = '<div class="tokens-empty">No per-role token data available for this session.</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  var roleColorClass = function(role) {
+    if (role === 'planner') return 'tokens-role-planner';
+    if (role === 'coder') return 'tokens-role-coder';
+    if (role === 'reviewer') return 'tokens-role-reviewer';
+    return 'tokens-role-unknown';
+  };
+
+  var html = '<table class="tokens-table"><thead><tr><th>Role</th><th>Input</th><th>Output</th><th>Cost</th></tr></thead><tbody>';
+  stepNames.forEach(function(name) {
+    var st = steps[name];
+    html += '<tr><td class="' + roleColorClass(name) + '">' + name.charAt(0).toUpperCase() + name.slice(1) + '</td>';
+    html += '<td>' + (st.input_tokens || 0).toLocaleString() + '</td>';
+    html += '<td>' + (st.output_tokens || 0).toLocaleString() + '</td>';
+    html += '<td>$' + (st.cost_usd || 0).toFixed(4) + '</td></tr>';
+  });
+  html += '<tr class="total-row"><td>Total</td>';
+  html += '<td>' + (bd.total_input || 0).toLocaleString() + '</td>';
+  html += '<td>' + (bd.total_output || 0).toLocaleString() + '</td>';
+  html += '<td>$' + (bd.total_cost || 0).toFixed(4) + '</td></tr>';
+  html += '</tbody></table>';
+
+  content.innerHTML = html;
+  panel.classList.remove('hidden');
+}
+
+function closeTokensPanel() {
+  document.getElementById('tokens-panel').classList.add('hidden');
+}
+
+// ── Session Analysis ────────────────────────────────────────────────────────
+
+function requestAnalyzeSession() {
+  if (!currentSessionId || !ws) return;
+  var btn = document.getElementById('history-analyze-btn');
+  if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
+  ws.send(JSON.stringify({ type: 'analyze_session', session_id: currentSessionId }));
+}
+
+function showSessionAnalysis(msg) {
+  var btn = document.getElementById('history-analyze-btn');
+  if (btn) { btn.textContent = 'Analyze'; btn.disabled = false; }
+
+  if (msg.status === 'running') {
+    // Show loading state
+    var panel = document.getElementById('analysis-panel');
+    var content = document.getElementById('analysis-panel-content');
+    content.innerHTML = '<div class="analysis-loading">Analyzing session... This may take a moment.</div>';
+    panel.classList.remove('hidden');
+    if (btn) { btn.textContent = 'Analyzing...'; btn.disabled = true; }
+    return;
+  }
+
+  if (msg.status === 'error') {
+    var panel = document.getElementById('analysis-panel');
+    var content = document.getElementById('analysis-panel-content');
+    content.innerHTML = '<div class="analysis-loading" style="color:var(--red);">' + (msg.message || 'Analysis failed.') + '</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  var panel = document.getElementById('analysis-panel');
+  var content = document.getElementById('analysis-panel-content');
+  var title = document.getElementById('analysis-panel-title');
+
+  var s = sessions[msg.session_id];
+  title.textContent = s ? 'Session Analysis — ' + s.project : 'Session Analysis';
+
+  var analysis = msg.analysis || {};
+
+  // If raw text (couldn't parse JSON), display as-is
+  if (analysis.raw_text) {
+    content.innerHTML = '<div class="analysis-raw">' + escapeHtml(analysis.raw_text) + '</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  var html = '';
+
+  // Tasks
+  var tasks = analysis.tasks || [];
+  tasks.forEach(function(task, idx) {
+    html += '<div class="analysis-task-card">';
+    html += '<div class="analysis-task-header" onclick="this.nextElementSibling.classList.toggle(\'expanded\')">';
+    html += '<span class="analysis-task-title">' + (idx + 1) + '. ' + escapeHtml(task.title || 'Untitled task') + '</span>';
+    html += '<span class="analysis-task-toggle">expand</span>';
+    html += '</div>';
+    html += '<div class="analysis-task-body">';
+    if (task.objective) html += '<div class="analysis-task-objective"><b>Objective:</b> ' + escapeHtml(task.objective) + '</div>';
+    if (task.assessment) html += '<div class="analysis-task-assessment"><b>Assessment:</b> ' + escapeHtml(task.assessment) + '</div>';
+    if (task.suggestions && task.suggestions.length > 0) {
+      task.suggestions.forEach(function(sug) {
+        html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
+      });
+    }
+    html += '</div></div>';
+  });
+
+  // Overall suggestions
+  var overall = analysis.overall_suggestions || [];
+  if (overall.length > 0 || analysis.team_recommendation) {
+    html += '<div class="analysis-overall">';
+    html += '<div class="analysis-overall-title">Overall Suggestions</div>';
+    overall.forEach(function(sug) {
+      html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
+    });
+    if (analysis.team_recommendation) {
+      html += '<div class="analysis-team-rec"><b>Recommended team:</b> ' + escapeHtml(analysis.team_recommendation) + '</div>';
+    }
+    html += '</div>';
+  }
+
+  if (!html) {
+    html = '<div class="analysis-loading">No analysis data available.</div>';
+  }
+
+  content.innerHTML = html;
+  panel.classList.remove('hidden');
+}
+
+function closeAnalysisPanel() {
+  document.getElementById('analysis-panel').classList.add('hidden');
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
 }
 </script>
 </body>

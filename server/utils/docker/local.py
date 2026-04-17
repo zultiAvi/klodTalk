@@ -1,5 +1,6 @@
 """Local Docker CLI implementation (currently working)."""
 
+import os
 import subprocess
 from typing import Optional
 
@@ -77,6 +78,14 @@ class LocalDockerUtils(DockerUtilsBase):
             capture_output=True, text=True,
         )
         return result.returncode == 0 and result.stdout.strip() == "true"
+
+    def copy_from_container(self, container_name: str, container_path: str, host_path: str) -> bool:
+        os.makedirs(host_path, exist_ok=True)
+        result = subprocess.run(
+            ["docker", "cp", f"{container_name}:{container_path}/.", host_path],
+            capture_output=True, text=True,
+        )
+        return result.returncode == 0
 
     def commit_container(self, container_name: str, image_name: str) -> bool:
         result = subprocess.run(

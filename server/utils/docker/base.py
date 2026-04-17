@@ -49,5 +49,9 @@ class DockerUtilsBase(ABC):
         """Commit a running container as a new image. Returns True on success."""
 
     @abstractmethod
+    def copy_from_container(self, container_name: str, container_path: str, host_path: str) -> bool:
+        """Copy a file or directory from a container to the host. Returns True on success."""
+
+    @abstractmethod
     def get_image_size(self, image_name: str) -> Optional[int]:
         """Return the image size in bytes, or None if image not found."""

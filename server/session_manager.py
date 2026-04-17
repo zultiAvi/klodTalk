@@ -88,6 +88,24 @@ class Session:
     users: list = field(default_factory=list)
 
 
+def _guess_role_from_prompt(prompt: str) -> str:
+    """Infer the pipeline role from the sub-agent's prompt text."""
+    prompt_lower = prompt[:500].lower()
+    role_keywords = {
+        "planner": ["planner", "planning", "implementation plan", "plan_meta"],
+        "coder": ["coder", "coding", "implement", "code changes"],
+        "reviewer": ["reviewer", "review", "code review"],
+        "idea": ["idea", "ideation", "brainstorm"],
+        "executor": ["executor", "execute", "run"],
+        "validator": ["validator", "validate", "validation"],
+    }
+    for role, keywords in role_keywords.items():
+        for kw in keywords:
+            if kw in prompt_lower:
+                return role
+    return "unknown"
+
+
 class SessionManager:
     def __init__(self):
         self._sessions: dict[str, Session] = {}
@@ -383,6 +401,8 @@ class SessionManager:
 
         log.info("Closing session %s", session_id)
 
+        docker = get_docker_utils()
+
         # 1. Archive history from temp workspace to project folder
         if session.project_folder:
             archive_dir = os.path.join(
@@ -398,8 +418,33 @@ class SessionManager:
                 except Exception as e:
                     log.error("Failed to archive history: %s", e)
 
+            # 1b. Archive Claude JSONL logs from container
+            claude_logs_dir = os.path.join(archive_dir, "claude_logs")
+            try:
+                docker.copy_from_container(
+                    session.container_name,
+                    "/home/agent/.claude/projects",
+                    claude_logs_dir
+                )
+                log.info("Archived Claude JSONL logs to %s", claude_logs_dir)
+            except Exception as e:
+                log.error("Failed to archive Claude JSONL logs: %s", e)
+
+            # 1c. Extract per-role token breakdown from archived JSONL
+            try:
+                role_tokens = self._extract_per_role_tokens(archive_dir)
+                if role_tokens:
+                    from token_store import TokenStore
+                    ts = TokenStore()
+                    for rt in role_tokens:
+                        ts.add_step_tokens(session.user_name, session_id, rt["role"],
+                                           rt["input_tokens"], rt["output_tokens"], rt["cost_usd"])
+                    log.info("Extracted per-role tokens: %s",
+                             {rt["role"]: rt["input_tokens"] + rt["output_tokens"] for rt in role_tokens})
+            except Exception as e:
+                log.error("Failed to extract per-role tokens: %s", e)
+
         # 2. Docker commit (before container removal)
-        docker = get_docker_utils()
         if session.docker_commit:
             per_project_image = sanitize_image_name(session.project_name)
             # Only commit if this is the last active session for this project
@@ -447,6 +492,55 @@ class SessionManager:
         session.closed_at = datetime.utcnow().isoformat() + "Z"
         self.save_sessions()
         return True
+
+    def _extract_per_role_tokens(self, archive_dir: str) -> list[dict]:
+        """Parse orchestrator JSONL to extract per-role token usage.
+
+        Returns list of {role: str, input_tokens: int, output_tokens: int, cost_usd: float}
+        """
+        from jsonl_reader import (
+            discover_archived_sessions, read_session_jsonl,
+            read_subagent_jsonl, aggregate_session_tokens,
+        )
+
+        claude_logs_dir = os.path.join(archive_dir, "claude_logs")
+        discovered = discover_archived_sessions(claude_logs_dir)
+        if not discovered:
+            return []
+
+        role_tokens = []
+        for disc in discovered:
+            events = read_session_jsonl(disc["path"], filter_noise=False)
+            for event in events:
+                if event.get("role_type") != "assistant":
+                    continue
+                message = event.get("message", {})
+                if not isinstance(message, dict):
+                    continue
+                content = message.get("content", [])
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+                    if part.get("type") == "tool_use" and part.get("name") == "agent":
+                        agent_input = part.get("input", {})
+                        prompt = agent_input.get("prompt", "") if isinstance(agent_input, dict) else ""
+                        role = _guess_role_from_prompt(prompt)
+
+                        agent_id = event.get("subagent_id", "")
+                        if agent_id and agent_id in disc.get("subagent_ids", []):
+                            sa_events = read_subagent_jsonl(
+                                claude_logs_dir, disc["session_id"], agent_id
+                            )
+                            sa_tokens = aggregate_session_tokens(sa_events)
+                            role_tokens.append({
+                                "role": role,
+                                "input_tokens": sa_tokens.get("input", 0),
+                                "output_tokens": sa_tokens.get("output", 0),
+                                "cost_usd": 0.0,
+                            })
+        return role_tokens
 
     def get_session(self, session_id: str) -> Optional[Session]:
         return self._sessions.get(session_id)

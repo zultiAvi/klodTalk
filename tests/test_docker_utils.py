@@ -220,6 +220,41 @@ class TestLocalDockerUtils:
         assert utils.is_container_running("nonexistent") is False
 
 
+    def test_copy_from_container_success(self, monkeypatch, tmp_path):
+        calls = []
+        class MockResult:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+        def mock_run(cmd, **kwargs):
+            calls.append(cmd)
+            return MockResult()
+        monkeypatch.setattr(subprocess, "run", mock_run)
+
+        utils = LocalDockerUtils()
+        host_path = str(tmp_path / "output")
+        result = utils.copy_from_container("my-container", "/home/agent/.claude", host_path)
+        assert result is True
+        assert len(calls) == 1
+        assert "docker" in calls[0]
+        assert "cp" in calls[0]
+        assert f"my-container:/home/agent/.claude/." in calls[0][-1] or "my-container:/home/agent/.claude/." in " ".join(calls[0])
+        # Verify host_path directory was created
+        assert os.path.isdir(host_path)
+
+    def test_copy_from_container_failure(self, monkeypatch, tmp_path):
+        class MockResult:
+            returncode = 1
+            stdout = ""
+            stderr = "Error"
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw: MockResult())
+
+        utils = LocalDockerUtils()
+        host_path = str(tmp_path / "output")
+        result = utils.copy_from_container("c", "/path", host_path)
+        assert result is False
+
+
 class TestDockerFactory:
     def test_factory_returns_local(self):
         from utils.docker import get_docker_utils
