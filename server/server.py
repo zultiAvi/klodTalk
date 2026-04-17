@@ -1711,6 +1711,15 @@ async def handle_get_subagent_logs(ws, user_name: str, data: dict):
     parent_session_id = data.get("parent_session_id", "")
     agent_id = data.get("agent_id", "")
 
+    # Validate IDs contain only hex characters to prevent path traversal
+    _HEX_RE = re.compile(r'^[a-f0-9]+$')
+    if parent_session_id and not _HEX_RE.match(parent_session_id):
+        await ws.send(json.dumps({"type": "error", "message": "Invalid parent_session_id"}))
+        return
+    if agent_id and not _HEX_RE.match(agent_id):
+        await ws.send(json.dumps({"type": "error", "message": "Invalid agent_id"}))
+        return
+
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
@@ -1841,11 +1850,16 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
             system_prompt = f.read()
 
         history_text = ""
+        MAX_HISTORY_CHARS = 100_000
         for i, msg in enumerate(messages):
             role = msg.get("role", "unknown")
             content = msg.get("content", "")
             ts = msg.get("timestamp", "")
             history_text += f"[{i}] [{role}] ({ts})\n{content}\n\n"
+            if len(history_text) > MAX_HISTORY_CHARS:
+                history_text = history_text[:MAX_HISTORY_CHARS]
+                history_text += "\n\n[... history truncated at 100,000 characters ...]"
+                break
 
         full_prompt = f"{system_prompt}\n\n---\n\n## Session History\n\n{history_text}"
 

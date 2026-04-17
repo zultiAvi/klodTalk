@@ -2562,7 +2562,7 @@ function showAgentLogs(msg) {
     var tokenStr = cs.tokens
       ? 'In: ' + (cs.tokens.input || 0).toLocaleString() + ' / Out: ' + (cs.tokens.output || 0).toLocaleString()
       : '';
-    header.innerHTML = '<span>Session: ' + cs.claude_session_id + ' (' + cs.event_count + ' events)</span><span class="logs-token-summary">' + tokenStr + '</span>';
+    header.innerHTML = '<span>Session: ' + escapeHtml(cs.claude_session_id) + ' (' + cs.event_count + ' events)</span><span class="logs-token-summary">' + tokenStr + '</span>';
 
     var eventsDiv = document.createElement('div');
     eventsDiv.className = 'logs-events';
@@ -2727,7 +2727,7 @@ function showSessionTokens(msg) {
   var html = '<table class="tokens-table"><thead><tr><th>Role</th><th>Input</th><th>Output</th><th>Cost</th></tr></thead><tbody>';
   stepNames.forEach(function(name) {
     var st = steps[name];
-    html += '<tr><td class="' + roleColorClass(name) + '">' + name.charAt(0).toUpperCase() + name.slice(1) + '</td>';
+    html += '<tr><td class="' + roleColorClass(name) + '">' + escapeHtml(name.charAt(0).toUpperCase() + name.slice(1)) + '</td>';
     html += '<td>' + (st.input_tokens || 0).toLocaleString() + '</td>';
     html += '<td>' + (st.output_tokens || 0).toLocaleString() + '</td>';
     html += '<td>$' + (st.cost_usd || 0).toFixed(4) + '</td></tr>';
@@ -2772,7 +2772,7 @@ function showSessionAnalysis(msg) {
   if (msg.status === 'error') {
     var panel = document.getElementById('analysis-panel');
     var content = document.getElementById('analysis-panel-content');
-    content.innerHTML = '<div class="analysis-loading" style="color:var(--red);">' + (msg.message || 'Analysis failed.') + '</div>';
+    content.innerHTML = '<div class="analysis-loading" style="color:var(--red);">' + escapeHtml(msg.message || 'Analysis failed.') + '</div>';
     panel.classList.remove('hidden');
     return;
   }
