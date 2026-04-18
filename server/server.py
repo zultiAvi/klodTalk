@@ -28,6 +28,10 @@ from session_manager import HOST_GID, HOST_UID, SessionManager, _normalize_exter
 from history_store import HistoryStore
 from unread_state import UnreadState
 from token_store import TokenStore
+from jsonl_reader import (
+    discover_archived_sessions, read_session_jsonl, read_subagent_jsonl,
+    aggregate_session_tokens,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1650,6 +1654,276 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
             pass
 
 
+# ── Agent logs, token breakdown, session analysis ────────────────────────────
+
+async def handle_get_agent_logs(ws, user_name: str, data: dict):
+    """Return enriched JSONL events for a session's Claude logs."""
+    session_id = data.get("session_id", "")
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
+
+    # Find claude_logs in archive
+    logs_dir = ""
+    if session.project_folder:
+        archive_dir = os.path.join(
+            session.project_folder, ".klodTalk", "sessions", session_id, "claude_logs"
+        )
+        if os.path.isdir(archive_dir):
+            logs_dir = archive_dir
+
+    if not logs_dir:
+        await ws.send(json.dumps({
+            "type": "agent_logs",
+            "session_id": session_id,
+            "sessions": [],
+            "message": "No Claude JSONL logs found for this session."
+        }))
+        return
+
+    discovered = discover_archived_sessions(logs_dir)
+    result_sessions = []
+    for disc in discovered:
+        events = read_session_jsonl(disc["path"])
+        tokens = aggregate_session_tokens(events)
+        result_sessions.append({
+            "claude_session_id": disc["session_id"],
+            "event_count": len(events),
+            "tokens": tokens,
+            "subagent_ids": disc["subagent_ids"],
+            "events": events,
+        })
+
+    await ws.send(json.dumps({
+        "type": "agent_logs",
+        "session_id": session_id,
+        "sessions": result_sessions,
+    }))
+
+
+async def handle_get_subagent_logs(ws, user_name: str, data: dict):
+    """Return enriched JSONL events for a specific sub-agent."""
+    session_id = data.get("session_id", "")
+    parent_session_id = data.get("parent_session_id", "")
+    agent_id = data.get("agent_id", "")
+
+    # Validate IDs contain only hex characters to prevent path traversal
+    _HEX_RE = re.compile(r'^[a-f0-9]+$')
+    if parent_session_id and not _HEX_RE.match(parent_session_id):
+        await ws.send(json.dumps({"type": "error", "message": "Invalid parent_session_id"}))
+        return
+    if agent_id and not _HEX_RE.match(agent_id):
+        await ws.send(json.dumps({"type": "error", "message": "Invalid agent_id"}))
+        return
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
+
+    logs_dir = ""
+    if session.project_folder:
+        archive_dir = os.path.join(
+            session.project_folder, ".klodTalk", "sessions", session_id, "claude_logs"
+        )
+        if os.path.isdir(archive_dir):
+            logs_dir = archive_dir
+
+    events = []
+    if logs_dir:
+        events = read_subagent_jsonl(logs_dir, parent_session_id, agent_id)
+
+    tokens = aggregate_session_tokens(events) if events else {}
+    await ws.send(json.dumps({
+        "type": "subagent_logs",
+        "session_id": session_id,
+        "agent_id": agent_id,
+        "events": events,
+        "tokens": tokens,
+    }))
+
+
+async def handle_get_session_tokens(ws, user_name: str, data: dict):
+    """Return per-step token breakdown for a session."""
+    session_id = data.get("session_id", "")
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
+
+    breakdown = token_store.get_session_breakdown(session.user_name, session_id)
+    await ws.send(json.dumps({
+        "type": "session_tokens",
+        "session_id": session_id,
+        "breakdown": breakdown,
+    }))
+
+
+# session_id -> analysis result (cached)
+_session_analyses: dict[str, dict] = {}
+# session_ids with analysis currently running
+_session_analysis_running: set[str] = set()
+
+
+async def handle_analyze_session(ws, user_name: str, data: dict):
+    """Trigger Claude analysis of a session's history."""
+    session_id = data.get("session_id", "")
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
+
+    # Check if analysis already exists
+    if session_id in _session_analyses:
+        await ws.send(json.dumps({
+            "type": "session_analysis",
+            "session_id": session_id,
+            "analysis": _session_analyses[session_id],
+            "status": "complete",
+        }))
+        return
+
+    if session_id in _session_analysis_running:
+        await ws.send(json.dumps({
+            "type": "session_analysis",
+            "session_id": session_id,
+            "status": "running",
+        }))
+        return
+
+    # Get session history
+    if session.status == "closed":
+        archive = session_manager.get_archive_path(session)
+        archive_file = os.path.join(archive, "session.jsonl") if archive else ""
+        if archive_file and os.path.isfile(archive_file):
+            messages = []
+            with open(archive_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            messages.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+        else:
+            messages = []
+    else:
+        messages = history_store.read_session(session_id, session.workspace_path)
+
+    if not messages:
+        await ws.send(json.dumps({
+            "type": "session_analysis",
+            "session_id": session_id,
+            "status": "error",
+            "message": "No session history found to analyze.",
+        }))
+        return
+
+    _session_analysis_running.add(session_id)
+    await ws.send(json.dumps({
+        "type": "session_analysis",
+        "session_id": session_id,
+        "status": "running",
+    }))
+
+    asyncio.create_task(_run_session_analysis(session_id, session, messages, user_name))
+
+
+async def _run_session_analysis(session_id: str, session, messages: list, user_name: str):
+    """Run Claude to analyze the session."""
+    try:
+        prompt_path = os.path.join(BASE_DIR, "server", "prompts", "analyze_session.md")
+        with open(prompt_path) as f:
+            system_prompt = f.read()
+
+        history_text = ""
+        MAX_HISTORY_CHARS = 100_000
+        for i, msg in enumerate(messages):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            ts = msg.get("timestamp", "")
+            history_text += f"[{i}] [{role}] ({ts})\n{content}\n\n"
+            if len(history_text) > MAX_HISTORY_CHARS:
+                history_text = history_text[:MAX_HISTORY_CHARS]
+                history_text += "\n\n[... history truncated at 100,000 characters ...]"
+                break
+
+        full_prompt = f"{system_prompt}\n\n---\n\n## Session History\n\n{history_text}"
+
+        loop = asyncio.get_event_loop()
+
+        def run_claude():
+            result = subprocess.run(
+                [_CLAUDE_CMD, "--dangerously-skip-permissions", "--output-format", "json",
+                 "-p", full_prompt, "--max-turns", "1"],
+                capture_output=True, text=True, timeout=120,
+            )
+            return result.stdout.strip()
+
+        raw_output = await loop.run_in_executor(None, run_claude)
+
+        # Parse the output
+        try:
+            output_data = json.loads(raw_output)
+            content = output_data.get("result", raw_output)
+        except json.JSONDecodeError:
+            content = raw_output
+
+        # Try to parse as JSON analysis
+        analysis = None
+        try:
+            json_match = re.search(r'\{[\s\S]*"tasks"[\s\S]*\}', content)
+            if json_match:
+                analysis = json.loads(json_match.group())
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        if not analysis:
+            analysis = {"raw_text": content, "tasks": [], "overall_suggestions": []}
+
+        _session_analyses[session_id] = analysis
+
+        # Save analysis to archive if available
+        if session.project_folder:
+            analysis_dir = os.path.join(
+                session.project_folder, ".klodTalk", "sessions", session_id
+            )
+            os.makedirs(analysis_dir, exist_ok=True)
+            analysis_path = os.path.join(analysis_dir, "analysis.json")
+            with open(analysis_path, "w") as f:
+                json.dump(analysis, f, indent=2)
+
+        await _broadcast_to_session_users(session_id, {
+            "type": "session_analysis",
+            "session_id": session_id,
+            "analysis": analysis,
+            "status": "complete",
+        })
+    except Exception as e:
+        log.error("Session analysis failed for '%s': %s", session_id, e)
+        await _broadcast_to_session_users(session_id, {
+            "type": "session_analysis",
+            "session_id": session_id,
+            "status": "error",
+            "message": str(e),
+        })
+    finally:
+        _session_analysis_running.discard(session_id)
+
+
 MAX_DIFF_BYTES = 500_000  # 500 KB cap on diff output
 
 
@@ -2015,6 +2289,18 @@ async def handle_client(websocket):
 
             elif msg_type == "remove_user_from_session":
                 await handle_remove_user_from_session(websocket, client_name, msg)
+
+            elif msg_type == "get_agent_logs":
+                await handle_get_agent_logs(websocket, client_name, msg)
+
+            elif msg_type == "get_subagent_logs":
+                await handle_get_subagent_logs(websocket, client_name, msg)
+
+            elif msg_type == "get_session_tokens":
+                await handle_get_session_tokens(websocket, client_name, msg)
+
+            elif msg_type == "analyze_session":
+                await handle_analyze_session(websocket, client_name, msg)
 
             else:
                 log.warning("Unknown message type '%s' from %s", msg_type, remote[0])

@@ -41,6 +41,39 @@ class TokenStore:
             user["cost_usd"] += cost_usd
             self._write(data)
 
+    def add_step_tokens(self, user_name: str, session_id: str, step_name: str,
+                        input_tokens: int, output_tokens: int, cost_usd: float):
+        """Record token usage for a specific pipeline step within a session."""
+        with self._lock:
+            data = self._read()
+            user = data["users"].setdefault(user_name, {
+                "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0
+            })
+            sessions = user.setdefault("sessions", {})
+            session = sessions.setdefault(session_id, {
+                "steps": {}, "total_input": 0, "total_output": 0, "total_cost": 0.0
+            })
+            step = session["steps"].setdefault(step_name, {
+                "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0
+            })
+            step["input_tokens"] += input_tokens
+            step["output_tokens"] += output_tokens
+            step["cost_usd"] += cost_usd
+            session["total_input"] += input_tokens
+            session["total_output"] += output_tokens
+            session["total_cost"] += cost_usd
+            self._write(data)
+
+    def get_session_breakdown(self, user_name: str, session_id: str) -> dict:
+        """Get per-step token breakdown for a specific session."""
+        with self._lock:
+            data = self._read()
+        user = data.get("users", {}).get(user_name, {})
+        sessions = user.get("sessions", {})
+        return sessions.get(session_id, {
+            "steps": {}, "total_input": 0, "total_output": 0, "total_cost": 0.0
+        })
+
     def get_summary(self) -> dict:
         with self._lock:
             data = self._read()
