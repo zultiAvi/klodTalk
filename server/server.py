@@ -2373,7 +2373,6 @@ def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: st
     """Build a concise prompt for the nightly routine when using a team pipeline."""
     sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
     tags_str = ", ".join(sanitized_tags)
-    today = datetime.now().strftime("%Y-%m-%d")
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     return f"""# Nightly GitHub Scouting Task
 
