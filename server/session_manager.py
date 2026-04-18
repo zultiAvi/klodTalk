@@ -86,6 +86,7 @@ class Session:
     docker_commit: bool = True
     docker_socket: bool = True
     users: list = field(default_factory=list)
+    system: bool = False  # True for system-managed sessions (non-closeable by users)
 
 
 def _guess_role_from_prompt(prompt: str) -> str:
@@ -253,6 +254,72 @@ class SessionManager:
         log.info("Session %s created (branch=%s, container=%s)", session_id, branch_name, cname)
         return session
 
+    def create_system_session(self, session_id: str, project_name: str, project_config: dict, all_users: list[str]) -> Optional[Session]:
+        """Create a system-managed session that all users can see but nobody can close.
+
+        Unlike regular sessions, system sessions:
+        - Have a fixed session_id (so they persist across server restarts)
+        - Include ALL users in their users list
+        - Have system=True flag
+        - Do NOT create a git branch
+        """
+        # Check if this system session already exists
+        existing = self._sessions.get(session_id)
+        if existing:
+            # Update users list to include any new users
+            for u in all_users:
+                if u not in existing.users:
+                    existing.users.append(u)
+            self.save_sessions()
+            return existing
+
+        folder = project_config.get("folder", "")
+        if not folder:
+            log.error("No folder in project config for system session '%s'", session_id)
+            return None
+
+        temp_path = os.path.join(TEMP_BASE, session_id)
+        cname = f"{CONTAINER_PREFIX}{session_id}"
+
+        log.info("Creating system session %s for project '%s'", session_id, project_name)
+
+        # Create workspace directory and copy workspace
+        os.makedirs(temp_path, exist_ok=True)
+        try:
+            copy_git_tracked(folder, temp_path)
+        except Exception as e:
+            log.error("Failed to copy workspace for system session: %s", e)
+            return None
+
+        # Ensure .klodTalk dirs exist
+        for subdir in ("in_messages", "out_messages", "pr_messages", "history", "team/current"):
+            os.makedirs(os.path.join(temp_path, ".klodTalk", subdir), exist_ok=True)
+
+        # Start Docker container
+        if not self._start_session_container(cname, temp_path, project_config):
+            log.error("Failed to start container for system session %s", session_id)
+            return None
+
+        session = Session(
+            session_id=session_id,
+            project_name=project_name,
+            user_name="_system",
+            git_branch="",
+            workspace_path=temp_path,
+            container_name=cname,
+            status="active",
+            created_at=datetime.utcnow().isoformat() + "Z",
+            project_folder=folder,
+            docker_commit=project_config.get("docker_commit", True),
+            docker_socket=project_config.get("docker_socket", True),
+            users=list(all_users),
+            system=True,
+        )
+        self._sessions[session_id] = session
+        self.save_sessions()
+        log.info("System session %s created (container=%s)", session_id, cname)
+        return session
+
     @staticmethod
     def _dp(path: str) -> str:
         """Normalise a host path for Docker volume mounts.
@@ -394,6 +461,9 @@ class SessionManager:
         session = self._sessions.get(session_id)
         if not session:
             log.warning("Session %s not found", session_id)
+            return False
+        if session.system:
+            log.warning("Cannot close system session %s", session_id)
             return False
         if session.status == "closed":
             log.info("Session %s already closed", session_id)
@@ -639,6 +709,9 @@ class SessionManager:
         if session_id not in self._sessions:
             return False
         session = self._sessions[session_id]
+        if session.system:
+            log.warning("Cannot delete system session %s", session_id)
+            return False
         # Remove temp workspace directory
         if session.workspace_path and os.path.isdir(session.workspace_path):
             shutil.rmtree(session.workspace_path, ignore_errors=True)

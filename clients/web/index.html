@@ -137,6 +137,18 @@
     min-width: 18px; height: 18px; border-radius: 9px;
     display: inline-flex; align-items: center; justify-content: center; padding: 0 4px;
   }
+  /* ── System session styling ── */
+  .session-item.session-system {
+    border-left: 3px solid var(--amber);
+    background: rgba(255, 140, 0, 0.05);
+  }
+  .session-item.session-system:hover { background: rgba(255, 140, 0, 0.10); }
+  .session-dot.system { background: var(--amber); }
+  .system-badge {
+    background: var(--amber); color: #000; font-size: 10px;
+    padding: 2px 6px; border-radius: 4px; font-weight: 600;
+    white-space: nowrap;
+  }
 
   /* ── History screen ── */
   #page-history { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
@@ -970,10 +982,14 @@ function goToHistory(sessionId) {
     timesEl.style.display = 'none';
   }
 
-  // Close / Reopen button
+  // Close / Reopen button (hidden for system sessions)
   const closeBtnEl = document.getElementById('history-close-btn');
   const reopenBtnEl = document.getElementById('history-reopen-btn');
-  if (s.status === 'active') {
+  const isSystemSession = s.system || s.session_id === 'system_routine';
+  if (isSystemSession) {
+    closeBtnEl.classList.add('hidden');
+    reopenBtnEl.classList.add('hidden');
+  } else if (s.status === 'active') {
     closeBtnEl.classList.remove('hidden');
     reopenBtnEl.classList.add('hidden');
   } else if (s.status === 'closed') {
@@ -1483,6 +1499,10 @@ function renderSessionsList() {
   const container = document.getElementById('sessions-list');
   const sessionArray = Object.values(sessions)
     .sort((a, b) => {
+      // System sessions always at top
+      const aSys = a.system ? 1 : 0;
+      const bSys = b.system ? 1 : 0;
+      if (aSys !== bSys) return bSys - aSys;
       const aActive = a.status !== 'closed' ? 1 : 0;
       const bActive = b.status !== 'closed' ? 1 : 0;
       if (aActive !== bActive) return bActive - aActive;
@@ -1511,12 +1531,13 @@ function renderSessionsList() {
     </div>`).join('');
 
   const sessionsHtml = sessionArray.map(s => {
+    const isSystem = s.system || s.session_id === 'system_routine';
     const isUnread = unreadSessions.has(s.session_id);
     const isActive = s.status === 'active';
     const isClosing = s.status === 'closing';
     const isReopening = s.status === 'reopening';
     const isJustCreated = justCreatedSessions.has(s.session_id);
-    const dotClass = (isClosing || isReopening) ? 'closing-spin' : (isJustCreated ? 'just-created' : (isUnread ? 'unread' : (!isActive ? 'closed' : (s.working ? 'working' : ''))));
+    const dotClass = isSystem ? 'system' : ((isClosing || isReopening) ? 'closing-spin' : (isJustCreated ? 'just-created' : (isUnread ? 'unread' : (!isActive ? 'closed' : (s.working ? 'working' : '')))));
     const nameClass = isUnread ? 'session-name unread' : 'session-name';
     const created = s.created_at ? new Date(s.created_at).toLocaleString() : '';
     const unreadBadge = isUnread ? '<span class="unread-badge">●</span>' : '';
@@ -1536,23 +1557,28 @@ function renderSessionsList() {
 
     const isClosed = s.status === 'closed';
     const closingClass = isClosing ? ' closing' : '';
-    const swipeClass = isClosed ? ' closed-swipeable' : '';
+    const swipeClass = (isClosed && !isSystem) ? ' closed-swipeable' : '';
     const unreadClass = isUnread ? (isActive ? ' unread-active' : ' unread-closed') : '';
+    const systemClass = isSystem ? ' session-system' : '';
     const branchStatus = isClosing ? 'Closing…' : (isReopening ? 'Reopening…' : (isJustCreated ? 'created' : s.status));
+    const displayName = isSystem ? 'System Routine' : esc(s.project);
+    const branchDisplay = isSystem ? 'Nightly scout' : esc(s.branch || '');
 
     let actionButtons = '';
-    if (isActive) {
+    if (isSystem) {
+      actionButtons = '<span class="system-badge">System</span>';
+    } else if (isActive) {
       actionButtons = `<button class="session-close-btn" onclick="event.stopPropagation(); promptCloseSession('${s.session_id}')" title="Close session">✕</button>`;
     } else if (isClosed) {
       actionButtons = `<button class="session-reopen-btn" onclick="event.stopPropagation(); reopenSession('${s.session_id}')" title="Reopen session">↻ Reopen</button><button class="session-delete-btn" onclick="event.stopPropagation(); deleteSession('${s.session_id}')" title="Delete session">🗑 Delete</button>`;
     }
 
-    const inner = `<div class="session-item${closingClass}${swipeClass}${unreadClass}" data-session-id="${s.session_id}" onclick="goToHistory('${s.session_id}')">
+    const inner = `<div class="session-item${closingClass}${swipeClass}${unreadClass}${systemClass}" data-session-id="${s.session_id}" onclick="goToHistory('${s.session_id}')">
       <div class="session-dot ${dotClass}"></div>
       <div class="session-info">
-        <div class="${nameClass}">${esc(s.project)} ${unreadBadge}</div>
+        <div class="${nameClass}">${displayName} ${unreadBadge}</div>
         ${usersLine}
-        <div class="session-branch">${esc(s.branch || '')} · ${branchStatus}</div>
+        <div class="session-branch">${branchDisplay} · ${branchStatus}</div>
         ${preview ? `<div class="session-time">${esc(preview)}</div>` : `<div class="session-time">${created}</div>`}
         ${tokenLine}
       </div>
