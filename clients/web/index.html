@@ -985,7 +985,7 @@ function goToHistory(sessionId) {
   // Close / Reopen button (hidden for system sessions)
   const closeBtnEl = document.getElementById('history-close-btn');
   const reopenBtnEl = document.getElementById('history-reopen-btn');
-  const isSystemSession = s.system || s.session_id === 'system_routine';
+  const isSystemSession = s.system;
   if (isSystemSession) {
     closeBtnEl.classList.add('hidden');
     reopenBtnEl.classList.add('hidden');
@@ -1531,7 +1531,7 @@ function renderSessionsList() {
     </div>`).join('');
 
   const sessionsHtml = sessionArray.map(s => {
-    const isSystem = s.system || s.session_id === 'system_routine';
+    const isSystem = s.system;
     const isUnread = unreadSessions.has(s.session_id);
     const isActive = s.status === 'active';
     const isClosing = s.status === 'closing';

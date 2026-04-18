@@ -1188,6 +1188,10 @@ async def handle_stop(ws, user_name: str, data: dict):
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
         return
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be stopped by users"}))
+        return
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
         return
@@ -1233,6 +1237,10 @@ async def handle_btw(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions do not accept user messages"}))
         return
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
@@ -1410,6 +1418,11 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be reopened"}))
+        return
+
     if session.status == "active":
         await ws.send(json.dumps({"type": "error", "reason": "session_active",
                                   "message": "Session is already active"}))
@@ -1467,6 +1480,11 @@ async def handle_text(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions do not accept user messages"}))
         return
 
     if session.status != "active":
@@ -1565,6 +1583,11 @@ async def handle_add_user_to_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
         return
 
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System session user list cannot be modified"}))
+        return
+
     # Only the session owner can add users
     if user_name != session.user_name:
         await ws.send(json.dumps({"type": "error", "message": "Only the session owner can add users"}))
@@ -1623,6 +1646,11 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System session user list cannot be modified"}))
         return
 
     # Owner cannot be removed (neither by themselves nor by others)
@@ -2343,7 +2371,9 @@ async def handle_client(websocket):
 
 def _build_routine_prompt(tags: list[str], max_ideas: int, project_name: str) -> str:
     """Build the prompt for the nightly GitHub scouting routine."""
-    tags_str = ", ".join(tags)
+    # Sanitize tags: strip newlines and enforce alphanumeric/hyphen/space allowlist
+    sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
+    tags_str = ", ".join(sanitized_tags)
     today = datetime.now().strftime("%Y-%m-%d")
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     return f"""# Nightly Improvement Routine
