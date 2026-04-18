@@ -261,7 +261,7 @@ class SessionManager:
         - Have a fixed session_id (so they persist across server restarts)
         - Include ALL users in their users list
         - Have system=True flag
-        - Do NOT create a git branch
+        - Create a 'system_nightly_github_check' git branch
         """
         # Check if this system session already exists
         existing = self._sessions.get(session_id)
@@ -291,6 +291,23 @@ class SessionManager:
             log.error("Failed to copy workspace for system session: %s", e)
             return None
 
+        # Create a descriptive git branch for the system session
+        branch_name = "system_nightly_github_check"
+        try:
+            subprocess.run(["git", "config", "user.name", "Claude Bot"],
+                           cwd=temp_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "claude@bot.local"],
+                           cwd=temp_path, check=True, capture_output=True)
+            result = subprocess.run(["git", "checkout", "-b", branch_name],
+                                    cwd=temp_path, capture_output=True)
+            if result.returncode != 0:
+                # Branch may already exist; try checking it out
+                subprocess.run(["git", "checkout", branch_name],
+                               cwd=temp_path, capture_output=True)
+        except Exception as e:
+            log.warning("Failed to create git branch for system session: %s", e)
+            branch_name = ""
+
         # Ensure .klodTalk dirs exist
         for subdir in ("in_messages", "out_messages", "pr_messages", "history", "team/current"):
             os.makedirs(os.path.join(temp_path, ".klodTalk", subdir), exist_ok=True)
@@ -304,7 +321,7 @@ class SessionManager:
             session_id=session_id,
             project_name=project_name,
             user_name="_system",
-            git_branch="",
+            git_branch=branch_name,
             workspace_path=temp_path,
             container_name=cname,
             status="active",

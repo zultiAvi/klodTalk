@@ -2369,6 +2369,22 @@ async def handle_client(websocket):
 # ── Nightly Routine ───────────────────────────────────────────────────────────
 
 
+def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: str) -> str:
+    """Build a concise prompt for the nightly routine when using a team pipeline."""
+    sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
+    tags_str = ", ".join(sanitized_tags)
+    today = datetime.now().strftime("%Y-%m-%d")
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    return f"""# Nightly GitHub Scouting Task
+
+Search GitHub for repositories and ideas related to: {tags_str}
+Focus on recent activity (last 7 days, since {week_ago}).
+Prefer repositories with more stars, but don't exclude promising low-star repos.
+Look for: tools, skills, MCP servers, prompt techniques, workflow patterns for Claude Code and multi-agent systems.
+Evaluate and implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
+"""
+
+
 def _build_routine_prompt(tags: list[str], max_ideas: int, project_name: str) -> str:
     """Build the prompt for the nightly GitHub scouting routine."""
     # Sanitize tags: strip newlines and enforce alphanumeric/hyphen/space allowlist
@@ -2494,8 +2510,13 @@ async def run_nightly_routine(routine_cfg: dict):
             session.users.append(u)
     session_manager.save_sessions()
 
-    # 2. Build the prompt for the routine agent
-    routine_prompt = _build_routine_prompt(tags, max_ideas, project_name)
+    # 2. Determine team and build prompt
+    team_name = routine_cfg.get("team", "github-scout")
+    if team_name:
+        _session_team_override[SYSTEM_SESSION_ID] = team_name
+        routine_prompt = _build_team_routine_prompt(tags, max_ideas, project_name)
+    else:
+        routine_prompt = _build_routine_prompt(tags, max_ideas, project_name)
 
     # 3. Write the prompt to the system session's in_message.txt
     workspace = session.workspace_path
