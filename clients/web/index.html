@@ -1000,6 +1000,17 @@ function goToHistory(sessionId) {
     reopenBtnEl.classList.add('hidden');
   }
 
+  // Hide team selector and mic button for system sessions
+  const teamSelect = document.getElementById('team-select');
+  const micBtn = document.getElementById('mic-btn');
+  if (isSystemSession) {
+    if (teamSelect) teamSelect.style.display = 'none';
+    if (micBtn) micBtn.style.display = 'none';
+  } else {
+    if (teamSelect) teamSelect.style.display = '';
+    if (micBtn) micBtn.style.display = '';
+  }
+
   // Mark as read
   if (unreadSessions.has(sessionId)) {
     unreadSessions.delete(sessionId);
@@ -2136,25 +2147,50 @@ function sendMsg(mode) {
 
 function updateInputButtons() {
   const isWorking = currentSessionId && workingSessions.has(currentSessionId);
+  const session = currentSessionId ? sessions[currentSessionId] : null;
+  const isSystem = session && session.system;
   const confirmBtn = document.getElementById('btn-confirm');
   const executeBtn = document.getElementById('btn-execute');
   if (!confirmBtn || !executeBtn) return;
   if (isWorking) {
-    confirmBtn.textContent = 'Stop';
-    confirmBtn.className = 'btn btn-red btn-small';
-    confirmBtn.onclick = () => confirmStop();
-    executeBtn.textContent = 'BTW';
-    executeBtn.className = 'btn btn-blue btn-small';
-    executeBtn.style.flex = '1';
-    executeBtn.onclick = () => sendBtw();
+    if (isSystem) {
+      confirmBtn.textContent = 'Read Back';
+      confirmBtn.className = 'btn btn-amber btn-small';
+      confirmBtn.onclick = () => sendMsg('confirm');
+      confirmBtn.disabled = true;
+      executeBtn.textContent = 'BTW';
+      executeBtn.className = 'btn btn-blue btn-small';
+      executeBtn.style.flex = '1';
+      executeBtn.onclick = () => sendBtw();
+    } else {
+      confirmBtn.textContent = 'Stop';
+      confirmBtn.className = 'btn btn-red btn-small';
+      confirmBtn.onclick = () => confirmStop();
+      confirmBtn.disabled = false;
+      executeBtn.textContent = 'BTW';
+      executeBtn.className = 'btn btn-blue btn-small';
+      executeBtn.style.flex = '1';
+      executeBtn.onclick = () => sendBtw();
+    }
   } else {
-    confirmBtn.textContent = 'Read Back';
-    confirmBtn.className = 'btn btn-amber btn-small';
-    confirmBtn.onclick = () => sendMsg('confirm');
-    executeBtn.textContent = 'Start Working';
-    executeBtn.className = 'btn btn-green btn-small';
-    executeBtn.style.flex = '1';
-    executeBtn.onclick = () => sendMsg('execute');
+    confirmBtn.disabled = false;
+    if (isSystem) {
+      confirmBtn.textContent = 'Read Back';
+      confirmBtn.className = 'btn btn-amber btn-small';
+      confirmBtn.onclick = () => sendMsg('confirm');
+      executeBtn.textContent = 'Scout Now';
+      executeBtn.className = 'btn btn-green btn-small';
+      executeBtn.style.flex = '1';
+      executeBtn.onclick = () => sendScoutNow();
+    } else {
+      confirmBtn.textContent = 'Read Back';
+      confirmBtn.className = 'btn btn-amber btn-small';
+      confirmBtn.onclick = () => sendMsg('confirm');
+      executeBtn.textContent = 'Start Working';
+      executeBtn.className = 'btn btn-green btn-small';
+      executeBtn.style.flex = '1';
+      executeBtn.onclick = () => sendMsg('execute');
+    }
   }
 }
 
@@ -2184,6 +2220,11 @@ function sendBtw() {
   const msgInput = document.getElementById('msg-input');
   msgInput.value = '';
   autoResizeTextarea(msgInput);
+}
+
+function sendScoutNow() {
+  if (!ws || !isConnected) { alert('Not connected'); return; }
+  ws.send(JSON.stringify({ type: 'scout_now' }));
 }
 
 // ── Voice input ────────────────────────────────────────────────────────────

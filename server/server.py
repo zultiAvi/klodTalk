@@ -1482,9 +1482,14 @@ async def handle_text(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
-    if getattr(session, 'system', False):
+    if getattr(session, 'system', False) and mode != "confirm":
         await ws.send(json.dumps({"type": "error", "reason": "system_session",
-                                  "message": "System sessions do not accept user messages"}))
+                                  "message": "System sessions only accept read-back (confirm) mode"}))
+        return
+
+    if getattr(session, 'system', False) and session_id in running_sessions:
+        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
+                                  "message": "System session is currently running. Please wait until it finishes."}))
         return
 
     if session.status != "active":
@@ -1536,6 +1541,45 @@ async def handle_text(ws, user_name: str, data: dict):
         await ws.send(ack)
 
     asyncio.create_task(trigger_session(session_id, mode, user_name))
+
+
+async def handle_scout_now(ws, user_name: str, data: dict):
+    """Trigger the nightly scouting routine on demand."""
+    session_id = SYSTEM_SESSION_ID
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "reason": "no_system_session",
+                                  "message": "System session not found. Is the routine enabled in config?"}))
+        return
+
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden",
+                                  "message": "You don't have access to the system session"}))
+        return
+
+    if session_id in running_sessions:
+        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
+                                  "message": "Scout is already running"}))
+        return
+
+    # Load routine config
+    try:
+        with open(CONFIG_PATH) as f:
+            full_cfg = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        full_cfg = {}
+    routine_cfg = full_cfg.get("routine", {})
+    if not routine_cfg.get("project"):
+        await ws.send(json.dumps({"type": "error", "reason": "routine_disabled",
+                                  "message": "Routine project is not configured in server config"}))
+        return
+
+    # Send ack before starting
+    await ws.send(json.dumps({"type": "ack", "session_id": session_id,
+                              "content": "Starting scout now..."}))
+
+    # Trigger the routine (reuse existing run_nightly_routine)
+    asyncio.create_task(run_nightly_routine(routine_cfg))
 
 
 async def handle_get_history(ws, user_name: str):
@@ -2323,6 +2367,9 @@ async def handle_client(websocket):
 
             elif msg_type == "btw":
                 await handle_btw(websocket, client_name, msg)
+
+            elif msg_type == "scout_now":
+                await handle_scout_now(websocket, client_name, msg)
 
             elif msg_type == "add_user_to_session":
                 await handle_add_user_to_session(websocket, client_name, msg)
