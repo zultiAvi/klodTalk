@@ -1,2 +1,0 @@
-server/server.py
-clients/web/index.html
