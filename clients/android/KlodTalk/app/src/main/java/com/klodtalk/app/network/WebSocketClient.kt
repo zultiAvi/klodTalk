@@ -22,6 +22,7 @@ data class SessionInfo(
     val tempId: String? = null,
     val working: Boolean = false,
     val users: List<String> = emptyList(),
+    val system: Boolean = false,
 )
 
 data class HistoryMessage(
@@ -328,6 +329,7 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
         tempId = json.optString("temp_id").ifEmpty { null },
         working = json.optBoolean("working", false),
         users = parseStringArray(json.optJSONArray("users")),
+        system = json.optBoolean("system", false),
     )
 
     private fun parseSessionArray(arr: JSONArray?): List<SessionInfo> {

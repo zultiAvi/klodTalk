@@ -229,7 +229,7 @@ fun HistoryScreen(viewModel: MainViewModel) {
             }
 
             // Session users bar
-            if (session != null && session.users.isNotEmpty()) {
+            if (session != null && session.users.isNotEmpty() && !session.system) {
                 SessionUsersBar(
                     users = session.users,
                     ownerName = session.userName ?: "",
