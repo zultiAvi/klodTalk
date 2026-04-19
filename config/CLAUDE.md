@@ -32,7 +32,23 @@ server:
   docker: true        # start agent containers on boot
   ssl_cert: ""        # Path to server.crt — leave empty for plain ws://
   ssl_key: ""         # Path to server.key — leave empty for plain ws://
+
+routine:
+  enabled: false            # opt-in nightly GitHub scouting routine
+  schedule_hour: 4          # 24h format, local time
+  schedule_minute: 0
+  github_search_tags:       # topics to search for on GitHub
+    - "claude"
+    - "claude-code"
+    - "claude-skill"
+    - "claude-agent"
+    - "claude-mcp"
+    - "anthropic"
+  max_ideas_to_implement: 3 # max ideas to implement per run
+  project: ""               # project name whose workspace the scout uses
 ```
+
+`routine` (optional) -- Automated nightly routine that scouts GitHub for Claude-related improvements, evaluates ideas, and implements the best ones. When `enabled` is `true` and `project` is set to a valid project name, the server creates a permanent "system" session (ID: `system_routine`) visible to all users. At the configured time (default 4:00 AM local), a scout agent runs inside this session's Docker container, searches GitHub, and reports findings. The system session cannot be closed or deleted by users. All clients see it with distinct amber styling and a "System" badge.
 
 ### users.json (gitignored)
 ```json

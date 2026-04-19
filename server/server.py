@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import websockets
@@ -64,6 +64,7 @@ CLAUDE_SESSION_CHECK_SECONDS = 3600
 DOCKER_IMAGE_NAME = "klodtalk-agent"
 KLODTALK_DIR = ".klodTalk"
 MAX_REVIEW_ITERATIONS = 3
+SYSTEM_SESSION_ID = "system_routine"  # Fixed ID for the system session
 _OUT_MESSAGE_EXCLUDED = {"confirm_message.txt", "progress_message.txt", "planner_message.txt", "coder_message.txt", "idea_message.txt", "idea_review_message.txt", "final_plan_message.txt", "idea_history_message.txt", "btw_response.txt"}
 
 # On Windows, npm global installs create `claude.cmd`, not a bare `claude` binary.
@@ -1148,6 +1149,7 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "user_name": session.user_name,
         "users": session.users,
         "working": session.session_id in running_sessions,
+        "system": getattr(session, 'system', False),
     }
     if include_messages:
         if session.status == "closed":
@@ -1185,6 +1187,10 @@ async def handle_stop(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be stopped by users"}))
         return
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
@@ -1231,6 +1237,10 @@ async def handle_btw(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions do not accept user messages"}))
         return
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
@@ -1351,6 +1361,11 @@ async def handle_close_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be closed"}))
+        return
+
     if user_name != session.user_name:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "Only the session owner can close this session"}))
         return
@@ -1372,6 +1387,11 @@ async def handle_delete_session(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be deleted"}))
         return
 
     if session.status != "closed":
@@ -1396,6 +1416,11 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions cannot be reopened"}))
         return
 
     if session.status == "active":
@@ -1457,12 +1482,22 @@ async def handle_text(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "reason": "unknown_session", "message": f"Session '{session_id}' not found"}))
         return
 
+    if getattr(session, 'system', False) and mode != "confirm":
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System sessions only accept read-back (confirm) mode"}))
+        return
+
     if session.status != "active":
         await ws.send(json.dumps({"type": "error", "reason": "session_closed", "message": "Session is closed"}))
         return
 
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+        return
+
+    if getattr(session, 'system', False) and session_id in running_sessions:
+        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
+                                  "message": "System session is currently running. Please wait until it finishes."}))
         return
 
     # If a confirm (read-back) was already sent for this session, clear the accumulated
@@ -1508,6 +1543,45 @@ async def handle_text(ws, user_name: str, data: dict):
     asyncio.create_task(trigger_session(session_id, mode, user_name))
 
 
+async def handle_scout_now(ws, user_name: str, data: dict):
+    """Trigger the nightly scouting routine on demand."""
+    session_id = SYSTEM_SESSION_ID
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "reason": "no_system_session",
+                                  "message": "System session not found. Is the routine enabled in config?"}))
+        return
+
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "reason": "forbidden",
+                                  "message": "You don't have access to the system session"}))
+        return
+
+    if session_id in running_sessions:
+        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
+                                  "message": "Scout is already running"}))
+        return
+
+    # Load routine config
+    try:
+        with open(CONFIG_PATH) as f:
+            full_cfg = yaml.safe_load(f) or {}
+    except FileNotFoundError:
+        full_cfg = {}
+    routine_cfg = full_cfg.get("routine", {})
+    if not routine_cfg.get("project"):
+        await ws.send(json.dumps({"type": "error", "reason": "routine_disabled",
+                                  "message": "Routine project is not configured in server config"}))
+        return
+
+    # Send ack before starting
+    await ws.send(json.dumps({"type": "ack", "session_id": session_id,
+                              "content": "Starting scout now..."}))
+
+    # Trigger the routine (reuse existing run_nightly_routine)
+    asyncio.create_task(run_nightly_routine(routine_cfg))
+
+
 async def handle_get_history(ws, user_name: str):
     projects = load_projects()
     sessions = session_manager.get_user_sessions(user_name)
@@ -1551,6 +1625,11 @@ async def handle_add_user_to_session(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System session user list cannot be modified"}))
         return
 
     # Only the session owner can add users
@@ -1611,6 +1690,11 @@ async def handle_remove_user_from_session(ws, user_name: str, data: dict):
     session = session_manager.get_session(session_id)
     if not session:
         await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    if getattr(session, 'system', False):
+        await ws.send(json.dumps({"type": "error", "reason": "system_session",
+                                  "message": "System session user list cannot be modified"}))
         return
 
     # Owner cannot be removed (neither by themselves nor by others)
@@ -2284,6 +2368,9 @@ async def handle_client(websocket):
             elif msg_type == "btw":
                 await handle_btw(websocket, client_name, msg)
 
+            elif msg_type == "scout_now":
+                await handle_scout_now(websocket, client_name, msg)
+
             elif msg_type == "add_user_to_session":
                 await handle_add_user_to_session(websocket, client_name, msg)
 
@@ -2324,6 +2411,184 @@ async def handle_client(websocket):
         if client_name and client_name in connected_clients:
             del connected_clients[client_name]
             log.info("Removed '%s' from connected clients", client_name)
+
+
+# ── Nightly Routine ───────────────────────────────────────────────────────────
+
+
+def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: str) -> str:
+    """Build a concise prompt for the nightly routine when using a team pipeline."""
+    sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
+    tags_str = ", ".join(sanitized_tags)
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    return f"""# Nightly GitHub Scouting Task
+
+Search GitHub for repositories and ideas related to: {tags_str}
+Focus on recent activity (last 7 days, since {week_ago}).
+Prefer repositories with more stars, but don't exclude promising low-star repos.
+Look for: tools, skills, MCP servers, prompt techniques, workflow patterns for Claude Code and multi-agent systems.
+Evaluate and implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
+"""
+
+
+def _build_routine_prompt(tags: list[str], max_ideas: int, project_name: str) -> str:
+    """Build the prompt for the nightly GitHub scouting routine."""
+    # Sanitize tags: strip newlines and enforce alphanumeric/hyphen/space allowlist
+    sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
+    tags_str = ", ".join(sanitized_tags)
+    today = datetime.now().strftime("%Y-%m-%d")
+    week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    return f"""# Nightly Improvement Routine
+
+You are running an automated nightly routine for the {project_name} project (a multi-agent orchestration system built on Claude Code CLI).
+
+## Your Task
+
+### Step 1: Scout GitHub
+Search GitHub for public repositories and discussions related to these topics: {tags_str}
+
+Focus on:
+- Repositories with recent activity (created or updated in the last 7 days, since {week_ago})
+- Tools, skills, MCP servers, prompt techniques, or workflow patterns
+- Things that could improve multi-agent orchestration, team definitions, role prompts, or developer workflows
+- Claude Code CLI tips, custom slash commands, or automation patterns
+
+Use web search to search GitHub. Example searches:
+- `site:github.com claude-code skill created:>{week_ago}`
+- `site:github.com anthropic claude agent workflow`
+- GitHub trending repositories in the AI/LLM space
+
+### Step 2: Evaluate Ideas
+For each interesting finding, evaluate:
+- Is it relevant to our codebase? (multi-agent teams, WebSocket server, Docker containers, Claude CLI)
+- How hard would it be to implement?
+- What would be the impact? (productivity, quality, developer experience)
+
+### Step 3: Implement Top Ideas
+Pick the top {max_ideas} most impactful and feasible ideas. For each one:
+- Describe what you found and why it's useful
+- Implement it in our codebase if possible (new team definitions, improved role prompts, server enhancements, etc.)
+- If it requires changes that are too large, describe what needs to be done and create a plan
+
+### Step 4: Report
+Write a clear summary report with:
+- **Scouted**: What you searched and how many repos/resources you reviewed
+- **Found**: The most interesting ideas (even ones you didn't implement)
+- **Implemented**: What you actually changed, with file paths
+- **Recommended**: Ideas that need human review before implementing
+
+Write this report as your final output. Be specific about what you changed and why.
+"""
+
+
+async def watch_nightly_routine(routine_cfg: dict):
+    """Sleep until the configured hour, then run the nightly routine."""
+    if not routine_cfg.get("enabled", False):
+        log.info("[routine] Nightly routine disabled in config")
+        return
+
+    hour = int(routine_cfg.get("schedule_hour", 4))
+    minute = int(routine_cfg.get("schedule_minute", 0))
+    project_name = routine_cfg.get("project", "")
+
+    if not project_name:
+        log.error("[routine] No project configured for nightly routine")
+        return
+
+    log.info("[routine] Nightly routine enabled, scheduled for %02d:%02d", hour, minute)
+
+    while True:
+        # Calculate seconds until next scheduled time
+        now = datetime.now()
+        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        wait_seconds = (target - now).total_seconds()
+
+        log.info("[routine] Next run at %s (in %.0f minutes)",
+                 target.strftime("%Y-%m-%d %H:%M"), wait_seconds / 60)
+
+        await asyncio.sleep(wait_seconds)
+
+        log.info("[routine] === Nightly routine starting ===")
+        try:
+            await run_nightly_routine(routine_cfg)
+        except Exception as e:
+            log.error("[routine] Nightly routine failed: %s", e)
+
+        # Sleep at least 60 seconds to avoid double-triggering
+        await asyncio.sleep(60)
+
+
+async def run_nightly_routine(routine_cfg: dict):
+    """Execute the nightly GitHub scouting and implementation routine."""
+    project_name = routine_cfg.get("project", "")
+    project = get_project_record(project_name)
+    if not project:
+        log.error("[routine] Project '%s' not found", project_name)
+        return
+
+    tags = routine_cfg.get("github_search_tags", ["claude", "claude-code"])
+    max_ideas = routine_cfg.get("max_ideas_to_implement", 3)
+
+    # 1. Ensure system session exists
+    all_users = list({u for p in load_projects() for u in p.get("users", [])})
+    session = session_manager.get_session(SYSTEM_SESSION_ID)
+
+    if not session or session.status != "active":
+        if session and session.status == "closed":
+            # Reopen it (system sessions shouldn't be closed, but handle gracefully)
+            session.system = True
+            session_manager.reopen_session(SYSTEM_SESSION_ID, project)
+            session = session_manager.get_session(SYSTEM_SESSION_ID)
+        else:
+            session = session_manager.create_system_session(
+                SYSTEM_SESSION_ID, project_name, project, all_users
+            )
+
+    if not session:
+        log.error("[routine] Failed to create/get system session")
+        return
+
+    # Update users list to include everyone
+    for u in all_users:
+        if u not in session.users:
+            session.users.append(u)
+    session_manager.save_sessions()
+
+    # 2. Determine team and build prompt
+    team_name = routine_cfg.get("team", "github-scout")
+    if team_name:
+        _session_team_override[SYSTEM_SESSION_ID] = team_name
+        routine_prompt = _build_team_routine_prompt(tags, max_ideas, project_name)
+    else:
+        routine_prompt = _build_routine_prompt(tags, max_ideas, project_name)
+
+    # 3. Write the prompt to the system session's in_message.txt
+    workspace = session.workspace_path
+    ensure_klodtalk_dir(workspace)
+    in_path = klodtalk_path(workspace, "in_messages", "in_message.txt")
+    # Clear any previous message
+    if os.path.isfile(in_path):
+        os.remove(in_path)
+    append_in_message(workspace, routine_prompt)
+
+    # 4. Log the routine start to history
+    history_store.append(SYSTEM_SESSION_ID, workspace, "system",
+                         f"Nightly routine started at {datetime.utcnow().isoformat()}Z")
+
+    # 5. Notify all connected clients
+    await _broadcast_to_session_users(SYSTEM_SESSION_ID, {
+        "type": "new_message",
+        "session_id": SYSTEM_SESSION_ID,
+        "project": project_name,
+        "role": "system",
+        "content": "Nightly routine starting: scanning GitHub for Claude-related improvements...",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    })
+
+    # 6. Trigger the agent in execute mode
+    await trigger_session(SYSTEM_SESSION_ID, "execute", "_system")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -2367,6 +2632,25 @@ async def main():
     # Migrate existing sessions: populate users list for backward compatibility
     session_manager.migrate_sessions_add_users(projects)
 
+    # Initialize system session for nightly routine
+    routine_cfg = full_cfg.get("routine", {})
+    if routine_cfg.get("enabled", False):
+        routine_project = routine_cfg.get("project", "")
+        if routine_project:
+            rp = get_project_record(routine_project)
+            if rp:
+                all_users = list({u for p in projects for u in p.get("users", [])})
+                sys_session = session_manager.get_session(SYSTEM_SESSION_ID)
+                if sys_session and sys_session.status == "closed":
+                    session_manager.reopen_session(SYSTEM_SESSION_ID, rp)
+                elif not sys_session:
+                    session_manager.create_system_session(SYSTEM_SESSION_ID, routine_project, rp, all_users)
+                log.info("[routine] System session '%s' ready", SYSTEM_SESSION_ID)
+            else:
+                log.warning("[routine] Project '%s' not found in config", routine_project)
+        else:
+            log.warning("[routine] routine.enabled is true but no project configured")
+
     # TLS / WSS setup
     ssl_cert = cfg.get("ssl_cert", "")
     ssl_key = cfg.get("ssl_key", "")
@@ -2384,6 +2668,7 @@ async def main():
     asyncio.create_task(watch_out_messages())
     asyncio.create_task(watch_claude_session())
     asyncio.create_task(watch_remote_changes(auto_update_cfg))
+    asyncio.create_task(watch_nightly_routine(routine_cfg))
 
     # Pre-create the socket to avoid getaddrinfo failures on Windows (Winsock errno 10109).
     # Binding directly to (host, port) bypasses getaddrinfo entirely.

@@ -15,3 +15,18 @@ auto_update:
   enabled: false          # must be explicitly opted in
   check_interval_minutes: 5
   branch: "main"
+
+routine:
+  enabled: false            # opt-in, like auto_update
+  schedule_hour: 4          # 24h format, local time
+  schedule_minute: 0
+  github_search_tags:
+    - "claude"
+    - "claude-code"
+    - "claude-skill"
+    - "claude-agent"
+    - "claude-mcp"
+    - "anthropic"
+  max_ideas_to_implement: 3
+  project: ""               # Must be set to a valid project name
+  team: "github-scout"      # Team pipeline for the routine (omit for single-agent mode)
