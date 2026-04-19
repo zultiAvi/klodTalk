@@ -1460,7 +1460,7 @@ function renderSessionUsers(sessionId) {
   const section = document.getElementById('session-users-section');
   const bar = document.getElementById('session-users-bar');
   const s = sessions[sessionId];
-  if (!s || !s.users || s.users.length === 0) {
+  if (!s || !s.users || s.users.length === 0 || s.system) {
     section.style.display = 'none';
     return;
   }
@@ -1563,7 +1563,7 @@ function renderSessionsList() {
     const tokenLine = (st && (st.inputTokens > 0 || st.outputTokens > 0))
       ? `<div class="session-tokens">In: ${fmtNum(st.inputTokens)} · Out: ${fmtNum(st.outputTokens)} · ${fmtCost(st.costUsd)}</div>`
       : '';
-    const usersLine = (s.users && s.users.length > 0)
+    const usersLine = (!isSystem && s.users && s.users.length > 0)
       ? `<div class="session-users-line">${s.users.map(u => esc(u)).join(', ')}</div>`
       : '';
 

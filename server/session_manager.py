@@ -629,6 +629,36 @@ class SessionManager:
                             })
         return role_tokens
 
+    def get_live_claude_logs(self, session_id: str) -> Optional[str]:
+        """Copy live Claude logs from a running container into a temp dir.
+
+        Returns the temp dir path on success (caller must clean up with
+        shutil.rmtree), or None if session is not active / copy fails.
+        """
+        session = self._sessions.get(session_id)
+        if not session or session.status != "active":
+            return None
+
+        docker = get_docker_utils()
+        if not docker.is_container_running(session.container_name):
+            return None
+
+        tmp_dir = tempfile.mkdtemp(prefix="klodtalk_live_logs_")
+        try:
+            ok = docker.copy_from_container(
+                session.container_name,
+                "/home/agent/.claude/projects",
+                tmp_dir,
+            )
+            if not ok:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return None
+            return tmp_dir
+        except Exception as e:
+            log.error("Failed to fetch live claude logs for %s: %s", session_id, e)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            return None
+
     def get_session(self, session_id: str) -> Optional[Session]:
         return self._sessions.get(session_id)
 
