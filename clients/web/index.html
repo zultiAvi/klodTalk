@@ -1341,6 +1341,7 @@ function handleMessage(msg) {
           closed_at: s.closed_at,
           users: s.users || [],
           user_name: s.user_name || '',
+          system: s.system || false,
         };
         if (s.working) workingSessions.add(s.session_id);
         sessionMessages[s.session_id] = s.messages || [];

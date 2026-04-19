@@ -1487,17 +1487,17 @@ async def handle_text(ws, user_name: str, data: dict):
                                   "message": "System sessions only accept read-back (confirm) mode"}))
         return
 
-    if getattr(session, 'system', False) and session_id in running_sessions:
-        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
-                                  "message": "System session is currently running. Please wait until it finishes."}))
-        return
-
     if session.status != "active":
         await ws.send(json.dumps({"type": "error", "reason": "session_closed", "message": "Session is closed"}))
         return
 
     if user_name not in session.users:
         await ws.send(json.dumps({"type": "error", "reason": "forbidden", "message": "You don't have access to this session"}))
+        return
+
+    if getattr(session, 'system', False) and session_id in running_sessions:
+        await ws.send(json.dumps({"type": "error", "reason": "session_busy",
+                                  "message": "System session is currently running. Please wait until it finishes."}))
         return
 
     # If a confirm (read-back) was already sent for this session, clear the accumulated

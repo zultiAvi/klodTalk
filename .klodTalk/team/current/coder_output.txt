@@ -1,0 +1,13 @@
+## Coder Output — Review Fix Round 2
+
+### Issue 1 (Bug — High): Missing `system` field in web client history handler
+
+**File:** `clients/web/index.html`
+
+Added `system: s.system || false,` to the session object literal in the `history` message handler. Without this, after page reload `isSystem` evaluated to `false` and system session UI features (Scout Now button, hidden mic, etc.) broke.
+
+### Issue 2 (Minor Security): Busy check before access check in handle_text()
+
+**File:** `server/server.py`
+
+Moved the system session busy check block to AFTER the user access check (`user_name not in session.users`). Previously, any authenticated user could probe whether a system session was running by sending a message and observing the error type. Now the access check runs first, so unauthorized users get "forbidden" before ever reaching the busy check.
