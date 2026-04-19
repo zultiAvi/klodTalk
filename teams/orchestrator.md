@@ -208,6 +208,7 @@ The "primary output file" depends on the role type:
 - **Reviewer-type roles** (reviewer, idea_reviewer): read and include the full content of `reviewer_output.txt`
 - **Executor-type roles** (executor): read and include the full content of `executor_output.txt`
 - **Validator-type roles** (validator): read and include the full content of `validator_output.txt`
+- **Debugger-type roles** (debugger): read and include the full content of `debugger_output.txt`
 
 Do NOT truncate or summarize — include the entire file content.
 

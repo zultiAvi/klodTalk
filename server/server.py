@@ -65,7 +65,7 @@ DOCKER_IMAGE_NAME = "klodtalk-agent"
 KLODTALK_DIR = ".klodTalk"
 MAX_REVIEW_ITERATIONS = 3
 SYSTEM_SESSION_ID = "system_routine"  # Fixed ID for the system session
-_OUT_MESSAGE_EXCLUDED = {"confirm_message.txt", "progress_message.txt", "planner_message.txt", "coder_message.txt", "debugger_message.txt", "idea_message.txt", "idea_review_message.txt", "final_plan_message.txt", "idea_history_message.txt", "btw_response.txt"}
+_OUT_MESSAGE_EXCLUDED = {"confirm_message.txt", "progress_message.txt", "planner_message.txt", "coder_message.txt", "debugger_message.txt", "idea_message.txt", "idea_review_message.txt", "final_plan_message.txt", "idea_history_message.txt", "btw_response.txt", "executor_message.txt", "validator_message.txt"}
 
 # On Windows, npm global installs create `claude.cmd`, not a bare `claude` binary.
 _CLAUDE_CMD = "claude.cmd" if sys.platform == "win32" else "claude"

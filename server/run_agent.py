@@ -97,12 +97,12 @@ fi
 
 # Log every tool call
 mkdir -p "$(dirname "$LOG_FILE")"
-python3 -c "
-import json, sys
+HOOK_TIMESTAMP="$TIMESTAMP" HOOK_TOOL="$TOOL_NAME" HOOK_COMMAND="$COMMAND" python3 -c "
+import json, os
 entry = {
-    'timestamp': '$TIMESTAMP',
-    'tool': '$TOOL_NAME',
-    'command': '''$COMMAND'''.strip()
+    'timestamp': os.environ.get('HOOK_TIMESTAMP', ''),
+    'tool': os.environ.get('HOOK_TOOL', ''),
+    'command': os.environ.get('HOOK_COMMAND', '').strip()
 }
 print(json.dumps(entry))
 " >> "$LOG_FILE" 2>/dev/null || true
