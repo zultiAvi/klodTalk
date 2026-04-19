@@ -280,6 +280,23 @@ Use atomic write:
 2. Write content to `/workspace/.klodTalk/out_messages/coder_message.txt.tmp`
 3. Rename `/workspace/.klodTalk/out_messages/coder_message.txt.tmp` to `/workspace/.klodTalk/out_messages/coder_message.txt`
 
+### Debugger Message Broadcast
+
+After any sub-agent whose role name contains "debugger" completes, write a debugger message file at `/workspace/.klodTalk/out_messages/debugger_message.txt` with the diagnosis from debugger_output.txt:
+
+```
+## Team: <team name from team.md> (claude)
+
+## Debug Diagnosis
+
+<the debugger's diagnosis and suggested fix from debugger_output.txt>
+```
+
+Use atomic write to prevent the server from reading a partial file:
+1. `mkdir -p /workspace/.klodTalk/out_messages`
+2. Write content to `/workspace/.klodTalk/out_messages/debugger_message.txt.tmp`
+3. Rename `/workspace/.klodTalk/out_messages/debugger_message.txt.tmp` to `/workspace/.klodTalk/out_messages/debugger_message.txt`
+
 ### Executor Message Broadcast
 
 After the executor sub-agent completes, write results to `/workspace/.klodTalk/out_messages/executor_message.txt`:
