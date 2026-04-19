@@ -2643,8 +2643,9 @@ async def main():
                 sys_session = session_manager.get_session(SYSTEM_SESSION_ID)
                 if sys_session and sys_session.status == "closed":
                     session_manager.reopen_session(SYSTEM_SESSION_ID, rp)
-                elif not sys_session:
-                    session_manager.create_system_session(SYSTEM_SESSION_ID, routine_project, rp, all_users)
+                # Always call create_system_session: for new sessions it creates them,
+                # for existing sessions it updates the users list.
+                session_manager.create_system_session(SYSTEM_SESSION_ID, routine_project, rp, all_users)
                 log.info("[routine] System session '%s' ready", SYSTEM_SESSION_ID)
             else:
                 log.warning("[routine] Project '%s' not found in config", routine_project)
