@@ -45,7 +45,8 @@ Use this format:
 ## Top Candidates (Recommended for Implementation)
 
 ### 1. <Idea Name>
-- **Source**: <repo URL>
+- **Source repo**: <repo name> — <repo URL> (⭐ <star count>)
+- **What we took from it**: <specific technique, pattern, or feature borrowed from this repo>
 - **Relevance**: <high/medium/low> -- <explanation>
 - **Difficulty**: <high/medium/low> -- <explanation>
 - **Impact**: <high/medium/low> -- <explanation>
@@ -71,3 +72,4 @@ Use this format:
 - Prefer small, self-contained improvements over large refactors
 - Always explain your reasoning for ranking decisions
 - Include concrete implementation notes so the coder can act immediately
+- **Always preserve source repo attribution** -- every idea must clearly link back to the GitHub repo it came from, including the repo name, URL, and star count. This is critical so users can trace each idea to its origin.
