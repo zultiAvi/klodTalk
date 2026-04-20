@@ -22,6 +22,7 @@ You will receive:
 2. **Select relevant skills** for the current task — match keywords from each skill's "When to Use" section against the user request.
 3. **Include relevant skills in sub-agent prompts** by adding them to the `## Relevant Skills` section in the Sub-Agent Prompt Template (see below).
 4. If no skills are relevant, set the Relevant Skills section to "None".
+5. **Read Project Instincts**: If `/workspace/.klodTalk/instincts.md` exists, read its content. Include it in every sub-agent prompt under `## Project Instincts` (see Sub-Agent Prompt Template). If the file does not exist, set the Project Instincts section to "None".
 
 ## Step 2: Classify the Task
 
@@ -94,6 +95,9 @@ When spawning a sub-agent, provide this structure:
 
 ## Team Rules (from team definition — MUST follow)
 <special rules extracted from team.md, or "None" if no special rules>
+
+## Project Instincts (from .klodTalk/instincts.md — hard-won lessons)
+<content of instincts.md, or "None" if the file does not exist>
 
 ## Relevant Skills (from CLAUDE/skills/ — use these patterns)
 <content of each relevant skill, or "None" if no skills match>
@@ -523,6 +527,29 @@ After the pipeline completes (and after writing all output files), reflect on th
 - Create at most **2 new skills** per pipeline run (to avoid clutter).
 - Do **NOT** create skills for simple or trivial tasks.
 - If the task was classified as simple in Step 2, skip this step entirely.
+
+## Step 7: Extract and Append Project Instincts
+
+**Only for COMPLEX tasks.** After the pipeline completes, reflect on the task and extract genuinely new project-specific lessons.
+
+1. **Read existing instincts**: Read `/workspace/.klodTalk/instincts.md` if it exists. Note all existing bullets to avoid duplicates.
+2. **Extract 0-2 new instincts** from this pipeline run. Each instinct must be:
+   - **Actionable**: tells a future agent what to do or avoid.
+   - **Project-specific**: relevant to this codebase, not generic advice.
+   - **Under 20 words**: concise enough to scan quickly.
+   - **Non-duplicate**: not already covered by an existing instinct.
+3. **Append** each new instinct as a bullet point (`- `) to `/workspace/.klodTalk/instincts.md`. Create the file if it does not exist.
+4. **If no genuinely new lessons emerged**, do not append anything. Zero instincts is fine — quality over quantity.
+
+**Quality filter — do NOT add instincts like these:**
+- "Follow the plan" (generic, not project-specific)
+- "Write clean code" (generic)
+- "Test your changes" (generic)
+
+**Good instinct examples:**
+- "KlodTalk's Docker hook requires exit code 2 + JSON stderr to block a tool call."
+- "Team .md files need a Members table with Name/Role/Model/Optional columns."
+- "out_messages/ files must use atomic write (write .tmp then rename) to avoid partial reads."
 
 ## Error Handling
 
