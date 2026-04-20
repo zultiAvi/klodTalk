@@ -2609,6 +2609,7 @@ def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: st
 Check official Claude and Anthropic websites for recent news, updates, API changes, new features, deprecations, and best practices.
 Sources: docs.anthropic.com, anthropic.com/news, anthropic.com/engineering, github.com/anthropics.
 Focus on changes in the last 7 days (since {week_ago}).
+The website_scout agent will write its findings to `.klodTalk/team/current/website_scout_findings.md`.
 
 ## Pass 2: GitHub Community
 Search GitHub for repositories and ideas related to: {tags_str}
