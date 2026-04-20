@@ -1751,14 +1751,21 @@ async def handle_get_agent_logs(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
         return
 
-    # Find claude_logs in archive
+    # Find claude_logs in archive (closed sessions)
     logs_dir = ""
+    tmp_dir = None
     if session.project_folder:
         archive_dir = os.path.join(
             session.project_folder, ".klodTalk", "sessions", session_id, "claude_logs"
         )
         if os.path.isdir(archive_dir):
             logs_dir = archive_dir
+
+    # For active sessions, fetch live logs from the running container
+    if not logs_dir:
+        tmp_dir = session_manager.get_live_claude_logs(session_id)
+        if tmp_dir:
+            logs_dir = tmp_dir
 
     if not logs_dir:
         await ws.send(json.dumps({
@@ -1769,24 +1776,28 @@ async def handle_get_agent_logs(ws, user_name: str, data: dict):
         }))
         return
 
-    discovered = discover_archived_sessions(logs_dir)
-    result_sessions = []
-    for disc in discovered:
-        events = read_session_jsonl(disc["path"])
-        tokens = aggregate_session_tokens(events)
-        result_sessions.append({
-            "claude_session_id": disc["session_id"],
-            "event_count": len(events),
-            "tokens": tokens,
-            "subagent_ids": disc["subagent_ids"],
-            "events": events,
-        })
+    try:
+        discovered = discover_archived_sessions(logs_dir)
+        result_sessions = []
+        for disc in discovered:
+            events = read_session_jsonl(disc["path"])
+            tokens = aggregate_session_tokens(events)
+            result_sessions.append({
+                "claude_session_id": disc["session_id"],
+                "event_count": len(events),
+                "tokens": tokens,
+                "subagent_ids": disc["subagent_ids"],
+                "events": events,
+            })
 
-    await ws.send(json.dumps({
-        "type": "agent_logs",
-        "session_id": session_id,
-        "sessions": result_sessions,
-    }))
+        await ws.send(json.dumps({
+            "type": "agent_logs",
+            "session_id": session_id,
+            "sessions": result_sessions,
+        }))
+    finally:
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 async def handle_get_subagent_logs(ws, user_name: str, data: dict):
@@ -1813,6 +1824,7 @@ async def handle_get_subagent_logs(ws, user_name: str, data: dict):
         return
 
     logs_dir = ""
+    tmp_dir = None
     if session.project_folder:
         archive_dir = os.path.join(
             session.project_folder, ".klodTalk", "sessions", session_id, "claude_logs"
@@ -1820,18 +1832,28 @@ async def handle_get_subagent_logs(ws, user_name: str, data: dict):
         if os.path.isdir(archive_dir):
             logs_dir = archive_dir
 
-    events = []
-    if logs_dir:
-        events = read_subagent_jsonl(logs_dir, parent_session_id, agent_id)
+    # For active sessions, fetch live logs from the running container
+    if not logs_dir:
+        tmp_dir = session_manager.get_live_claude_logs(session_id)
+        if tmp_dir:
+            logs_dir = tmp_dir
 
-    tokens = aggregate_session_tokens(events) if events else {}
-    await ws.send(json.dumps({
-        "type": "subagent_logs",
-        "session_id": session_id,
-        "agent_id": agent_id,
-        "events": events,
-        "tokens": tokens,
-    }))
+    try:
+        events = []
+        if logs_dir:
+            events = read_subagent_jsonl(logs_dir, parent_session_id, agent_id)
+
+        tokens = aggregate_session_tokens(events) if events else {}
+        await ws.send(json.dumps({
+            "type": "subagent_logs",
+            "session_id": session_id,
+            "agent_id": agent_id,
+            "events": events,
+            "tokens": tokens,
+        }))
+    finally:
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 async def handle_get_session_tokens(ws, user_name: str, data: dict):
@@ -1846,6 +1868,58 @@ async def handle_get_session_tokens(ws, user_name: str, data: dict):
         return
 
     breakdown = token_store.get_session_breakdown(session.user_name, session_id)
+
+    # If no per-role steps exist, compute tokens from JSONL logs directly
+    if not breakdown.get("steps"):
+        logs_dir = ""
+        tmp_dir = None
+        if session.project_folder:
+            archive_dir = os.path.join(
+                session.project_folder, ".klodTalk", "sessions", session_id, "claude_logs"
+            )
+            if os.path.isdir(archive_dir):
+                logs_dir = archive_dir
+
+        # For active sessions, fetch live logs from the running container
+        if not logs_dir:
+            tmp_dir = session_manager.get_live_claude_logs(session_id)
+            if tmp_dir:
+                logs_dir = tmp_dir
+
+        if logs_dir:
+            try:
+                discovered = discover_archived_sessions(logs_dir)
+                total_input = 0
+                total_output = 0
+                total_cache_creation = 0
+                total_cache_read = 0
+                for disc in discovered:
+                    events = read_session_jsonl(disc["path"], filter_noise=False)
+                    tokens = aggregate_session_tokens(events)
+                    total_input += tokens.get("input", 0)
+                    total_output += tokens.get("output", 0)
+                    total_cache_creation += tokens.get("cache_creation", 0)
+                    total_cache_read += tokens.get("cache_read", 0)
+
+                if total_input or total_output:
+                    breakdown = {
+                        "steps": {
+                            "claude": {
+                                "input_tokens": total_input,
+                                "output_tokens": total_output,
+                                "cache_creation": total_cache_creation,
+                                "cache_read": total_cache_read,
+                                "cost_usd": 0.0,
+                            }
+                        },
+                        "total_input": total_input,
+                        "total_output": total_output,
+                        "total_cost": 0.0,
+                    }
+            finally:
+                if tmp_dir:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+
     await ws.send(json.dumps({
         "type": "session_tokens",
         "session_id": session_id,

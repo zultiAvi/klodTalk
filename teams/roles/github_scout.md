@@ -45,7 +45,7 @@ Use this format:
 
 ## Findings
 
-### 1. <Repo or Resource Name>
+### 1. <Repo or Resource Name> (`owner/repo`)
 - **URL**: <url>
 - **Stars**: <count>
 - **Description**: <one-line summary>
