@@ -155,7 +155,8 @@ def enrich_event(event: dict) -> dict:
             )
         else:
             result_text = str(tur_content)
-        enriched["tool_result_text"] = result_text[:500]
+        if "tool_result_text" not in enriched:
+            enriched["tool_result_text"] = result_text[:500]
 
     enriched["tool_calls"] = tool_calls
     enriched["text_content"] = "\n".join(text_parts) if text_parts else get_content_text(content)

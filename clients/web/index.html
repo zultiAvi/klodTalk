@@ -2731,7 +2731,7 @@ function renderLogEvents(events, container, sessionId, parentSessionId, subagent
     }
 
     // Text content for assistant/user messages (show first 500 chars)
-    if (evt.text_content && !evt.tool_calls.length) {
+    if (evt.text_content && !(evt.tool_calls && evt.tool_calls.length)) {
       var textEl = document.createElement('div');
       textEl.className = 'log-text-content';
       if (roleType === 'system') {

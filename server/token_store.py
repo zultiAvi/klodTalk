@@ -78,7 +78,8 @@ class TokenStore:
         user = data.get("users", {}).get(user_name, {})
         sessions = user.get("sessions", {})
         return sessions.get(session_id, {
-            "steps": {}, "total_input": 0, "total_output": 0, "total_cost": 0.0
+            "steps": {}, "total_input": 0, "total_output": 0,
+            "total_cache_creation": 0, "total_cache_read": 0, "total_cost": 0.0
         })
 
     def get_summary(self) -> dict:
