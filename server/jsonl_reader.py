@@ -1,9 +1,11 @@
 """Read and enrich Claude Code CLI JSONL session files."""
 
 import json
+import os
 import re
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 
 # --- Noise filtering ---
@@ -111,6 +113,65 @@ def enrich_event(event: dict) -> dict:
             agent_id = m.group(1)
     enriched["subagent_id"] = agent_id
 
+    # --- Structured content extraction for richer log display ---
+    content = event.get("content", "")
+    msg_content = event.get("message", {}).get("content", []) if isinstance(event.get("message"), dict) else []
+
+    # Tool calls: list of {name, input_preview}
+    tool_calls = []
+    text_parts = []
+    if isinstance(msg_content, list):
+        for item in msg_content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "tool_use":
+                tool_name = item.get("name", "unknown")
+                tool_input = item.get("input", {})
+                # Create a short preview of the input
+                if isinstance(tool_input, dict):
+                    input_preview = json.dumps(tool_input, ensure_ascii=False)[:200]
+                else:
+                    input_preview = str(tool_input)[:200]
+                tool_calls.append({"name": tool_name, "input_preview": input_preview})
+            elif item.get("type") == "text":
+                text_parts.append(item.get("text", ""))
+            elif item.get("type") == "tool_result":
+                result_content = item.get("content", "")
+                if isinstance(result_content, list):
+                    result_text = " ".join(
+                        p.get("text", "") for p in result_content if isinstance(p, dict) and p.get("type") == "text"
+                    )
+                else:
+                    result_text = str(result_content)
+                enriched["tool_result_text"] = result_text[:500]
+
+    # toolUseResult (top-level) extraction
+    if isinstance(event.get("toolUseResult"), dict):
+        tur = event["toolUseResult"]
+        tur_content = tur.get("content", "")
+        if isinstance(tur_content, list):
+            result_text = " ".join(
+                p.get("text", "") for p in tur_content if isinstance(p, dict) and p.get("type") == "text"
+            )
+        else:
+            result_text = str(tur_content)
+        enriched["tool_result_text"] = result_text[:500]
+
+    enriched["tool_calls"] = tool_calls
+    enriched["text_content"] = "\n".join(text_parts) if text_parts else get_content_text(content)
+
+    # Build content_summary
+    if tool_calls:
+        call_strs = [tc["name"] for tc in tool_calls]
+        enriched["content_summary"] = "Called: " + ", ".join(call_strs)
+    elif enriched.get("tool_result_text"):
+        enriched["content_summary"] = "Tool result (" + str(len(enriched["tool_result_text"])) + " chars)"
+    elif text_parts:
+        enriched["content_summary"] = "Text response (" + str(sum(len(t) for t in text_parts)) + " chars)"
+    else:
+        plain = get_content_text(content)
+        enriched["content_summary"] = plain[:120] if plain else ""
+
     return enriched
 
 
@@ -137,20 +198,89 @@ def read_session_jsonl(jsonl_path: str, filter_noise: bool = True) -> list[dict]
     return events
 
 
+# --- Session timestamp extraction ---
+
+def get_session_start_time(jsonl_path: str) -> Optional[str]:
+    """Read the first few lines of a JSONL file to extract the earliest timestamp.
+
+    Returns an ISO timestamp string or None if not found.
+    """
+    try:
+        with open(jsonl_path) as f:
+            for i, line in enumerate(f):
+                if i >= 10:  # Only check first 10 lines
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                # Check for timestamp at top level
+                ts = event.get("timestamp")
+                if ts:
+                    return ts
+                # Check message.created (some Claude event formats)
+                msg = event.get("message", {})
+                if isinstance(msg, dict):
+                    created = msg.get("created")
+                    if created:
+                        # Unix timestamp -> ISO
+                        if isinstance(created, (int, float)):
+                            return datetime.utcfromtimestamp(created).isoformat() + "Z"
+                        return str(created)
+    except Exception:
+        pass
+    # Fallback: use file modification time
+    try:
+        mtime = os.path.getmtime(jsonl_path)
+        return datetime.utcfromtimestamp(mtime).isoformat() + "Z"
+    except Exception:
+        return None
+
+
+def _parse_iso_timestamp(ts: str) -> Optional[datetime]:
+    """Parse an ISO timestamp string into a datetime object."""
+    if not ts:
+        return None
+    try:
+        # Handle trailing Z
+        ts_clean = ts.replace("Z", "+00:00") if ts.endswith("Z") else ts
+        # Try standard parsing
+        return datetime.fromisoformat(ts_clean)
+    except (ValueError, TypeError):
+        return None
+
+
 # --- Session discovery in archive ---
 
-def discover_archived_sessions(archive_dir: str) -> list[dict]:
+def discover_archived_sessions(archive_dir: str, filter_after: Optional[str] = None) -> list[dict]:
     """Find all JSONL session files in an archived claude_logs directory.
 
     archive_dir is typically: <project_folder>/.klodTalk/sessions/<session_id>/claude_logs/
     Claude writes to: ~/.claude/projects/<project_hash>/<session_id>.jsonl
     So the structure inside archive_dir mirrors: <project_hash>/<session_id>.jsonl
+
+    If filter_after is set (ISO timestamp), only include sessions whose start time
+    is >= this timestamp (used to filter to current KlodTalk session only).
     """
     sessions = []
     logs_path = Path(archive_dir)
     if not logs_path.is_dir():
         return sessions
+
+    filter_dt = _parse_iso_timestamp(filter_after) if filter_after else None
+
     for jsonl_file in logs_path.glob("*/*.jsonl"):
+        # Apply time filter if set
+        if filter_dt:
+            session_start = get_session_start_time(str(jsonl_file))
+            start_dt = _parse_iso_timestamp(session_start) if session_start else None
+            if start_dt and start_dt < filter_dt:
+                continue
+            # If we can't determine the start time, include it (safe default)
+
         session_id = jsonl_file.stem
         # Check for subagent directory
         subagent_dir = jsonl_file.parent / session_id / "subagents"

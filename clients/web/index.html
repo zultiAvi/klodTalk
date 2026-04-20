@@ -551,7 +551,7 @@
   }
   .log-event:hover { background: rgba(255,255,255,0.03); }
   .log-event.expanded .log-event-full { display: block; }
-  .log-event-full { display: none; white-space: pre-wrap; color: #ccc; margin-top: 6px; font-size: 12px; max-height: 300px; overflow-y: auto; }
+  .log-event-full { display: none; color: #ccc; margin-top: 6px; font-size: 12px; max-height: 500px; overflow-y: auto; }
   .log-role-badge {
     font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
     white-space: nowrap; flex-shrink: 0; min-width: 60px; text-align: center;
@@ -562,7 +562,22 @@
   .log-role-badge.system { background: var(--msg-system); color: #aaa; }
   .log-role-badge.hook { background: var(--msg-review); color: #c8a; }
   .log-role-badge.unknown { background: #333; color: #888; }
-  .log-event-preview { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .log-event-preview { color: #aaa; flex: 1; min-width: 0; }
+  .log-content-summary { font-size: 12px; color: #8af; margin-bottom: 2px; font-weight: 500; }
+  .log-tool-call { display: flex; gap: 6px; align-items: baseline; margin: 2px 0; flex-wrap: wrap; }
+  .log-tool-pill {
+    font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 3px;
+    background: #2a3a5a; color: #6cf; white-space: nowrap;
+  }
+  .log-tool-input { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .log-tool-result-preview { font-size: 11px; color: #9a9; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
+  .log-text-content { font-size: 12px; color: #bbb; white-space: pre-wrap; word-break: break-word; }
+  .log-full-text { white-space: pre-wrap; margin-bottom: 8px; }
+  .log-full-tool { margin: 6px 0; }
+  .log-full-tool pre, .log-full-tool-result pre {
+    background: #1a1a2e; padding: 6px 8px; border-radius: 4px; overflow-x: auto;
+    font-size: 11px; margin: 4px 0; white-space: pre-wrap; word-break: break-word;
+  }
   .log-tokens { font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
   .log-subagent-link { color: var(--blue); cursor: pointer; font-size: 11px; text-decoration: underline; margin-left: 6px; }
   .log-subagent-link:hover { color: #4a9eff; }
@@ -589,7 +604,7 @@
   }
   .tokens-close-btn:hover { background: rgba(255,255,255,0.15); }
   .tokens-content { flex: 1; overflow-y: auto; padding: 20px; background: #0d0d0d; }
-  .tokens-table { width: 100%; max-width: 500px; margin: 0 auto; border-collapse: collapse; }
+  .tokens-table { width: 100%; max-width: 700px; margin: 0 auto; border-collapse: collapse; }
   .tokens-table th, .tokens-table td {
     padding: 8px 16px; text-align: right; font-size: 14px; border-bottom: 1px solid #333;
   }
@@ -601,6 +616,7 @@
   .tokens-role-reviewer { color: #c080e0; }
   .tokens-role-unknown { color: var(--muted); }
   .tokens-empty { color: var(--muted); font-style: italic; padding: 24px; text-align: center; }
+  .tokens-pricing-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; font-style: italic; }
 
   /* --- Analysis overlay --- */
   .analysis-overlay {
@@ -643,6 +659,11 @@
   .analysis-overall-title { font-weight: 600; color: var(--text); margin-bottom: 8px; }
   .analysis-team-rec { color: var(--amber); font-size: 13px; margin-top: 10px; }
   .analysis-raw { white-space: pre-wrap; color: #ccc; font-size: 13px; line-height: 1.6; }
+  .analysis-cached-banner {
+    background: #2a2a1a; border: 1px solid #554; border-radius: 6px;
+    padding: 8px 14px; margin-bottom: 12px; font-size: 12px; color: var(--amber);
+    font-style: italic; text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -2627,9 +2648,13 @@ function showAgentLogs(msg) {
 
     var header = document.createElement('div');
     header.className = 'logs-session-header';
-    var tokenStr = cs.tokens
-      ? 'In: ' + (cs.tokens.input || 0).toLocaleString() + ' / Out: ' + (cs.tokens.output || 0).toLocaleString()
-      : '';
+    var tokenStr = '';
+    if (cs.tokens) {
+      tokenStr = 'In: ' + (cs.tokens.input || 0).toLocaleString() + ' / Out: ' + (cs.tokens.output || 0).toLocaleString();
+      if (cs.tokens.cache_creation > 0 || cs.tokens.cache_read > 0) {
+        tokenStr += ' / Cache W: ' + (cs.tokens.cache_creation || 0).toLocaleString() + ' R: ' + (cs.tokens.cache_read || 0).toLocaleString();
+      }
+    }
     header.innerHTML = '<span>Session: ' + escapeHtml(cs.claude_session_id) + ' (' + cs.event_count + ' events)</span><span class="logs-token-summary">' + tokenStr + '</span>';
 
     var eventsDiv = document.createElement('div');
@@ -2662,32 +2687,77 @@ function renderLogEvents(events, container, sessionId, parentSessionId, subagent
 
     var row = document.createElement('div');
     row.className = 'log-event';
+    var roleType = evt.role_type || 'unknown';
 
     var badge = document.createElement('span');
-    badge.className = 'log-role-badge ' + (evt.role_type || 'unknown');
-    badge.textContent = evt.role_type || 'unknown';
+    badge.className = 'log-role-badge ' + roleType;
+    badge.textContent = roleType;
 
-    var contentText = '';
-    if (typeof evt.content === 'string') {
-      contentText = evt.content;
-    } else if (evt.message && evt.message.content) {
-      contentText = typeof evt.message.content === 'string'
-        ? evt.message.content
-        : JSON.stringify(evt.message.content).substring(0, 200);
+    // --- Rich content preview ---
+    var previewDiv = document.createElement('div');
+    previewDiv.className = 'log-event-preview';
+
+    // Summary line
+    if (evt.content_summary) {
+      var summaryEl = document.createElement('div');
+      summaryEl.className = 'log-content-summary';
+      summaryEl.textContent = evt.content_summary;
+      previewDiv.appendChild(summaryEl);
     }
 
-    var preview = document.createElement('span');
-    preview.className = 'log-event-preview';
-    preview.textContent = contentText.substring(0, 200);
+    // Tool calls display
+    if (evt.tool_calls && evt.tool_calls.length > 0) {
+      evt.tool_calls.forEach(function(tc) {
+        var toolEl = document.createElement('div');
+        toolEl.className = 'log-tool-call';
+        var pill = document.createElement('span');
+        pill.className = 'log-tool-pill';
+        pill.textContent = tc.name;
+        toolEl.appendChild(pill);
+        var inputPrev = document.createElement('span');
+        inputPrev.className = 'log-tool-input';
+        inputPrev.textContent = (tc.input_preview || '').substring(0, 150);
+        toolEl.appendChild(inputPrev);
+        previewDiv.appendChild(toolEl);
+      });
+    }
 
+    // Tool result display
+    if (evt.tool_result_text && roleType === 'tool') {
+      var resultEl = document.createElement('div');
+      resultEl.className = 'log-tool-result-preview';
+      resultEl.textContent = evt.tool_result_text.substring(0, 300);
+      previewDiv.appendChild(resultEl);
+    }
+
+    // Text content for assistant/user messages (show first 500 chars)
+    if (evt.text_content && !evt.tool_calls.length) {
+      var textEl = document.createElement('div');
+      textEl.className = 'log-text-content';
+      if (roleType === 'system') {
+        textEl.style.fontStyle = 'italic';
+        textEl.style.opacity = '0.7';
+      }
+      textEl.textContent = evt.text_content.substring(0, 500);
+      if (evt.text_content.length > 500) {
+        textEl.textContent += '...';
+      }
+      previewDiv.appendChild(textEl);
+    }
+
+    // Token info with cache tokens
     var tokenInfo = document.createElement('span');
     tokenInfo.className = 'log-tokens';
     if (evt.tokens && (evt.tokens.input > 0 || evt.tokens.output > 0)) {
-      tokenInfo.textContent = evt.tokens.input + '/' + evt.tokens.output;
+      var tokenText = 'in:' + evt.tokens.input.toLocaleString() + ' out:' + evt.tokens.output.toLocaleString();
+      if (evt.tokens.cache_creation > 0 || evt.tokens.cache_read > 0) {
+        tokenText += ' cache:' + (evt.tokens.cache_creation + evt.tokens.cache_read).toLocaleString();
+      }
+      tokenInfo.textContent = tokenText;
     }
 
     row.appendChild(badge);
-    row.appendChild(preview);
+    row.appendChild(previewDiv);
     row.appendChild(tokenInfo);
 
     // Sub-agent link
@@ -2702,10 +2772,30 @@ function renderLogEvents(events, container, sessionId, parentSessionId, subagent
       row.appendChild(saLink);
     }
 
-    // Expand/collapse full content
+    // Expand/collapse full content with formatted tool details
     var fullDiv = document.createElement('div');
     fullDiv.className = 'log-event-full';
-    fullDiv.textContent = contentText || JSON.stringify(evt, null, 2);
+
+    var fullHtml = '';
+    // Full text content
+    if (evt.text_content) {
+      fullHtml += '<div class="log-full-text">' + escapeHtml(evt.text_content) + '</div>';
+    }
+    // Full tool call details
+    if (evt.tool_calls && evt.tool_calls.length > 0) {
+      evt.tool_calls.forEach(function(tc) {
+        fullHtml += '<div class="log-full-tool"><strong>' + escapeHtml(tc.name) + '</strong><pre>' + escapeHtml(tc.input_preview) + '</pre></div>';
+      });
+    }
+    // Full tool result
+    if (evt.tool_result_text) {
+      fullHtml += '<div class="log-full-tool-result"><strong>Result:</strong><pre>' + escapeHtml(evt.tool_result_text) + '</pre></div>';
+    }
+    // Raw JSON fallback
+    if (!fullHtml) {
+      fullHtml = '<pre>' + escapeHtml(JSON.stringify(evt, null, 2)) + '</pre>';
+    }
+    fullDiv.innerHTML = fullHtml;
 
     row.onclick = function() {
       row.classList.toggle('expanded');
@@ -2737,8 +2827,15 @@ function showSubagentLogs(msg) {
     content.innerHTML = '<div class="logs-empty">No events found for this sub-agent.</div>';
   } else {
     content.innerHTML = '';
-    var tokenStr = msg.tokens
-      ? '<div class="logs-token-summary" style="padding:8px 12px;">In: ' + (msg.tokens.input || 0).toLocaleString() + ' / Out: ' + (msg.tokens.output || 0).toLocaleString() + '</div>'
+    var saTokenStr = '';
+    if (msg.tokens) {
+      saTokenStr = 'In: ' + (msg.tokens.input || 0).toLocaleString() + ' / Out: ' + (msg.tokens.output || 0).toLocaleString();
+      if (msg.tokens.cache_creation > 0 || msg.tokens.cache_read > 0) {
+        saTokenStr += ' / Cache W: ' + (msg.tokens.cache_creation || 0).toLocaleString() + ' R: ' + (msg.tokens.cache_read || 0).toLocaleString();
+      }
+    }
+    var tokenStr = saTokenStr
+      ? '<div class="logs-token-summary" style="padding:8px 12px;">' + saTokenStr + '</div>'
       : '';
     content.innerHTML = tokenStr;
     var eventsDiv = document.createElement('div');
@@ -2792,19 +2889,24 @@ function showSessionTokens(msg) {
     return 'tokens-role-unknown';
   };
 
-  var html = '<table class="tokens-table"><thead><tr><th>Role</th><th>Input</th><th>Output</th><th>Cost</th></tr></thead><tbody>';
+  var html = '<table class="tokens-table"><thead><tr><th>Role</th><th>Input</th><th>Output</th><th>Cache Create</th><th>Cache Read</th><th>Cost</th></tr></thead><tbody>';
   stepNames.forEach(function(name) {
     var st = steps[name];
     html += '<tr><td class="' + roleColorClass(name) + '">' + escapeHtml(name.charAt(0).toUpperCase() + name.slice(1)) + '</td>';
     html += '<td>' + (st.input_tokens || 0).toLocaleString() + '</td>';
     html += '<td>' + (st.output_tokens || 0).toLocaleString() + '</td>';
+    html += '<td>' + (st.cache_creation || 0).toLocaleString() + '</td>';
+    html += '<td>' + (st.cache_read || 0).toLocaleString() + '</td>';
     html += '<td>$' + (st.cost_usd || 0).toFixed(4) + '</td></tr>';
   });
   html += '<tr class="total-row"><td>Total</td>';
   html += '<td>' + (bd.total_input || 0).toLocaleString() + '</td>';
   html += '<td>' + (bd.total_output || 0).toLocaleString() + '</td>';
+  html += '<td>' + (bd.total_cache_creation || 0).toLocaleString() + '</td>';
+  html += '<td>' + (bd.total_cache_read || 0).toLocaleString() + '</td>';
   html += '<td>$' + (bd.total_cost || 0).toFixed(4) + '</td></tr>';
   html += '</tbody></table>';
+  html += '<div class="tokens-pricing-note">Pricing based on Sonnet 4 rates (Input: $3/M, Output: $15/M, Cache Write: $3.75/M, Cache Read: $0.30/M)</div>';
 
   content.innerHTML = html;
   panel.classList.remove('hidden');
@@ -2854,14 +2956,19 @@ function showSessionAnalysis(msg) {
 
   var analysis = msg.analysis || {};
 
+  var html = '';
+
+  // Show cached banner if this is a cached result
+  if (msg.cached) {
+    html += '<div class="analysis-cached-banner">(cached - no new activity since last analysis)</div>';
+  }
+
   // If raw text (couldn't parse JSON), display as-is
   if (analysis.raw_text) {
-    content.innerHTML = '<div class="analysis-raw">' + escapeHtml(analysis.raw_text) + '</div>';
+    content.innerHTML = html + '<div class="analysis-raw">' + escapeHtml(analysis.raw_text) + '</div>';
     panel.classList.remove('hidden');
     return;
   }
-
-  var html = '';
 
   // Tasks
   var tasks = analysis.tasks || [];
