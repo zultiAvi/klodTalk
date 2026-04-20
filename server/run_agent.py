@@ -64,6 +64,109 @@ def _disable_workspace_plugins():
         print(f"WARNING: Could not disable workspace plugins: {e}")
 
 
+def _setup_agent_hooks():
+    """Install a PreToolUse hook that blocks destructive commands and logs tool calls.
+
+    Writes a bash hook script and registers it in ~/.claude/settings.json.
+    The hook intercepts Bash tool calls and blocks dangerous patterns like
+    force-push, hard reset, etc. All tool calls are logged to a JSONL file.
+    """
+    hook_script_path = "/home/agent/.klodtalk_pretool_hook.sh"
+    settings_path = os.path.expanduser("~/.claude/settings.json")
+    history_dir = "/workspace/.klodTalk/history"
+
+    # Ensure history directory exists for tool call logging
+    os.makedirs(history_dir, exist_ok=True)
+
+    hook_script = r"""#!/usr/bin/env bash
+# KlodTalk PreToolUse hook — blocks destructive commands and logs tool calls.
+# Reads JSON from stdin ($CLAUDE_TOOL_INPUT).
+
+set -euo pipefail
+
+TOOL_INPUT=$(cat)
+TOOL_NAME="${CLAUDE_TOOL_NAME:-unknown}"
+LOG_FILE="/workspace/.klodTalk/history/tool_calls.jsonl"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Extract command for Bash tool calls
+COMMAND=""
+if [ "$TOOL_NAME" = "Bash" ] || [ "$TOOL_NAME" = "bash" ]; then
+    COMMAND=$(echo "$TOOL_INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('command',''))" 2>/dev/null || echo "")
+fi
+
+# Log every tool call
+mkdir -p "$(dirname "$LOG_FILE")"
+HOOK_TIMESTAMP="$TIMESTAMP" HOOK_TOOL="$TOOL_NAME" HOOK_COMMAND="$COMMAND" python3 -c "
+import json, os
+entry = {
+    'timestamp': os.environ.get('HOOK_TIMESTAMP', ''),
+    'tool': os.environ.get('HOOK_TOOL', ''),
+    'command': os.environ.get('HOOK_COMMAND', '').strip()
+}
+print(json.dumps(entry))
+" >> "$LOG_FILE" 2>/dev/null || true
+
+# Block destructive patterns for Bash tool calls
+if [ -n "$COMMAND" ]; then
+    BLOCKED=""
+    case "$COMMAND" in
+        *"git push"*"--force"*)   BLOCKED="git push --force is blocked" ;;
+        *"git push"*"-f"*)        BLOCKED="git push -f is blocked" ;;
+        *"git reset"*"--hard"*)   BLOCKED="git reset --hard is blocked" ;;
+        *"git clean"*"-f"*)       BLOCKED="git clean -f is blocked" ;;
+        *"git checkout ."*)       BLOCKED="git checkout . is blocked" ;;
+        *"git restore ."*)        BLOCKED="git restore . is blocked" ;;
+        *"rm -rf /"*)             BLOCKED="rm -rf / is blocked" ;;
+    esac
+
+    if [ -n "$BLOCKED" ]; then
+        echo "{\"decision\": \"block\", \"reason\": \"$BLOCKED\"}" >&2
+        exit 2
+    fi
+fi
+
+# Allow the tool call
+exit 0
+"""
+
+    try:
+        with open(hook_script_path, "w") as f:
+            f.write(hook_script)
+        os.chmod(hook_script_path, 0o755)
+
+        # Read or initialize settings
+        settings = {}
+        if os.path.isfile(settings_path):
+            try:
+                with open(settings_path) as f:
+                    settings = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                settings = {}
+
+        # Register the hook under hooks.PreToolUse
+        settings["hooks"] = {
+            "PreToolUse": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": hook_script_path,
+                        }
+                    ],
+                }
+            ]
+        }
+
+        os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+        with open(settings_path, "w") as f:
+            json.dump(settings, f, indent=2)
+
+    except Exception as e:
+        print(f"WARNING: Could not set up agent hooks: {e}")
+
+
 def _claude_cmd(prompt: str) -> list[str]:
     """Build the claude CLI command with auth-specific args."""
     return ["claude"] + _claude_auth.get_cli_args() + [
@@ -656,6 +759,7 @@ def main():
     os.makedirs(PR_DIR, exist_ok=True)
 
     _disable_workspace_plugins()
+    _setup_agent_hooks()
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     is_git = git_available()
