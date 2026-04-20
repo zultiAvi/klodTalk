@@ -12,7 +12,7 @@ KlodTalk is a multi-agent orchestration platform:
 
 ## Your Task
 
-1. Read scout findings from `.klodTalk/team/current/scout_findings.md`
+1. Read scout findings from `.klodTalk/team/current/scout_findings.md` and website scout findings from `.klodTalk/team/current/website_scout_findings.md` (evaluate whichever files exist — one or both)
 2. For each finding, assess:
    - **Relevance**: How well does it fit the KlodTalk codebase and its goals?
    - **Implementation difficulty**: How much effort to integrate? (low / medium / high)
@@ -45,7 +45,7 @@ Use this format:
 ## Top Candidates (Recommended for Implementation)
 
 ### 1. <Idea Name>
-- **Source repo**: <repo name> — <repo URL> (⭐ <star count>)
+- **Source**: <repo name — repo URL (⭐ star count)> for GitHub findings, OR <article title — URL (source site)> for website findings
 - **What we took from it**: <specific technique, pattern, or feature borrowed from this repo>
 - **Relevance**: <high/medium/low> -- <explanation>
 - **Difficulty**: <high/medium/low> -- <explanation>

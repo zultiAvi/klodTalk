@@ -2603,13 +2603,21 @@ def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: st
     sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
     tags_str = ", ".join(sanitized_tags)
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-    return f"""# Nightly GitHub Scouting Task
+    return f"""# Nightly Scouting Task
 
+## Pass 1: Claude/Anthropic Official Channels
+Check official Claude and Anthropic websites for recent news, updates, API changes, new features, deprecations, and best practices.
+Sources: docs.anthropic.com, anthropic.com/news, anthropic.com/engineering, github.com/anthropics.
+Focus on changes in the last 7 days (since {week_ago}).
+
+## Pass 2: GitHub Community
 Search GitHub for repositories and ideas related to: {tags_str}
 Focus on recent activity (last 7 days, since {week_ago}).
 Prefer repositories with more stars, but don't exclude promising low-star repos.
 Look for: tools, skills, MCP servers, prompt techniques, workflow patterns for Claude Code and multi-agent systems.
-Evaluate and implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
+
+## Evaluation & Implementation
+Evaluate findings from BOTH passes together. Implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
 """
 
 
@@ -2765,7 +2773,7 @@ async def run_nightly_routine(routine_cfg: dict):
         "session_id": SYSTEM_SESSION_ID,
         "project": project_name,
         "role": "system",
-        "content": "Nightly routine starting: scanning GitHub for Claude-related improvements...",
+        "content": "Nightly routine starting: scanning Claude/Anthropic channels and GitHub for improvements...",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     })
 
