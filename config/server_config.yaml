@@ -17,7 +17,7 @@ auto_update:
   branch: "main"
 
 routine:
-  enabled: false            # opt-in, like auto_update
+  enabled: true            # opt-in, like auto_update
   schedule_hour: 4          # 24h format, local time
   schedule_minute: 0
   github_search_tags:
@@ -28,5 +28,5 @@ routine:
     - "claude-mcp"
     - "anthropic"
   max_ideas_to_implement: 3
-  project: ""               # Must be set to a valid project name
   team: "nightly-scout"      # Team pipeline for the routine (omit for single-agent mode)
+  project: "klod_talk"               # Must be set to a valid project name
