@@ -42,7 +42,8 @@ class TokenStore:
             self._write(data)
 
     def add_step_tokens(self, user_name: str, session_id: str, step_name: str,
-                        input_tokens: int, output_tokens: int, cost_usd: float):
+                        input_tokens: int, output_tokens: int, cost_usd: float,
+                        cache_creation: int = 0, cache_read: int = 0):
         """Record token usage for a specific pipeline step within a session."""
         with self._lock:
             data = self._read()
@@ -51,16 +52,22 @@ class TokenStore:
             })
             sessions = user.setdefault("sessions", {})
             session = sessions.setdefault(session_id, {
-                "steps": {}, "total_input": 0, "total_output": 0, "total_cost": 0.0
+                "steps": {}, "total_input": 0, "total_output": 0,
+                "total_cache_creation": 0, "total_cache_read": 0, "total_cost": 0.0
             })
             step = session["steps"].setdefault(step_name, {
-                "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0
+                "input_tokens": 0, "output_tokens": 0,
+                "cache_creation": 0, "cache_read": 0, "cost_usd": 0.0
             })
             step["input_tokens"] += input_tokens
             step["output_tokens"] += output_tokens
+            step["cache_creation"] += cache_creation
+            step["cache_read"] += cache_read
             step["cost_usd"] += cost_usd
             session["total_input"] += input_tokens
             session["total_output"] += output_tokens
+            session["total_cache_creation"] = session.get("total_cache_creation", 0) + cache_creation
+            session["total_cache_read"] = session.get("total_cache_read", 0) + cache_read
             session["total_cost"] += cost_usd
             self._write(data)
 
@@ -71,7 +78,8 @@ class TokenStore:
         user = data.get("users", {}).get(user_name, {})
         sessions = user.get("sessions", {})
         return sessions.get(session_id, {
-            "steps": {}, "total_input": 0, "total_output": 0, "total_cost": 0.0
+            "steps": {}, "total_input": 0, "total_output": 0,
+            "total_cache_creation": 0, "total_cache_read": 0, "total_cost": 0.0
         })
 
     def get_summary(self) -> dict:

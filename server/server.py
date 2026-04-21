@@ -1777,7 +1777,7 @@ async def handle_get_agent_logs(ws, user_name: str, data: dict):
         return
 
     try:
-        discovered = discover_archived_sessions(logs_dir)
+        discovered = discover_archived_sessions(logs_dir, filter_after=session.created_at)
         result_sessions = []
         for disc in discovered:
             events = read_session_jsonl(disc["path"])
@@ -1856,6 +1856,24 @@ async def handle_get_subagent_logs(ws, user_name: str, data: dict):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def _compute_cost(input_tokens: int, output_tokens: int,
+                   cache_creation: int = 0, cache_read: int = 0) -> float:
+    """Compute cost in USD based on Claude Sonnet 4 pricing.
+
+    Rates per 1M tokens:
+      Input:          $3.00
+      Output:        $15.00
+      Cache creation: $3.75
+      Cache read:     $0.30
+    """
+    return (
+        (input_tokens / 1_000_000) * 3.00
+        + (output_tokens / 1_000_000) * 15.00
+        + (cache_creation / 1_000_000) * 3.75
+        + (cache_read / 1_000_000) * 0.30
+    )
+
+
 async def handle_get_session_tokens(ws, user_name: str, data: dict):
     """Return per-step token breakdown for a session."""
     session_id = data.get("session_id", "")
@@ -1868,6 +1886,18 @@ async def handle_get_session_tokens(ws, user_name: str, data: dict):
         return
 
     breakdown = token_store.get_session_breakdown(session.user_name, session_id)
+
+    # Add cost to existing steps if they have zero cost but have tokens
+    if breakdown.get("steps"):
+        recalc_total_cost = 0.0
+        for step_name, st in breakdown["steps"].items():
+            if st.get("cost_usd", 0.0) == 0.0 and (st.get("input_tokens", 0) or st.get("output_tokens", 0)):
+                st["cost_usd"] = _compute_cost(
+                    st.get("input_tokens", 0), st.get("output_tokens", 0),
+                    st.get("cache_creation", 0), st.get("cache_read", 0))
+            recalc_total_cost += st.get("cost_usd", 0.0)
+        if breakdown.get("total_cost", 0.0) == 0.0:
+            breakdown["total_cost"] = recalc_total_cost
 
     # If no per-role steps exist, compute tokens from JSONL logs directly
     if not breakdown.get("steps"):
@@ -1888,33 +1918,102 @@ async def handle_get_session_tokens(ws, user_name: str, data: dict):
 
         if logs_dir:
             try:
-                discovered = discover_archived_sessions(logs_dir)
+                from session_manager import _guess_role_from_prompt
+                from jsonl_reader import read_subagent_jsonl
+
+                discovered = discover_archived_sessions(logs_dir, filter_after=session.created_at)
+                steps = {}
                 total_input = 0
                 total_output = 0
                 total_cache_creation = 0
                 total_cache_read = 0
+                total_cost = 0.0
+
                 for disc in discovered:
                     events = read_session_jsonl(disc["path"], filter_noise=False)
                     tokens = aggregate_session_tokens(events)
-                    total_input += tokens.get("input", 0)
-                    total_output += tokens.get("output", 0)
-                    total_cache_creation += tokens.get("cache_creation", 0)
-                    total_cache_read += tokens.get("cache_read", 0)
+
+                    # Try to determine role from the session content
+                    role_label = "claude"
+                    for evt in events[:20]:
+                        content = evt.get("text_content", "") or ""
+                        if content:
+                            guessed = _guess_role_from_prompt(content)
+                            if guessed != "unknown":
+                                role_label = guessed
+                                break
+
+                    inp = tokens.get("input", 0)
+                    out = tokens.get("output", 0)
+                    cc = tokens.get("cache_creation", 0)
+                    cr = tokens.get("cache_read", 0)
+                    cost = _compute_cost(inp, out, cc, cr)
+
+                    # Aggregate into the role step
+                    step = steps.setdefault(role_label, {
+                        "input_tokens": 0, "output_tokens": 0,
+                        "cache_creation": 0, "cache_read": 0, "cost_usd": 0.0,
+                    })
+                    step["input_tokens"] += inp
+                    step["output_tokens"] += out
+                    step["cache_creation"] += cc
+                    step["cache_read"] += cr
+                    step["cost_usd"] += cost
+
+                    total_input += inp
+                    total_output += out
+                    total_cache_creation += cc
+                    total_cache_read += cr
+                    total_cost += cost
+
+                    # Process sub-agents for this Claude session
+                    for sa_id in disc.get("subagent_ids", []):
+                        sa_events = read_subagent_jsonl(
+                            logs_dir, disc["session_id"], sa_id, filter_noise=False
+                        )
+                        if not sa_events:
+                            continue
+                        sa_tokens = aggregate_session_tokens(sa_events)
+                        # Guess sub-agent role
+                        sa_role = "sub-agent"
+                        for sa_evt in sa_events[:20]:
+                            sa_content = sa_evt.get("text_content", "") or ""
+                            if sa_content:
+                                sa_guessed = _guess_role_from_prompt(sa_content)
+                                if sa_guessed != "unknown":
+                                    sa_role = sa_guessed
+                                    break
+
+                        sa_inp = sa_tokens.get("input", 0)
+                        sa_out = sa_tokens.get("output", 0)
+                        sa_cc = sa_tokens.get("cache_creation", 0)
+                        sa_cr = sa_tokens.get("cache_read", 0)
+                        sa_cost = _compute_cost(sa_inp, sa_out, sa_cc, sa_cr)
+
+                        sa_step = steps.setdefault(sa_role, {
+                            "input_tokens": 0, "output_tokens": 0,
+                            "cache_creation": 0, "cache_read": 0, "cost_usd": 0.0,
+                        })
+                        sa_step["input_tokens"] += sa_inp
+                        sa_step["output_tokens"] += sa_out
+                        sa_step["cache_creation"] += sa_cc
+                        sa_step["cache_read"] += sa_cr
+                        sa_step["cost_usd"] += sa_cost
+
+                        total_input += sa_inp
+                        total_output += sa_out
+                        total_cache_creation += sa_cc
+                        total_cache_read += sa_cr
+                        total_cost += sa_cost
 
                 if total_input or total_output:
                     breakdown = {
-                        "steps": {
-                            "claude": {
-                                "input_tokens": total_input,
-                                "output_tokens": total_output,
-                                "cache_creation": total_cache_creation,
-                                "cache_read": total_cache_read,
-                                "cost_usd": 0.0,
-                            }
-                        },
+                        "steps": steps,
                         "total_input": total_input,
                         "total_output": total_output,
-                        "total_cost": 0.0,
+                        "total_cache_creation": total_cache_creation,
+                        "total_cache_read": total_cache_read,
+                        "total_cost": total_cost,
                     }
             finally:
                 if tmp_dir:
@@ -1927,8 +2026,8 @@ async def handle_get_session_tokens(ws, user_name: str, data: dict):
     }))
 
 
-# session_id -> analysis result (cached)
-_session_analyses: dict[str, dict] = {}
+# session_id -> (analysis result, message count at time of analysis)
+_session_analyses: dict[str, tuple[dict, int]] = {}
 # session_ids with analysis currently running
 _session_analysis_running: set[str] = set()
 
@@ -1944,25 +2043,7 @@ async def handle_analyze_session(ws, user_name: str, data: dict):
         await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
         return
 
-    # Check if analysis already exists
-    if session_id in _session_analyses:
-        await ws.send(json.dumps({
-            "type": "session_analysis",
-            "session_id": session_id,
-            "analysis": _session_analyses[session_id],
-            "status": "complete",
-        }))
-        return
-
-    if session_id in _session_analysis_running:
-        await ws.send(json.dumps({
-            "type": "session_analysis",
-            "session_id": session_id,
-            "status": "running",
-        }))
-        return
-
-    # Get session history
+    # Get session history first (needed for both cache check and analysis)
     if session.status == "closed":
         archive = session_manager.get_archive_path(session)
         archive_file = os.path.join(archive, "session.jsonl") if archive else ""
@@ -1981,6 +2062,33 @@ async def handle_analyze_session(ws, user_name: str, data: dict):
     else:
         messages = history_store.read_session(session_id, session.workspace_path)
 
+    current_msg_count = len(messages)
+
+    # Check if analysis already exists and is still valid
+    if session_id in _session_analyses:
+        cached_analysis, cached_msg_count = _session_analyses[session_id]
+        if current_msg_count == cached_msg_count:
+            # No new messages since last analysis - return cached
+            await ws.send(json.dumps({
+                "type": "session_analysis",
+                "session_id": session_id,
+                "analysis": cached_analysis,
+                "status": "complete",
+                "cached": True,
+            }))
+            return
+        else:
+            # New messages arrived - invalidate cache
+            del _session_analyses[session_id]
+
+    if session_id in _session_analysis_running:
+        await ws.send(json.dumps({
+            "type": "session_analysis",
+            "session_id": session_id,
+            "status": "running",
+        }))
+        return
+
     if not messages:
         await ws.send(json.dumps({
             "type": "session_analysis",
@@ -1997,10 +2105,10 @@ async def handle_analyze_session(ws, user_name: str, data: dict):
         "status": "running",
     }))
 
-    asyncio.create_task(_run_session_analysis(session_id, session, messages, user_name))
+    asyncio.create_task(_run_session_analysis(session_id, session, messages, user_name, current_msg_count))
 
 
-async def _run_session_analysis(session_id: str, session, messages: list, user_name: str):
+async def _run_session_analysis(session_id: str, session, messages: list, user_name: str, msg_count: int = 0):
     """Run Claude to analyze the session."""
     try:
         prompt_path = os.path.join(BASE_DIR, "server", "prompts", "analyze_session.md")
@@ -2052,7 +2160,7 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
         if not analysis:
             analysis = {"raw_text": content, "tasks": [], "overall_suggestions": []}
 
-        _session_analyses[session_id] = analysis
+        _session_analyses[session_id] = (analysis, msg_count)
 
         # Save analysis to archive if available
         if session.project_folder:
@@ -2495,13 +2603,22 @@ def _build_team_routine_prompt(tags: list[str], max_ideas: int, project_name: st
     sanitized_tags = [re.sub(r'[^a-zA-Z0-9\s\-]', '', tag.replace('\n', ' ').replace('\r', ' ')) for tag in tags]
     tags_str = ", ".join(sanitized_tags)
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-    return f"""# Nightly GitHub Scouting Task
+    return f"""# Nightly Scouting Task
 
+## Pass 1: Claude/Anthropic Official Channels
+Check official Claude and Anthropic websites for recent news, updates, API changes, new features, deprecations, and best practices.
+Sources: docs.anthropic.com, anthropic.com/news, anthropic.com/engineering, github.com/anthropics.
+Focus on changes in the last 7 days (since {week_ago}).
+The website_scout agent will write its findings to `.klodTalk/team/current/website_scout_findings.md`.
+
+## Pass 2: GitHub Community
 Search GitHub for repositories and ideas related to: {tags_str}
 Focus on recent activity (last 7 days, since {week_ago}).
 Prefer repositories with more stars, but don't exclude promising low-star repos.
 Look for: tools, skills, MCP servers, prompt techniques, workflow patterns for Claude Code and multi-agent systems.
-Evaluate and implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
+
+## Evaluation & Implementation
+Evaluate findings from BOTH passes together. Implement the top {max_ideas} most impactful and feasible ideas for the {project_name} project.
 """
 
 
@@ -2657,7 +2774,7 @@ async def run_nightly_routine(routine_cfg: dict):
         "session_id": SYSTEM_SESSION_ID,
         "project": project_name,
         "role": "system",
-        "content": "Nightly routine starting: scanning GitHub for Claude-related improvements...",
+        "content": "Nightly routine starting: scanning Claude/Anthropic channels and GitHub for improvements...",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     })
 
