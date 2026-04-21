@@ -64,9 +64,10 @@ When a pipeline step has a review loop:
 2. Read the reviewer's output file **completely**.
 2b. Log the full reviewer output to `orchestrator_log.md` using the History Logging format (with the round number in the step title, e.g., "Step N: idea_reviewer (Round R)").
 2c. Broadcast the reviewer output: for idea teams write to `idea_review_message.txt` (see Idea Review Broadcast), for code teams write to `pr_message.txt` (see Reviewer Message Broadcast).
-3. If the reviewer wrote `NO_ISSUES_FOUND` → the loop is done, proceed to next pipeline step.
-4. If the reviewer requested changes and iterations remain → log the fix request context to `orchestrator_log.md`, then run the fix role with the review remarks, then run the reviewer again. The fix role is the member specified in the pipeline (e.g., idea_maker for ideation teams, coder for code teams).
-5. If max iterations reached → proceed to next pipeline step regardless.
+3. **BLOCKER scan rule**: Scan the reviewer output for lines starting with `BLOCKER:`. If zero `BLOCKER:` lines are found, treat the review as **approved** regardless of the `REVIEW RESULT` header — the loop is done, proceed to next pipeline step. `WARNING:` and `SUGGESTION:` lines are informational only and do not trigger a fix round.
+4. If one or more `BLOCKER:` lines are found and iterations remain → log the fix request context to `orchestrator_log.md`, then run the fix role with the review remarks (include all BLOCKER lines), then run the reviewer again. The fix role is the member specified in the pipeline (e.g., idea_maker for ideation teams, coder for code teams).
+5. If the reviewer wrote `NO_ISSUES_FOUND` → the loop is done (same as zero blockers).
+6. If max iterations reached → proceed to next pipeline step regardless.
 
 ### Validator Review Loops
 
@@ -550,6 +551,38 @@ After the pipeline completes (and after writing all output files), reflect on th
 - "KlodTalk's Docker hook requires exit code 2 + JSON stderr to block a tool call."
 - "Team .md files need a Members table with Name/Role/Model/Optional columns."
 - "out_messages/ files must use atomic write (write .tmp then rename) to avoid partial reads."
+
+## Context Budget Awareness
+
+Long pipelines accumulate context. When context usage approaches ~80% capacity, Claude's output quality degrades silently — responses shorten, details are omitted, and instructions may be partially followed. Detect and mitigate this proactively.
+
+### Heuristics for Detecting Context Pressure
+
+You are likely at >80% context fill if **any** of the following are true:
+- **Step count**: You have completed 5 or more sub-agent invocations (including review loop rounds).
+- **Output volume**: The combined text you have read from sub-agent output files exceeds ~30,000 words.
+- **Review loop depth**: A single review loop has run 3 or more rounds.
+- **Self-response length**: Your own reasoning or logging text has become noticeably shorter or less detailed than earlier steps — this is an unconscious signal of context pressure.
+
+### Mitigation: Context Pressure Warning Block
+
+When context pressure is detected, **prepend** the following block to every subsequent sub-agent prompt (before the role instructions):
+
+```
+## CONTEXT PRESSURE WARNING
+You are being invoked late in a multi-step pipeline. Context budget is constrained.
+- Be concise in your reasoning — focus on the essential points only.
+- Write ALL substantial output to files (your designated output file), not inline.
+- Do NOT repeat prior context, plans, or code that is already in files on disk.
+- If you need to reference earlier work, read it from the file system rather than relying on prompt context.
+- Prefer short, targeted file reads over full-file reads.
+```
+
+### Additional Notes
+
+- A shortened self-response (from you, the orchestrator) is itself a signal of context pressure. If you notice your own step logs becoming terse, activate the warning block for remaining steps.
+- When context pressure is detected, summarize prior step results in 2-3 sentences instead of including full verbatim output in subsequent sub-agent prompts. The full output is already logged in `orchestrator_log.md` and can be read from disk.
+- This guidance does not change the pipeline order or skip steps — it only changes how prompts are composed to preserve output quality under constrained context.
 
 ## Error Handling
 
