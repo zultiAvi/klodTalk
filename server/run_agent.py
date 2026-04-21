@@ -24,6 +24,7 @@ CHANGED_FILES_PATH = "/workspace/.klodTalk/changed_files.txt"
 AGENT_SCRIPT = "/workspace/agent_run.sh"
 PROGRESS_FILE = os.path.join(OUT_DIR, "progress_message.txt")
 TEAM_CURRENT_DIR = "/workspace/.klodTalk/team/current"
+SESSION_STOPPED_SENTINEL = "/workspace/.klodTalk/team/current/.session_stopped"
 
 HISTORY_FILE = "/workspace/.klodTalk/history/session.jsonl"
 MAX_HISTORY_CHARS = 20000
@@ -72,6 +73,7 @@ def _setup_agent_hooks():
     force-push, hard reset, etc. All tool calls are logged to a JSONL file.
     """
     hook_script_path = "/home/agent/.klodtalk_pretool_hook.sh"
+    stop_hook_script_path = "/home/agent/.klodtalk_stop_hook.sh"
     settings_path = os.path.expanduser("~/.claude/settings.json")
     history_dir = "/workspace/.klodTalk/history"
 
@@ -130,10 +132,30 @@ fi
 exit 0
 """
 
+    # Stop hook script — writes a sentinel file on clean exit
+    stop_hook_script = f"""#!/usr/bin/env bash
+# KlodTalk Stop hook — writes a sentinel file to signal clean session exit.
+# The sentinel is checked by run_execute_mode() after the subprocess returns.
+
+set -euo pipefail
+
+SENTINEL="{SESSION_STOPPED_SENTINEL}"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Atomic write: write to tmp then rename
+mkdir -p "$(dirname "$SENTINEL")"
+echo "$TIMESTAMP" > "${{SENTINEL}}.tmp"
+mv "${{SENTINEL}}.tmp" "$SENTINEL"
+"""
+
     try:
         with open(hook_script_path, "w") as f:
             f.write(hook_script)
         os.chmod(hook_script_path, 0o755)
+
+        with open(stop_hook_script_path, "w") as f:
+            f.write(stop_hook_script)
+        os.chmod(stop_hook_script_path, 0o755)
 
         # Read or initialize settings
         settings = {}
@@ -144,7 +166,7 @@ exit 0
             except (json.JSONDecodeError, OSError):
                 settings = {}
 
-        # Register the hook under hooks.PreToolUse
+        # Register hooks under hooks.PreToolUse and hooks.Stop
         settings["hooks"] = {
             "PreToolUse": [
                 {
@@ -156,7 +178,18 @@ exit 0
                         }
                     ],
                 }
-            ]
+            ],
+            "Stop": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": stop_hook_script_path,
+                        }
+                    ],
+                }
+            ],
         }
 
         os.makedirs(os.path.dirname(settings_path), exist_ok=True)
@@ -514,7 +547,29 @@ def run_execute_mode(input_text: str):
 
         print(f"Delegating to Claude team orchestrator (team={TEAM_NAME})...")
         write_progress("Starting Claude team pipeline...")
+
+        # Clear stale sentinel before launch
+        if os.path.isfile(SESSION_STOPPED_SENTINEL):
+            os.remove(SESSION_STOPPED_SENTINEL)
+
         result = subprocess.run([claude_team_script, TEAM_NAME], env=env)
+
+        # Check for clean exit via sentinel
+        clean_exit = os.path.isfile(SESSION_STOPPED_SENTINEL)
+        if not clean_exit and result.returncode != 0:
+            crash_warning = (
+                f"WARNING: Team pipeline interrupted (exit code {result.returncode}). "
+                "The orchestrator may have crashed or been killed before completing. "
+                "Output may be incomplete or missing."
+            )
+            print(crash_warning)
+            # Prepend warning to output file if it exists, or create it
+            existing = ""
+            if os.path.isfile(OUT_FILE):
+                with open(OUT_FILE, 'r') as f:
+                    existing = f.read()
+            with open(OUT_FILE, 'w') as f:
+                f.write(f"{crash_warning}\n\n{existing}" if existing else crash_warning)
 
         if not os.path.isfile(OUT_FILE):
             with open(OUT_FILE, 'w') as f:
