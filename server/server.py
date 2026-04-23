@@ -92,6 +92,22 @@ _session_team_override: dict[str, str] = {}
 # session_id → set of file paths that have been reverted (for targeted commit)
 _session_reverted_files: dict[str, set[str]] = {}
 
+# Current model IDs -- updated automatically by nightly model check
+CURRENT_MODELS = {
+    "opus": "claude-opus-4-6",
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5-20251001",
+}
+
+# Files containing model ID references that need updating
+MODEL_REFERENCE_FILES = [
+    "server/server.py",
+    "teams/run_claude_team.sh",
+    "config/CLAUDE.md",
+    "docs/add_team.md",
+    "README.md",
+]
+
 
 def _short_model_name(model_id: str) -> str:
     """Extract short display name from model ID. e.g. 'claude-sonnet-4-6' → 'Sonnet'"""
@@ -2595,6 +2611,117 @@ async def handle_client(websocket):
             log.info("Removed '%s' from connected clients", client_name)
 
 
+# ── Nightly Model Check ──────────────────────────────────────────────────────
+
+
+def _find_repo_root(workspace: str) -> str:
+    """Find the git repository root from a workspace path."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=workspace, capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _query_latest_model(family: str) -> str:
+    """Query the Claude CLI for the latest model ID of a given family.
+
+    Uses the model alias (e.g. 'opus') which always resolves to the latest
+    version, then asks the model to self-report its exact model ID.
+    """
+    result = subprocess.run(
+        [_CLAUDE_CMD, "--print", "--model", family, "--max-turns", "1",
+         "Reply ONLY with your exact model ID string (e.g. claude-opus-4-6). Nothing else."],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"claude CLI failed for {family}: {result.stderr.strip()}")
+    model_id = result.stdout.strip()
+    # Validate the output looks like a model ID
+    if not re.match(r'^claude-(opus|sonnet|haiku)-[\w\-]+$', model_id):
+        raise RuntimeError(f"Unexpected model ID format for {family}: {model_id!r}")
+    return model_id
+
+
+async def check_and_update_models(workspace: str) -> dict:
+    """Check for new Claude model versions and update all references in the codebase.
+
+    Returns a dict of updates made, e.g. {"opus": {"old": "...", "new": "..."}}.
+    Returns empty dict if nothing changed or on failure.
+    """
+    try:
+        repo_root = _find_repo_root(workspace)
+
+        # Query latest model IDs for each family (run in thread pool to avoid blocking)
+        loop = asyncio.get_event_loop()
+        latest = {}
+        for family in CURRENT_MODELS:
+            model_id = await loop.run_in_executor(None, _query_latest_model, family)
+            latest[family] = model_id
+
+        # Compare against current
+        updates = {}
+        for family, current_id in CURRENT_MODELS.items():
+            new_id = latest.get(family)
+            if new_id and new_id != current_id:
+                updates[family] = {"old": current_id, "new": new_id}
+
+        if not updates:
+            log.info("[model-check] All models are up to date")
+            return {}
+
+        log.info("[model-check] Found model updates: %s", updates)
+
+        # Apply replacements to all reference files
+        changed_files = []
+        for rel_path in MODEL_REFERENCE_FILES:
+            abs_path = os.path.join(repo_root, rel_path)
+            if not os.path.isfile(abs_path):
+                log.warning("[model-check] File not found, skipping: %s", abs_path)
+                continue
+            with open(abs_path, "r") as f:
+                content = f.read()
+            original = content
+            for family, upd in updates.items():
+                content = content.replace(upd["old"], upd["new"])
+            if content != original:
+                with open(abs_path, "w") as f:
+                    f.write(content)
+                changed_files.append(rel_path)
+                log.info("[model-check] Updated %s", rel_path)
+
+        if not changed_files:
+            log.info("[model-check] No files needed changes")
+            return {}
+
+        # Update the in-memory CURRENT_MODELS dict
+        for family, upd in updates.items():
+            CURRENT_MODELS[family] = upd["new"]
+
+        # Git add and commit the changed files
+        subprocess.run(
+            ["git", "add"] + changed_files,
+            cwd=repo_root, capture_output=True, text=True, timeout=30,
+        )
+        commit_lines = ["chore: update Claude model references", ""]
+        for family, upd in updates.items():
+            commit_lines.append(f"{family}: {upd['old']} -> {upd['new']}")
+        subprocess.run(
+            ["git", "commit", "-m", "\n".join(commit_lines)],
+            cwd=repo_root, capture_output=True, text=True, timeout=30,
+        )
+        log.info("[model-check] Committed model reference updates for: %s",
+                 ", ".join(changed_files))
+
+        return updates
+
+    except Exception as e:
+        log.warning("[model-check] Model check failed (non-fatal): %s", e)
+        return {}
+
+
 # ── Nightly Routine ───────────────────────────────────────────────────────────
 
 
@@ -2746,6 +2873,23 @@ async def run_nightly_routine(routine_cfg: dict):
         if u not in session.users:
             session.users.append(u)
     session_manager.save_sessions()
+
+    # Pre-step: check for model updates
+    try:
+        updates = await check_and_update_models(session.workspace_path)
+        if updates:
+            log.info("[routine] Model references updated: %s", updates)
+            msg_parts = [f"{f}: {u['old']} -> {u['new']}" for f, u in updates.items()]
+            await _broadcast_to_session_users(SYSTEM_SESSION_ID, {
+                "type": "new_message",
+                "session_id": SYSTEM_SESSION_ID,
+                "project": project_name,
+                "role": "system",
+                "content": f"Model references updated: {', '.join(msg_parts)}",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            })
+    except Exception as e:
+        log.warning("[routine] Model check failed (non-fatal): %s", e)
 
     # 2. Determine team and build prompt
     team_name = routine_cfg.get("team", "github-scout")
