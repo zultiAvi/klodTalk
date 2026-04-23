@@ -30,7 +30,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Pin CLI version and disable auto-updates to prevent silent mid-session upgrades
+# Install CLI globally and disable auto-updates to prevent silent mid-session upgrades
 RUN npm install -g @anthropic-ai/claude-code
 ENV DISABLE_UPDATES=1
 

@@ -16,7 +16,7 @@ mcpServers:
     command: npx
     args:
       - "-y"
-      - "@anthropic-ai/mcp-filesystem"
+      - "@modelcontextprotocol/server-filesystem"
       - "/workspace"
 ---
 
@@ -33,7 +33,7 @@ mcpServers:
 - Each server needs `command` (the binary to run) and `args` (command-line arguments).
 - The filesystem MCP server restricts access to the paths listed in `args`.
 - Only add MCP servers to roles that genuinely need tool access; not every role requires them.
-- The frontmatter is parsed by the orchestrator or Claude Code CLI before the role instructions are applied.
+- **Forward-looking**: The frontmatter is not currently interpreted as MCP config by the orchestrator (it is passed as prompt text). For the MCP servers to be active, the role `.md` file must be loaded directly by the Claude Code CLI (e.g., via `--mcp-config` or as a session file). This format is forward-looking for when the orchestrator or CLI gains native frontmatter parsing support.
 
 ### Source
 Inspired by Claude Code CLI v2.1.117 release (github.com/anthropics/claude-code).

@@ -4,7 +4,7 @@ mcpServers:
     command: npx
     args:
       - "-y"
-      - "@anthropic-ai/mcp-filesystem"
+      - "@modelcontextprotocol/server-filesystem"
       - "/workspace"
 ---
 
