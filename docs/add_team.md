@@ -109,3 +109,8 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 - `opus` — most capable (claude-opus-4-6)
 - `sonnet` — balanced (claude-sonnet-4-6)
 - `haiku` — fastest/cheapest (claude-haiku-4-5-20251001)
+
+**Deprecated models (do not use):**
+- `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
+- `claude-sonnet-4-20250514` — retiring June 15, 2026; use `sonnet` alias instead
+- `claude-opus-4-20250514` — retiring June 15, 2026; use `opus` alias instead

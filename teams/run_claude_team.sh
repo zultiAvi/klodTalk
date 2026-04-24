@@ -36,6 +36,11 @@ CURRENT_BRANCH="${CURRENT_BRANCH:-$(git -C "${WORKSPACE}" branch --show-current 
 MERGE_STATUS="${MERGE_STATUS:-ok}"
 REPOS_JSON="${REPOS_JSON:-}"
 RESULTS_FOLDER="${RESULTS_FOLDER:-$(jq -r '.results_folder // ""' "${2:-/workspace}/.klodTalk/team/team.json" 2>/dev/null || echo "")}"
+# Model alias resolution: opus->claude-opus-4-6, sonnet->claude-sonnet-4-6, haiku->claude-haiku-4-5-20251001
+# Deprecation warnings (as of April 2026):
+#   - claude-3-haiku-20240307: RETIRED — returns API errors since March 2026
+#   - claude-sonnet-4-20250514: retiring June 15 2026 — migrate to claude-sonnet-4-6
+#   - claude-opus-4-20250514: retiring June 15 2026 — migrate to claude-opus-4-6
 CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-6}"
 CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-3600}"
 

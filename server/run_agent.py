@@ -132,6 +132,41 @@ fi
 exit 0
 """
 
+    # PostToolUse hook script — logs tool call duration to JSONL
+    post_tool_hook_script_path = "/home/agent/.klodtalk_posttool_hook.sh"
+    post_tool_hook_script = r"""#!/usr/bin/env bash
+# KlodTalk PostToolUse hook — logs tool call timing data.
+# CLAUDE_DURATION_MS is set by Claude Code for PostToolUse/PostToolUseFailure hooks.
+
+LOG_FILE="/workspace/.klodTalk/history/tool_perf.jsonl"
+TOOL_NAME="${CLAUDE_TOOL_NAME:-unknown}"
+DURATION_MS="${CLAUDE_DURATION_MS:-0}"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+SUCCESS="$1"  # "true" for PostToolUse, "false" for PostToolUseFailure
+
+mkdir -p "$(dirname "$LOG_FILE")"
+HOOK_TIMESTAMP="$TIMESTAMP" HOOK_TOOL="$TOOL_NAME" HOOK_DURATION="$DURATION_MS" HOOK_SUCCESS="$SUCCESS" python3 -c "
+import json, os
+entry = {
+    'timestamp': os.environ.get('HOOK_TIMESTAMP', ''),
+    'tool': os.environ.get('HOOK_TOOL', ''),
+    'duration_ms': int(os.environ.get('HOOK_DURATION', '0') or '0'),
+    'success': os.environ.get('HOOK_SUCCESS', 'true') == 'true'
+}
+print(json.dumps(entry))
+" >> "$LOG_FILE" 2>/dev/null || true
+
+# Always exit 0 — never block on post-tool hooks
+exit 0
+"""
+
+    # PostToolUseFailure wrapper — same script, passes success=false
+    post_tool_fail_hook_script_path = "/home/agent/.klodtalk_posttool_fail_hook.sh"
+    post_tool_fail_hook_script = r"""#!/usr/bin/env bash
+# KlodTalk PostToolUseFailure hook — delegates to PostToolUse hook with success=false.
+exec /home/agent/.klodtalk_posttool_hook.sh false
+"""
+
     # Stop hook script — writes a sentinel file on clean exit
     stop_hook_script = f"""#!/usr/bin/env bash
 # KlodTalk Stop hook — writes a sentinel file to signal clean session exit.
@@ -156,6 +191,14 @@ mv "${{SENTINEL}}.tmp" "$SENTINEL"
         with open(stop_hook_script_path, "w") as f:
             f.write(stop_hook_script)
         os.chmod(stop_hook_script_path, 0o755)
+
+        with open(post_tool_hook_script_path, "w") as f:
+            f.write(post_tool_hook_script)
+        os.chmod(post_tool_hook_script_path, 0o755)
+
+        with open(post_tool_fail_hook_script_path, "w") as f:
+            f.write(post_tool_fail_hook_script)
+        os.chmod(post_tool_fail_hook_script_path, 0o755)
 
         # Read or initialize settings
         settings = {}
@@ -186,6 +229,28 @@ mv "${{SENTINEL}}.tmp" "$SENTINEL"
                         {
                             "type": "command",
                             "command": stop_hook_script_path,
+                        }
+                    ],
+                }
+            ],
+            "PostToolUse": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": f"{post_tool_hook_script_path} true",
+                        }
+                    ],
+                }
+            ],
+            "PostToolUseFailure": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": post_tool_fail_hook_script_path,
                         }
                     ],
                 }

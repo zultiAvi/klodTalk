@@ -6,6 +6,12 @@ mcpServers:
       - "-y"
       - "@modelcontextprotocol/server-filesystem"
       - "/workspace"
+disallowedTools:
+  - Bash
+  - Write
+  - Edit
+  - MultiEdit
+  - NotebookEdit
 ---
 
 # Code Reviewer Role

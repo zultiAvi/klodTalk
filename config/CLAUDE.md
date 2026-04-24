@@ -115,4 +115,9 @@ Supported models:
 - `sonnet` (claude-sonnet-4-6) — balanced capability and speed
 - `haiku` (claude-haiku-4-5-20251001) — fastest and cheapest
 
+**Deprecated models (do not use):**
+- `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
+- `claude-sonnet-4-20250514` — retiring June 15, 2026; use `claude-sonnet-4-6` instead
+- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-6` instead
+
 Pick per role: e.g. Opus for the Coder when changes are heavy, Sonnet or Haiku for Planner/Reviewer when you want lower latency or cost.
