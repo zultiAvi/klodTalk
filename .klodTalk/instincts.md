@@ -1,0 +1,3 @@
+- PostToolUse/PostToolUseFailure hooks must always exit 0 -- a non-zero exit blocks Claude's tool pipeline.
+- disallowedTools frontmatter is fully supported; Dockerfile.agent is pinned to @2.90.0 which exceeds the v2.1.119 threshold.
+- Hook group objects in .claude/settings.json require a `matcher` field (use empty string to match all); see server/run_agent.py for the canonical format.

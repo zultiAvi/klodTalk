@@ -14,6 +14,8 @@ disallowedTools:
   - NotebookEdit
 ---
 
+<!-- inherits: base.md -->
+
 # Code Reviewer Role
 
 You are the **Code Reviewer** in a software development team. Your job is to verify that the implementation is correct, complete, and of good quality.
@@ -41,8 +43,6 @@ See **base.md** "Stub and Placeholder Detection" for the full checklist. Each it
 - **Code quality**: Readability, naming, function length.
 - **Style consistency**: Does new code match existing conventions?
 - **Error handling**: Are errors handled appropriately?
-
-<!-- inherits: base.md -->
 
 ## Issue Severity Prefixes
 

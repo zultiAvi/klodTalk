@@ -1,0 +1,31 @@
+Fix code review issues (round 2)
+
+## Issues Fixed
+
+### BLOCKER #1: .claude/settings.json — missing `matcher` field
+Added `"matcher": ""` to both PostToolUse and PostToolUseFailure hook group objects.
+Without this field, hooks would silently never fire per the canonical format in server/run_agent.py.
+
+### WARNING #2: teams/roles/coder.md — duplicate git commit rule
+Removed the "### Git commit / Stage and commit... Do NOT push" subsection (lines 38-41).
+This rule is already in base.md under "Git Commit Rules"; the coder.md copy was redundant.
+
+### WARNING #3: server/utils/hooks/post_tool_use_logger.sh — unsafe JSON in fallback
+Changed the raw-fallback path (line 42) to pipe through `jq -Rs .` so that quotes and
+control characters in INPUT are properly escaped. The resulting JSON is now always valid.
+The exit 0 invariant is preserved.
+
+### SUGGESTION #4: teams/roles/reviewer.md — inherits marker placement
+Moved `<!-- inherits: base.md -->` from mid-file (line 45) to the top of the file body
+(immediately after frontmatter, before the heading). Makes inheritance visible at a glance.
+
+### SUGGESTION #5: .klodTalk/instincts.md — hook format note
+Added a line documenting that hook group objects require a `matcher` field, referencing
+server/run_agent.py as the canonical format source.
+
+## Files Modified
+- .claude/settings.json
+- teams/roles/coder.md
+- server/utils/hooks/post_tool_use_logger.sh
+- teams/roles/reviewer.md
+- .klodTalk/instincts.md

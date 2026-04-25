@@ -35,10 +35,6 @@ A plain-text summary including:
 
 One file path per line (relative to `/workspace`), listing every file you created or modified.
 
-### Git commit
-
-Stage and commit all your changes with a descriptive message. Do NOT push.
-
 <!-- inherits: base.md -->
 
 ## When Fixing Review Issues

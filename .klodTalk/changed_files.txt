@@ -1,0 +1,5 @@
+.claude/settings.json
+teams/roles/coder.md
+server/utils/hooks/post_tool_use_logger.sh
+teams/roles/reviewer.md
+.klodTalk/instincts.md

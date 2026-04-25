@@ -39,7 +39,7 @@
     elif [ -n "${INPUT}" ]; then
         # Fallback: log the raw input with a timestamp prefix
         TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)" || TIMESTAMP="unknown"
-        echo "{\"timestamp\":\"${TIMESTAMP}\",\"raw\":true,\"data\":$(echo "${INPUT}" | head -c 4096)}" >> "${LOG_FILE}" 2>/dev/null || true
+        echo "{\"timestamp\":\"${TIMESTAMP}\",\"raw\":true,\"data\":$(echo "${INPUT}" | head -c 4096 | jq -Rs .)}" >> "${LOG_FILE}" 2>/dev/null || true
     fi
     # If INPUT is empty, silently do nothing
 } 2>/dev/null
