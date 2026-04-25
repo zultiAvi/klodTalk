@@ -92,6 +92,22 @@ _session_team_override: dict[str, str] = {}
 # session_id → set of file paths that have been reverted (for targeted commit)
 _session_reverted_files: dict[str, set[str]] = {}
 
+# Current model IDs -- updated automatically by nightly model check
+CURRENT_MODELS = {
+    "opus": "claude-opus-4-6",
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5-20251001",
+}
+
+# Files containing model ID references that need updating
+MODEL_REFERENCE_FILES = [
+    "server/server.py",
+    "teams/run_claude_team.sh",
+    "config/CLAUDE.md",
+    "docs/add_team.md",
+    "README.md",
+]
+
 
 def _short_model_name(model_id: str) -> str:
     """Extract short display name from model ID. e.g. 'claude-sonnet-4-6' → 'Sonnet'"""
@@ -165,7 +181,7 @@ async def watch_claude_session():
     while True:
         await asyncio.sleep(CLAUDE_SESSION_CHECK_SECONDS)
         log.info("Periodic Claude session check...")
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         valid = await loop.run_in_executor(None, check_claude_auth)
         if not valid:
             log.warning("Claude session expired — attempting re-authentication...")
@@ -197,7 +213,7 @@ async def watch_remote_changes(auto_update_cfg: dict):
     while True:
         await asyncio.sleep(interval)
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             # Fetch without modifying working tree
             fetch_result = await loop.run_in_executor(
@@ -212,7 +228,7 @@ async def watch_remote_changes(auto_update_cfg: dict):
                 continue
 
             # Compare local HEAD vs remote tip
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             local = await loop.run_in_executor(
                 None,
@@ -564,7 +580,7 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
     try:
         merge_status = "ok"
         if mode == "execute" and project:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             merge_status = await loop.run_in_executor(
                 None, lambda: git_prepare_workspace(session.workspace_path, project)
             )
@@ -634,7 +650,7 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
         if proc.returncode == 0:
             log.info("Session '%s' agent completed successfully", session_id)
             if mode == "execute" and project:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, lambda: git_push_workspace(session.workspace_path, project))
                 if project.get("code_review"):
                     log.info("Scheduling code review for session '%s'", session_id)
@@ -1333,7 +1349,7 @@ async def handle_new_session(ws, user_name: str, data: dict):
         "project": project_name,
     }))
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     session = await loop.run_in_executor(
         None, lambda: session_manager.create_session(project_name, user_name, project)
     )
@@ -1372,7 +1388,7 @@ async def handle_close_session(ws, user_name: str, data: dict):
 
     await ws.send(json.dumps({"type": "session_closing", "session_id": session_id}))
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     ok = await loop.run_in_executor(None, lambda: session_manager.close_session(session_id))
 
     if ok:
@@ -1451,7 +1467,7 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
 
     await ws.send(json.dumps({"type": "session_reopening", "session_id": session_id}))
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     ok = await loop.run_in_executor(None, lambda: session_manager.reopen_session(session_id, project))
 
     if ok:
@@ -2129,7 +2145,7 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
 
         full_prompt = f"{system_prompt}\n\n---\n\n## Session History\n\n{history_text}"
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         def run_claude():
             result = subprocess.run(
@@ -2248,7 +2264,7 @@ async def handle_get_diff(ws, user_name: str, data: dict):
         return
 
     project = get_project_record(session.project_name)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def compute_diff():
         repos = project.get("repos") if project else None
@@ -2351,7 +2367,7 @@ async def handle_revert_hunk(ws, user_name: str, data: dict):
                                   "success": False, "error": "Workspace not found"}))
         return
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def do_revert():
         # Write the patch to a temp file and apply --reverse
@@ -2413,7 +2429,7 @@ async def handle_commit_and_push(ws, user_name: str, data: dict):
                                   "success": False, "message": "Workspace not found"}))
         return
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def do_commit_push():
         # Stage only reverted files (Issue 3), not all changes
@@ -2595,6 +2611,130 @@ async def handle_client(websocket):
             log.info("Removed '%s' from connected clients", client_name)
 
 
+# ── Nightly Model Check ──────────────────────────────────────────────────────
+
+
+def _find_repo_root(workspace: str) -> str:
+    """Find the git repository root from a workspace path."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=workspace, capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git rev-parse failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def _query_latest_model(family: str) -> str:
+    """Query the Claude CLI for the latest model ID of a given family.
+
+    Uses the model alias (e.g. 'opus') which always resolves to the latest
+    version, then asks the model to self-report its exact model ID.
+    """
+    result = subprocess.run(
+        [_CLAUDE_CMD, "--print", "--model", family, "--max-turns", "1",
+         "Reply ONLY with your exact model ID string (e.g. claude-opus-4-6). Nothing else."],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"claude CLI failed for {family}: {result.stderr.strip()}")
+    model_id = result.stdout.strip()
+    # Validate the output looks like a model ID
+    if not re.match(r'^claude-(opus|sonnet|haiku)-[\w\-]+$', model_id):
+        raise RuntimeError(f"Unexpected model ID format for {family}: {model_id!r}")
+    return model_id
+
+
+async def check_and_update_models(workspace: str) -> dict:
+    """Check for new Claude model versions and update all references in the codebase.
+
+    Returns a dict of updates made, e.g. {"opus": {"old": "...", "new": "..."}}.
+    Returns empty dict if nothing changed or on failure.
+    """
+    try:
+        repo_root = _find_repo_root(workspace)
+
+        # Query latest model IDs for each family (run in thread pool to avoid blocking)
+        loop = asyncio.get_running_loop()
+        latest = {}
+        for family in CURRENT_MODELS:
+            model_id = await loop.run_in_executor(None, _query_latest_model, family)
+            latest[family] = model_id
+
+        # Compare against current
+        updates = {}
+        for family, current_id in CURRENT_MODELS.items():
+            new_id = latest.get(family)
+            if new_id and new_id != current_id:
+                updates[family] = {"old": current_id, "new": new_id}
+
+        if not updates:
+            log.info("[model-check] All models are up to date")
+            return {}
+
+        log.info("[model-check] Found model updates: %s", updates)
+
+        # Apply replacements to all reference files
+        changed_files = []
+        for rel_path in MODEL_REFERENCE_FILES:
+            abs_path = os.path.join(repo_root, rel_path)
+            if not os.path.isfile(abs_path):
+                log.warning("[model-check] File not found, skipping: %s", abs_path)
+                continue
+            with open(abs_path, "r") as f:
+                content = f.read()
+            original = content
+            for family, upd in updates.items():
+                content = content.replace(upd["old"], upd["new"])
+            if content != original:
+                with open(abs_path, "w") as f:
+                    f.write(content)
+                changed_files.append(rel_path)
+                log.info("[model-check] Updated %s", rel_path)
+
+        if not changed_files:
+            log.info("[model-check] No files needed changes")
+            return {}
+
+        # Update the in-memory CURRENT_MODELS dict
+        for family, upd in updates.items():
+            CURRENT_MODELS[family] = upd["new"]
+
+        # Git add and commit the changed files
+        add_result = subprocess.run(
+            ["git", "add"] + changed_files,
+            cwd=repo_root, capture_output=True, text=True, timeout=30,
+        )
+        if add_result.returncode != 0:
+            log.error("[model-check] git add failed: %s", add_result.stderr.strip())
+            return {}
+        commit_lines = ["chore: update Claude model references", ""]
+        for family, upd in updates.items():
+            commit_lines.append(f"{family}: {upd['old']} -> {upd['new']}")
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", "\n".join(commit_lines)],
+            cwd=repo_root, capture_output=True, text=True, timeout=30,
+        )
+        if commit_result.returncode != 0:
+            log.error("[model-check] git commit failed: %s", commit_result.stderr.strip())
+            return {}
+        log.info("[model-check] Committed model reference updates for: %s",
+                 ", ".join(changed_files))
+
+        # Push the commit so it's not lost if the nightly agent fails later
+        push_result = _git(["push", "origin", "HEAD"], repo_root)
+        if push_result.returncode != 0:
+            log.error("[model-check] git push failed: %s", push_result.stderr.strip())
+        else:
+            log.info("[model-check] Pushed model reference updates")
+
+        return updates
+
+    except Exception as e:
+        log.warning("[model-check] Model check failed (non-fatal): %s", e)
+        return {}
+
+
 # ── Nightly Routine ───────────────────────────────────────────────────────────
 
 
@@ -2746,6 +2886,23 @@ async def run_nightly_routine(routine_cfg: dict):
         if u not in session.users:
             session.users.append(u)
     session_manager.save_sessions()
+
+    # Pre-step: check for model updates
+    try:
+        updates = await check_and_update_models(session.workspace_path)
+        if updates:
+            log.info("[routine] Model references updated: %s", updates)
+            msg_parts = [f"{f}: {u['old']} -> {u['new']}" for f, u in updates.items()]
+            await _broadcast_to_session_users(SYSTEM_SESSION_ID, {
+                "type": "new_message",
+                "session_id": SYSTEM_SESSION_ID,
+                "project": project_name,
+                "role": "system",
+                "content": f"Model references updated: {', '.join(msg_parts)}",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            })
+    except Exception as e:
+        log.warning("[routine] Model check failed (non-fatal): %s", e)
 
     # 2. Determine team and build prompt
     team_name = routine_cfg.get("team", "github-scout")
