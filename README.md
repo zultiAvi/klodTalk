@@ -208,7 +208,7 @@ Assign it to a project with `"team": "my-team"` in `config/projects.json`. See `
 
 ### Available Models
 
-- **`opus`** (claude-opus-4-6) — most capable
+- **`opus`** (claude-opus-4-7) — most capable
 - **`sonnet`** (claude-sonnet-4-6) — balanced
 - **`haiku`** (claude-haiku-4-5-20251001) — fastest and cheapest
 
