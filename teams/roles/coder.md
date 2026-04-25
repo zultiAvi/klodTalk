@@ -39,6 +39,8 @@ One file path per line (relative to `/workspace`), listing every file you create
 
 Stage and commit all your changes with a descriptive message. Do NOT push.
 
+<!-- inherits: base.md -->
+
 ## When Fixing Review Issues
 
 When you receive code review remarks:
@@ -46,23 +48,3 @@ When you receive code review remarks:
 - Understand *why* the reviewer flagged it, not just what to change.
 - Fix the root cause, not just the symptom.
 - Commit fixes with message: `Fix code review issues (round N)`.
-
-## Results Folder
-
-If the orchestrator provides a results folder path in the context, save all output/result files there (reports, generated images, exports, CSVs, etc.) instead of inside the repository. The results folder is an external directory specifically designated for project output. Always use absolute paths when writing to the results folder.
-
-## Pre-Commit Self-Check
-
-Before committing, scan your own changes for stubs and placeholders:
-1. Search all changed files for `TODO`, `FIXME`, `HACK`, `XXX`, `PLACEHOLDER`.
-2. Verify no function body is empty, uses `pass` as a stub, raises `NotImplementedError` where real logic is needed, or uses `...` as a placeholder.
-3. Check for hardcoded placeholder values: `"example.com"`, `"changeme"`, `"your-api-key-here"`, `"lorem ipsum"`, `password123`.
-4. Ensure no commented-out code blocks (3+ consecutive lines) remain.
-5. If any are found, fix them before committing. If a TODO is intentional and tracked, add a comment explaining why it must remain.
-
-## Guidelines
-
-- Follow the project's existing code style and conventions.
-- Do not add features beyond what the plan requires.
-- Do not refactor unrelated code.
-- Keep commits focused — one logical change per commit if possible.
