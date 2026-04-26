@@ -1,4 +1,6 @@
 {
+  "disableSkillShellExecution": true,
+  "forceRemoteSettingsRefresh": true,
   "hooks": {
     "PostToolUse": [
       {

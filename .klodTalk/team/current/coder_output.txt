@@ -1,31 +1,53 @@
-Fix code review issues (round 2)
+Coder Output — Nightly Scout Top 3 Implementation
+===================================================
 
-## Issues Fixed
+## Idea 1: Planner Role — Parallel Sub-Task Decomposition
 
-### BLOCKER #1: .claude/settings.json — missing `matcher` field
-Added `"matcher": ""` to both PostToolUse and PostToolUseFailure hook group objects.
-Without this field, hooks would silently never fire per the canonical format in server/run_agent.py.
+Enhanced `teams/roles/planner.md` with:
+- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
+- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
+- Dependency note guidance after numbered steps identifying parallelizable steps.
+- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
 
-### WARNING #2: teams/roles/coder.md — duplicate git commit rule
-Removed the "### Git commit / Stage and commit... Do NOT push" subsection (lines 38-41).
-This rule is already in base.md under "Git Commit Rules"; the coder.md copy was redundant.
+Files modified: teams/roles/planner.md
 
-### WARNING #3: server/utils/hooks/post_tool_use_logger.sh — unsafe JSON in fallback
-Changed the raw-fallback path (line 42) to pipe through `jq -Rs .` so that quotes and
-control characters in INPUT are properly escaped. The resulting JSON is now always valid.
-The exit 0 invariant is preserved.
+## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
 
-### SUGGESTION #4: teams/roles/reviewer.md — inherits marker placement
-Moved `<!-- inherits: base.md -->` from mid-file (line 45) to the top of the file body
-(immediately after frontmatter, before the heading). Makes inheritance visible at a glance.
+Added to `.claude/settings.json`:
+- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
+- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
 
-### SUGGESTION #5: .klodTalk/instincts.md — hook format note
-Added a line documenting that hook group objects require a `matcher` field, referencing
-server/run_agent.py as the canonical format source.
+Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
 
-## Files Modified
-- .claude/settings.json
-- teams/roles/coder.md
-- server/utils/hooks/post_tool_use_logger.sh
-- teams/roles/reviewer.md
-- .klodTalk/instincts.md
+Files modified: .claude/settings.json
+Files created: CLAUDE/skills/disable-skill-shell-exec.md
+
+## Idea 3: Rate Limit Adaptive Awareness
+
+Created `server/utils/rate_limit_utils.py` with three functions:
+- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
+- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
+- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
+
+Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
+
+Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+
+Files modified: .klodTalk/instincts.md
+Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
+
+## Deviations from Plan
+
+None. All changes match the evaluator's specification.
+
+## Source Attribution
+
+1. **Planner Role — Parallel Sub-Task Decomposition**
+   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
+   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
+
+2. **Agent Security Hardening — disableSkillShellExecution**
+   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
+
+3. **Rate Limit Adaptive Awareness**
+   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api

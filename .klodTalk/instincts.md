@@ -1,3 +1,5 @@
 - PostToolUse/PostToolUseFailure hooks must always exit 0 -- a non-zero exit blocks Claude's tool pipeline.
 - disallowedTools frontmatter is fully supported; Dockerfile.agent is pinned to @2.90.0 which exceeds the v2.1.119 threshold.
 - Hook group objects in .claude/settings.json require a `matcher` field (use empty string to match all); see server/run_agent.py for the canonical format.
+- The Anthropic Rate Limits API (GET /v1/rate_limits, requires x-api-key header) allows proactive throttling before 429s hit. Use server/utils/rate_limit_utils.py:query_rate_limit_headroom() before spawning agent batches in session_manager.py. Always handle the case where the API key is absent (OAuth sessions have no API key) -- fall back to reactive 429 handling.
+- disableSkillShellExecution=true in .claude/settings.json blocks inline shell execution in skill files; forceRemoteSettingsRefresh=true ensures long-lived containers always get the latest policy settings.

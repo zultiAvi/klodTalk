@@ -20,16 +20,26 @@ IS_SIMPLE=<true|false>
 REVIEW_ITERATIONS=<1|2|3>
 COMPLEXITY=<low|medium|high>
 NEEDS_EXECUTION=<true|false>
+PARALLEL_GROUPS=<JSON array of arrays, or [] if all steps are sequential>
 ```
+
+`PARALLEL_GROUPS` encodes which plan steps can run concurrently. Each inner array is a group of step numbers that are independent of each other and can run in any order. Steps in different groups must run in group order. Example for a 4-step plan where steps 2 and 3 are independent:
+```
+PARALLEL_GROUPS=[[1],[2,3],[4]]
+```
+If all steps are strictly sequential: `PARALLEL_GROUPS=[[1],[2],[3],[4]]`
+If the task is SIMPLE: `PARALLEL_GROUPS=[]`
 
 ### Always write `/workspace/.klodTalk/team/current/plan.md`
 
 - **If SIMPLE**: Write `SIMPLE TASK: [one sentence description]`.
 - **If COMPLEX**: Write a structured plan with:
   - **Overview**: What needs to be built/changed and why.
-  - **Files to modify or create**: List each file and what changes.
+  - **Files to modify or create**: List each file and what changes. For each file, note whether it is **independent** (can be modified in any order relative to other files) or **depends on: [other file(s)]** (must be done after those files are modified).
   - **Step-by-step implementation**: Numbered steps for the Coder.
+  - **Dependency note**: After the numbered steps, add a brief note identifying which steps can run in parallel (e.g., "Steps 2 and 3 are independent — either can be done first.").
   - **Success criteria**: What "done" looks like — becomes the Reviewer's checklist.
+  - **Exit condition**: End with a single testable sentence starting with "DONE WHEN:" that the Reviewer uses as the primary checklist item (e.g., "DONE WHEN: all unit tests pass and the new endpoint returns 200 for a valid request.").
 
 ### If SIMPLE — also write:
 
