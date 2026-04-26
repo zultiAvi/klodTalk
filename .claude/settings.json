@@ -1,0 +1,28 @@
+{
+  "disableSkillShellExecution": true,
+  "forceRemoteSettingsRefresh": true,
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/post_tool_use_logger.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/post_tool_use_logger.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -106,7 +106,7 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 
 ## Available Models
 
-- `opus` — most capable (claude-opus-4-6)
+- `opus` — most capable (claude-opus-4-7)
 - `sonnet` — balanced (claude-sonnet-4-6)
 - `haiku` — fastest/cheapest (claude-haiku-4-5-20251001)
 

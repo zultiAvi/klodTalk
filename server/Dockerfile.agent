@@ -31,7 +31,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CLI globally and disable auto-updates to prevent silent mid-session upgrades
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g @anthropic-ai/claude-code@2.90.0
 ENV DISABLE_UPDATES=1
 
 RUN git config --global --add safe.directory '*'
