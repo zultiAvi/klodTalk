@@ -1,4 +1,18 @@
+---
+skill_name: disallowed-tools-frontmatter
+triggers:
+  - Adding or modifying role files that need tool restrictions
+  - Enforcing least-privilege for agent roles in --print mode
+  - Combining disallowedTools with MCP frontmatter
+summary: Use `disallowedTools:` in YAML frontmatter to restrict tools per role (requires CLI v2.1.119+).
+---
+
 # Skill: disallowedTools Frontmatter for Roles
+
+## Quick Reference
+- Add `disallowedTools:` list in YAML frontmatter between `---` markers
+- Current restricted roles: reviewer.md (read-only), executor.md (run-only), validator.md (read-only)
+- Requires Claude Code v2.1.119+ with `--print` mode
 
 ## When to Use
 When adding or modifying role files that need tool restrictions, or when enforcing least-privilege for agent roles in --print mode.

@@ -1,4 +1,18 @@
+---
+skill_name: hook-event-logging
+triggers:
+  - Adding new Claude Code hooks
+  - Debugging hook behavior
+  - Extending agent observability in KlodTalk
+summary: PostToolUse/PostToolUseFailure hooks log tool calls to JSONL; always exit 0.
+---
+
 # Skill: Hook Event Logging
+
+## Quick Reference
+- Hook script: `server/utils/hooks/post_tool_use_logger.sh`
+- Registration: `.claude/settings.json` with `"matcher": ""`
+- Rule: hooks MUST exit 0 -- non-zero blocks Claude's tool pipeline
 
 ## When to Use
 When adding new Claude Code hooks, debugging hook behavior, or extending agent observability in KlodTalk.

@@ -1,4 +1,18 @@
+---
+skill_name: placeholder-guard
+triggers:
+  - Reviewing code changes before committing
+  - Catching incomplete implementations or forgotten TODOs
+  - Running pre-commit self-checks on changed files
+summary: Scan changed files for TODO/FIXME/HACK/XXX, empty bodies, stub returns, and placeholder values.
+---
+
 # Skill: Stub and Placeholder Detection
+
+## Quick Reference
+- Markers to find: `TODO`, `FIXME`, `HACK`, `XXX`, `PLACEHOLDER`
+- Stubs: empty bodies, bare `pass`, `NotImplementedError`, `...` as body
+- Placeholders: `"example.com"`, `"changeme"`, `"your-api-key-here"`, `"lorem ipsum"`, `password123`
 
 ## When to Use
 When reviewing code changes or before committing, to catch incomplete implementations, placeholder values, and forgotten TODOs.

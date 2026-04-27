@@ -1,4 +1,18 @@
+---
+skill_name: rate-limit-awareness
+triggers:
+  - Spawning multiple concurrent agent sessions
+  - Diagnosing 429 errors from the Anthropic API
+  - Adding proactive throttling before agent batch launches
+summary: Proactive rate-limit checking via the Anthropic Rate Limits API before spawning agents.
+---
+
 # Skill: Rate Limit Awareness
+
+## Quick Reference
+- Utility: `server/utils/rate_limit_utils.py` — `query_rate_limit_headroom()`, `should_throttle()`, `wait_for_reset()`
+- Requires API key; OAuth sessions get `None` and fall back to reactive 429 handling
+- Integration point: `session_manager.py` `_launch_agent()` (restricted file)
 
 ## When to Use
 When the server is spawning multiple concurrent agent sessions, when diagnosing 429 errors from the Anthropic API, or when adding proactive throttling before agent batch launches.

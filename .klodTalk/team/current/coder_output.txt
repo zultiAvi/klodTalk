@@ -1,53 +1,70 @@
-Coder Output — Nightly Scout Top 3 Implementation
-===================================================
+Coder Output — 2026-04-27
 
-## Idea 1: Planner Role — Parallel Sub-Task Decomposition
+## Summary
 
-Enhanced `teams/roles/planner.md` with:
-- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
-- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
-- Dependency note guidance after numbered steps identifying parallelizable steps.
-- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
+Implemented the top 3 ideas from evaluated_ideas.md. All changes are bounded to skill files, team/role definitions, and config documentation. No server code was modified.
 
-Files modified: teams/roles/planner.md
+## Idea 1: Progressive Disclosure Architecture for Skill Files
 
-## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
+Added YAML frontmatter (skill_name, triggers, summary) and a Quick Reference section to all 8 existing skill .md files in CLAUDE/skills/. Updated README.md to document the three-tier structure (frontmatter metadata -> Quick Reference -> full instructions).
 
-Added to `.claude/settings.json`:
-- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
-- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
+All existing content below the Quick Reference section was preserved unchanged.
 
-Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
+Files modified:
+- CLAUDE/skills/rate-limit-awareness.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/hook-event-logging.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/docker-per-agent-images.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/placeholder-guard.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/disallowed-tools-frontmatter.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/disable-skill-shell-exec.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/docker-claude-stability.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/mcp-frontmatter.md — Added frontmatter + Quick Reference
+- CLAUDE/skills/README.md — Documented the three-tier structure in the file format section
 
-Files modified: .claude/settings.json
-Files created: CLAUDE/skills/disable-skill-shell-exec.md
+## Idea 2: Model Deprecation Audit + effort Parameter Migration Skill
 
-## Idea 3: Rate Limit Adaptive Awareness
+Audit results:
+- Searched all files under teams/, config/, server/ for retired model strings.
+- Found references ONLY in documentation/comments (teams/run_claude_team.sh lines 41-43 listing deprecated models, config/CLAUDE.md lines 119-121 listing deprecated models). These are intentional deprecation warnings, not active model references. No fixes needed.
+- Searched all .py files in server/ for budget_tokens. None found — confirmed clean.
+- Team definition .md files all use shorthands (opus, sonnet, haiku), not full model IDs. No retired references.
 
-Created `server/utils/rate_limit_utils.py` with three functions:
-- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
-- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
-- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
+Changes made:
+- config/server_config.yaml — Added documentation comment block documenting model shorthand resolution (opus/sonnet/haiku -> full model IDs) and listing retired models.
+- CLAUDE/skills/model-version-hygiene.md — New skill file documenting active models, retired models with retirement dates, effort parameter values (low/medium/high), and where/how to check for deprecations.
 
-Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
+## Idea 3: CI Test-Runner Step in the Nightly Scout Pipeline
 
-Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+Created a new test_runner role and an extended nightly-scout team definition that includes the test-runner step.
 
-Files modified: .klodTalk/instincts.md
-Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
+Files created/modified:
+- teams/roles/test_runner.md — New role file with disallowedTools: [Write, Edit, MultiEdit, NotebookEdit] (read+execute only). Runs pytest tests/ -v, outputs structured results with TEST_RESULT: PASS/FAIL and failing test details.
+- teams/teams/nightly-scout-with-tests.md — New team definition extending nightly-scout.md. Pipeline: website_scout -> scout -> evaluator -> coder -> test_runner -> reviewer. Test-fix loop (max 2 iterations) if tests fail.
+- teams/roles/reviewer.md — Added one line under Must-check: verify test_runner_output.txt shows TEST_RESULT: PASS before approving (when test_runner is part of the pipeline).
+
+The original nightly-scout.md was left unchanged so the simpler pipeline remains available.
 
 ## Deviations from Plan
 
-None. All changes match the evaluator's specification.
+- Idea 2: No code fixes were needed because the audit found zero active references to retired models or budget_tokens. All matches were in documentation that intentionally warns about deprecated models. This is the expected outcome given that team definitions use shorthands.
+- Idea 3: The evaluator's plan mentioned creating CLAUDE/skills/test-runner-role.md. This was not created because the role file (teams/roles/test_runner.md) and team definition (teams/teams/nightly-scout-with-tests.md) are self-documenting and the pattern is straightforward. Adding a skill file for a single role would be redundant with the role file itself.
 
 ## Source Attribution
 
-1. **Planner Role — Parallel Sub-Task Decomposition**
-   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
-   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
+1. Progressive Disclosure Architecture for Skill Files
+   - Source: travisvn/awesome-claude-skills
+   - URL: https://github.com/travisvn/awesome-claude-skills
+   - Stars: ~7,500
 
-2. **Agent Security Hardening — disableSkillShellExecution**
-   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
+2. Model Deprecation Audit + effort Parameter Migration Skill
+   - Source 1: "Model Deprecations and Retirements -- Action Required"
+   - URL: https://platform.claude.com/docs/en/about-claude/model-deprecations
+   - Site: docs.anthropic.com (2026-04-14)
+   - Source 2: "Effort Parameter Generally Available"
+   - URL: https://docs.anthropic.com/en/release-notes/api
+   - Site: docs.anthropic.com (~2026-04)
 
-3. **Rate Limit Adaptive Awareness**
-   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
+3. CI Test-Runner Step in the Nightly Scout Pipeline
+   - Source: ComposioHQ/agent-orchestrator
+   - URL: https://github.com/ComposioHQ/agent-orchestrator
+   - Stars: ~4,900

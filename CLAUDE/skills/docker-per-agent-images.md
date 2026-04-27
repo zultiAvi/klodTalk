@@ -1,4 +1,18 @@
+---
+skill_name: docker-per-agent-images
+triggers:
+  - Working on Docker container persistence or per-project images
+  - Configuring docker commit, Docker-in-Docker, or Docker socket mounting
+  - Troubleshooting project dependency persistence across sessions
+summary: Per-project Docker images via `docker commit` on session close; DinD via socket mount.
+---
+
 # Skill: Docker Per-Project Image Management
+
+## Quick Reference
+- Image naming: `klodtalk_{sanitized_project_name}`
+- Lifecycle: session start (check image) -> session close (commit then rm)
+- Key files: `server/session_manager.py`, `server/utils/docker/local.py`, `server/Dockerfile.agent`
 
 ## When to Use
 When working on Docker container persistence, per-project images, `docker commit`, project dependencies, Docker-in-Docker setup, or Docker socket mounting in the KlodTalk system.
