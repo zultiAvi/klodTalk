@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Optional
 
 from copy_tree import copy_git_tracked
+import session_log
 from utils.docker import get_docker_utils
 
 log = logging.getLogger("klodtalk.sessions")
@@ -251,6 +252,19 @@ class SessionManager:
         )
         self._sessions[session_id] = session
         self.save_sessions()
+        try:
+            session_log.init_session_log(
+                session.session_id,
+                project_name=session.project_name,
+                user_name=session.user_name,
+                created_at=session.created_at,
+            )
+            session_log.log_event(
+                session.session_id, "system",
+                f"session created (branch={branch_name})",
+            )
+        except Exception as e:
+            log.error("session_log init failed for %s: %s", session_id, e)
         log.info("Session %s created (branch=%s, container=%s)", session_id, branch_name, cname)
         return session
 
@@ -334,6 +348,19 @@ class SessionManager:
         )
         self._sessions[session_id] = session
         self.save_sessions()
+        try:
+            session_log.init_session_log(
+                session.session_id,
+                project_name=session.project_name,
+                user_name=session.user_name,
+                created_at=session.created_at,
+            )
+            session_log.log_event(
+                session.session_id, "system",
+                "system session created",
+            )
+        except Exception as e:
+            log.error("session_log init failed for system session %s: %s", session_id, e)
         log.info("System session %s created (container=%s)", session_id, cname)
         return session
 
@@ -578,6 +605,10 @@ class SessionManager:
         session.status = "closed"
         session.closed_at = datetime.utcnow().isoformat() + "Z"
         self.save_sessions()
+        try:
+            session_log.log_event(session_id, "system", "session closed")
+        except Exception as e:
+            log.error("session_log close failed for %s: %s", session_id, e)
         return True
 
     def _extract_per_role_tokens(self, archive_dir: str) -> list[dict]:
@@ -748,17 +779,35 @@ class SessionManager:
         session.status = "active"
         session.closed_at = None
         self.save_sessions()
+        try:
+            session_log.log_event(session_id, "system", "session reopened")
+        except Exception as e:
+            log.error("session_log reopen failed for %s: %s", session_id, e)
         log.info("Session %s reopened (container=%s)", session_id, cname)
         return True
 
     def delete_session(self, session_id: str) -> bool:
-        """Permanently remove a session record and its workspace from disk."""
+        """Permanently remove a session record and its workspace from disk.
+
+        Note: this does NOT delete the per-session log directory at
+        ``/tmp/klodTalk/<session_id>.klodTalk/`` — those logs persist after
+        deletion so the user can still inspect a deleted session's history.
+        Use ``session_log.purge(session_id)`` for explicit log cleanup.
+        """
         if session_id not in self._sessions:
             return False
         session = self._sessions[session_id]
         if session.system:
             log.warning("Cannot delete system session %s", session_id)
             return False
+        # Record deletion before destroying the workspace.
+        try:
+            session_log.log_event(
+                session_id, "system",
+                "session deleted (workspace removed; log dir preserved)",
+            )
+        except Exception as e:
+            log.error("session_log delete-record failed for %s: %s", session_id, e)
         # Remove temp workspace directory
         if session.workspace_path and os.path.isdir(session.workspace_path):
             shutil.rmtree(session.workspace_path, ignore_errors=True)
@@ -778,5 +827,13 @@ class SessionManager:
                 log.info("Session %s has no running container — marking closed", session.session_id)
                 session.status = "closed"
                 session.closed_at = datetime.utcnow().isoformat() + "Z"
+                try:
+                    session_log.log_event(
+                        session.session_id, "system",
+                        "marked closed (orphan cleanup)",
+                    )
+                except Exception as e:
+                    log.error("session_log orphan-cleanup failed for %s: %s",
+                              session.session_id, e)
                 # Keep temp workspace (removed on delete, not close)
         self.save_sessions()

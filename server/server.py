@@ -26,6 +26,7 @@ import yaml
 
 from session_manager import HOST_GID, HOST_UID, SessionManager, _normalize_external_paths, get_results_folder
 from history_store import HistoryStore
+import session_log
 from unread_state import UnreadState
 from token_store import TokenStore
 from jsonl_reader import (
@@ -647,6 +648,18 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
         if stderr_text:
             log.warning("Session '%s' stderr:\n%s", session_id, stderr_text)
 
+        try:
+            if stdout_text:
+                session_log.append_raw(session_id, "stdout", stdout_text)
+            if stderr_text:
+                session_log.append_raw(session_id, "stderr", stderr_text)
+            session_log.log_event(
+                session_id, "system",
+                f"agent exited rc={proc.returncode} (mode={mode})",
+            )
+        except Exception:
+            pass
+
         if proc.returncode == 0:
             log.info("Session '%s' agent completed successfully", session_id)
             if mode == "execute" and project:
@@ -678,6 +691,10 @@ async def _notify_session_error(session_id: str, message: str):
     session = session_manager.get_session(session_id)
     if not session:
         return
+    try:
+        session_log.log_event(session_id, "error", message)
+    except Exception:
+        pass
     payload = json.dumps({
         "type": "error",
         "session_id": session_id,
@@ -694,11 +711,43 @@ async def _notify_session_error(session_id: str, message: str):
 
 
 async def _broadcast_to_session_users(session_id: str, payload: dict):
-    """Send a message to all users registered on the session."""
+    """Send a message to all users registered on the session.
+
+    Every payload is mirrored to ``session_log.log_event`` so that no
+    user-visible event is ever lost — even if no client is currently
+    connected, the event still lands on disk.
+    """
     session = session_manager.get_session(session_id)
     if not session:
         return
     msg = json.dumps(payload)
+    # Mirror EVERY payload into the persistent session log exactly once.
+    try:
+        ptype = payload.get("type", "system")
+        # Choose role: prefer explicit "role" (new_message); else use type.
+        if ptype == "new_message":
+            role_for_log = payload.get("role") or "system"
+        elif ptype == "error":
+            role_for_log = "error"
+        else:
+            # Lifecycle events: session_working, session_reopening,
+            # session_reopened, session_deleted, etc.
+            role_for_log = "system"
+        # Body: prefer "content"/"message"; fall back to the payload itself
+        # so nothing is silently dropped.
+        body = payload.get("content")
+        if body is None:
+            body = payload.get("message")
+        if body is None:
+            body = json.dumps({k: v for k, v in payload.items() if k != "session_id"},
+                              ensure_ascii=False)
+        session_log.log_event(
+            session_id, role_for_log, body,
+            model=payload.get("model"),
+            extra={"type": ptype},
+        )
+    except Exception:
+        pass
     sent_to: set[str] = set()
     for user in session.users:
         if user in sent_to:
@@ -746,6 +795,10 @@ async def watch_out_messages():
                     if content:
                         _models = _session_team_models.get(session_id, {})
                         history_store.append(session_id, workspace, "review", content, model=_models.get("review", ""))
+                        try:
+                            session_log.log_event(session_id, "review", content, model=_models.get("review", ""))
+                        except Exception:
+                            pass
                         _mark_unread_for_others(session_id, session_triggered_by.get(session_id, ""))
 
                         _team_r = _session_team_override.get(session_id, "")
@@ -845,6 +898,10 @@ async def watch_out_messages():
 
                     if content:
                         history_store.append(session_id, workspace, "progress", content)
+                        try:
+                            session_log.log_event(session_id, "progress", content)
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -871,6 +928,10 @@ async def watch_out_messages():
                             _p_p = get_project_record(session.project_name)
                             _team_p = _p_p.get("team", "") if _p_p else ""
                         history_store.append(session_id, workspace, "planner", content, model=_models.get("planner", ""))
+                        try:
+                            session_log.log_event(session_id, "planner", content, model=_models.get("planner", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -899,6 +960,10 @@ async def watch_out_messages():
                             _p_c = get_project_record(session.project_name)
                             _team_c = _p_c.get("team", "") if _p_c else ""
                         history_store.append(session_id, workspace, "coder", content, model=_models.get("coder", ""))
+                        try:
+                            session_log.log_event(session_id, "coder", content, model=_models.get("coder", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -927,6 +992,10 @@ async def watch_out_messages():
                             _p_i = get_project_record(session.project_name)
                             _team_i = _p_i.get("team", "") if _p_i else ""
                         history_store.append(session_id, workspace, "idea", content, model=_models.get("idea", ""))
+                        try:
+                            session_log.log_event(session_id, "idea", content, model=_models.get("idea", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -955,6 +1024,10 @@ async def watch_out_messages():
                             _p_ir = get_project_record(session.project_name)
                             _team_ir = _p_ir.get("team", "") if _p_ir else ""
                         history_store.append(session_id, workspace, "idea_review", content, model=_models.get("idea_review", ""))
+                        try:
+                            session_log.log_event(session_id, "idea_review", content, model=_models.get("idea_review", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -983,6 +1056,10 @@ async def watch_out_messages():
                             _p_fp = get_project_record(session.project_name)
                             _team_fp = _p_fp.get("team", "") if _p_fp else ""
                         history_store.append(session_id, workspace, "final_plan", content, model=_models.get("final_plan", ""))
+                        try:
+                            session_log.log_event(session_id, "final_plan", content, model=_models.get("final_plan", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -1011,6 +1088,10 @@ async def watch_out_messages():
                             _p_ih = get_project_record(session.project_name)
                             _team_ih = _p_ih.get("team", "") if _p_ih else ""
                         history_store.append(session_id, workspace, "idea_history", content, model=_models.get("idea_history", ""))
+                        try:
+                            session_log.log_event(session_id, "idea_history", content, model=_models.get("idea_history", ""))
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -1033,6 +1114,10 @@ async def watch_out_messages():
                         content = None
                     if content:
                         history_store.append(session_id, workspace, "agent", content)
+                        try:
+                            session_log.log_event(session_id, "agent", content, extra={"source": "btw_response"})
+                        except Exception:
+                            pass
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
                             "session_id": session_id,
@@ -1061,6 +1146,10 @@ async def watch_out_messages():
 
                     if content:
                         history_store.append(session_id, workspace, "agent", content)
+                        try:
+                            session_log.log_event(session_id, "agent", content, extra={"source": "confirm_message"})
+                        except Exception:
+                            pass
                         _mark_unread_for_others(session_id, session_triggered_by.get(session_id, ""))
                         await _broadcast_to_session_users(session_id, {
                             "type": "new_message",
@@ -1099,6 +1188,10 @@ async def watch_out_messages():
 
                     if content:
                         history_store.append(session_id, workspace, "agent", content)
+                        try:
+                            session_log.log_event(session_id, "agent", content, extra={"source": "out_message"})
+                        except Exception:
+                            pass
                         _mark_unread_for_others(session_id, session_triggered_by.get(session_id, ""))
                         _team = _session_team_override.get(session_id, "")
                         if not _team:
@@ -1126,6 +1219,61 @@ async def watch_out_messages():
                             if t:
                                 token_store.add_tokens(user, t['input_tokens'], t['output_tokens'], t['cost_usd'])
                                 await _broadcast_usage_summary()
+
+                # hook_events.jsonl tail: forward newly appended hook events
+                # produced by post_tool_use_logger.sh into the persistent
+                # session log. Offset is tracked per-session so we don't
+                # re-read the same lines on every poll.
+                try:
+                    hook_events_path = os.path.join(
+                        workspace, ".klodTalk", "team", "current", "hook_events.jsonl"
+                    )
+                    offset_path = os.path.join(
+                        workspace, ".klodTalk", "team", "current", ".hook_events.offset"
+                    )
+                    if os.path.isfile(hook_events_path):
+                        last_offset = 0
+                        if os.path.isfile(offset_path):
+                            try:
+                                with open(offset_path, "r", encoding="utf-8") as off:
+                                    last_offset = int((off.read() or "0").strip() or 0)
+                            except Exception:
+                                last_offset = 0
+                        try:
+                            file_size = os.path.getsize(hook_events_path)
+                        except OSError:
+                            file_size = 0
+                        # If the file shrank (rotated/truncated), restart from 0.
+                        if last_offset > file_size:
+                            last_offset = 0
+                        if file_size > last_offset:
+                            new_offset = last_offset
+                            try:
+                                with open(hook_events_path, "r", encoding="utf-8") as hf:
+                                    hf.seek(last_offset)
+                                    for raw in hf:
+                                        line = raw.rstrip("\n")
+                                        if line.strip():
+                                            try:
+                                                session_log.log_event(
+                                                    session_id, "hook", line,
+                                                )
+                                            except Exception:
+                                                # Stop advancing on logging
+                                                # failure so we retry next poll.
+                                                break
+                                        new_offset += len(raw.encode("utf-8"))
+                            except Exception as e:
+                                log.error("hook_events tail read failed for %s: %s",
+                                          session_id, e)
+                            # Persist the advanced offset.
+                            try:
+                                with open(offset_path, "w", encoding="utf-8") as off:
+                                    off.write(str(new_offset))
+                            except Exception:
+                                pass
+                except Exception as e:
+                    log.error("hook_events tail block failed for %s: %s", session_id, e)
 
         except Exception as e:
             log.error("Watcher error: %s", e)
@@ -1168,7 +1316,30 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "system": getattr(session, 'system', False),
     }
     if include_messages:
-        if session.status == "closed":
+        # Prefer the durable per-session log when present — this is the
+        # only source guaranteed to survive workspace deletion or
+        # incomplete archiving (the symptom the user reported:
+        # "I open many closed sessions and see NO LOG MESSAGES inside").
+        try:
+            persistent = session_log.read_events(session.session_id)
+        except Exception:
+            persistent = []
+        if persistent:
+            # Map session_log events into the existing message shape so
+            # clients don't need any change to render them.
+            messages = []
+            for ev in persistent:
+                msg = {
+                    "timestamp": ev.get("timestamp", ""),
+                    "role": ev.get("role", "system"),
+                    "content": ev.get("content", ""),
+                    "session_id": session.session_id,
+                }
+                if ev.get("model"):
+                    msg["model"] = ev["model"]
+                messages.append(msg)
+            d["messages"] = messages
+        elif session.status == "closed":
             archive = session_manager.get_archive_path(session)
             # Archive stores session.jsonl directly in archive dir (not in .klodTalk/history/)
             archive_file = os.path.join(archive, "session.jsonl") if archive else ""
@@ -1233,6 +1404,10 @@ async def handle_stop(ws, user_name: str, data: dict):
             pass
     # Write a stop message to history
     history_store.append(session_id, session.workspace_path, "system", "Session stopped by user.")
+    try:
+        session_log.log_event(session_id, "system", f"stopped by user '{user_name}'")
+    except Exception:
+        pass
     await _broadcast_to_session_users(session_id, {
         "type": "new_message",
         "session_id": session_id,
@@ -1267,6 +1442,10 @@ async def handle_btw(ws, user_name: str, data: dict):
 
     # Log BTW message to history
     history_store.append(session_id, session.workspace_path, "user", f"[BTW] {content}")
+    try:
+        session_log.log_event(session_id, "user_btw", content, extra={"user": user_name})
+    except Exception:
+        pass
     await _broadcast_to_session_users(session_id, {
         "type": "new_message",
         "session_id": session_id,
@@ -1473,6 +1652,42 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
     if ok:
         await ws.send(json.dumps({"type": "session_reopened", "session_id": session_id, "status": "active"}))
         log.info("Session '%s' reopened by '%s'", session_id, user_name)
+        # Replay persistent log events (or fall back to legacy archive /
+        # in-workspace history) so the user can see the full session history
+        # immediately on reopen.
+        try:
+            events = session_log.read_events(session_id)
+            if not events:
+                # Fallback: legacy archive JSONL or live workspace JSONL.
+                fallback = []
+                archive = session_manager.get_archive_path(session)
+                archive_file = os.path.join(archive, "session.jsonl") if archive else ""
+                if archive_file and os.path.isfile(archive_file):
+                    try:
+                        with open(archive_file) as f:
+                            for line in f:
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                try:
+                                    fallback.append(json.loads(line))
+                                except json.JSONDecodeError:
+                                    continue
+                    except Exception as e:
+                        log.error("Reopen archive read failed for %s: %s",
+                                  session_id, e)
+                if not fallback and os.path.isdir(session.workspace_path):
+                    fallback = history_store.read_session(session_id, session.workspace_path)
+                events = fallback
+            if events:
+                events_capped = events[-500:]
+                await ws.send(json.dumps({
+                    "type": "session_replay",
+                    "session_id": session_id,
+                    "events": events_capped,
+                }))
+        except Exception as e:
+            log.error("Reopen replay failed for %s: %s", session_id, e)
     else:
         await ws.send(json.dumps({"type": "error", "reason": "reopen_failed",
                                   "session_id": session_id,
@@ -1531,6 +1746,10 @@ async def handle_text(ws, user_name: str, data: dict):
 
     # Log user message to history
     history_store.append(session_id, session.workspace_path, "user", content)
+    try:
+        session_log.log_event(session_id, "user", content, extra={"mode": mode, "user": user_name})
+    except Exception:
+        pass
 
     ts = datetime.now().strftime("%H:%M:%S")
     log.info("[%s] %s → session %s (mode=%s): %s", ts, user_name, session_id, mode, content)
@@ -2924,6 +3143,11 @@ async def run_nightly_routine(routine_cfg: dict):
     # 4. Log the routine start to history
     history_store.append(SYSTEM_SESSION_ID, workspace, "system",
                          f"Nightly routine started at {datetime.utcnow().isoformat()}Z")
+    try:
+        session_log.log_event(SYSTEM_SESSION_ID, "system",
+                              f"Nightly routine started at {datetime.utcnow().isoformat()}Z")
+    except Exception:
+        pass
 
     # 5. Notify all connected clients
     await _broadcast_to_session_users(SYSTEM_SESSION_ID, {
