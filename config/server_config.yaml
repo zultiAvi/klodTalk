@@ -16,6 +16,13 @@ auto_update:
   check_interval_minutes: 5
   branch: "main"
 
+# Model shorthand resolution (used in team member tables):
+#   opus   -> claude-opus-4-7
+#   sonnet -> claude-sonnet-4-6
+#   haiku  -> claude-haiku-4-5-20251001
+# Retired models (do not use): claude-3-haiku-20240307, claude-sonnet-4-20250514,
+# claude-opus-4-20250514. See CLAUDE/skills/model-version-hygiene.md for details.
+
 routine:
   enabled: true            # opt-in, like auto_update
   schedule_hour: 4          # 24h format, local time

@@ -1,4 +1,18 @@
+---
+skill_name: mcp-frontmatter
+triggers:
+  - Adding or modifying MCP server configs in team role files
+  - Giving a role access to external tools via MCP
+  - Combining mcpServers with disallowedTools in frontmatter
+summary: Declare MCP servers in role YAML frontmatter for tool access (forward-looking for native parsing).
+---
+
 # Skill: MCP Servers in Role Frontmatter
+
+## Quick Reference
+- Add `mcpServers:` in YAML frontmatter with `command` and `args` per server
+- Currently used by: `coder.md` (filesystem), `reviewer.md` (filesystem)
+- Forward-looking: frontmatter not yet parsed natively by orchestrator
 
 ## When to Use
 When adding or modifying MCP (Model Context Protocol) server configurations in team role files, or when a role needs access to external tools via MCP.

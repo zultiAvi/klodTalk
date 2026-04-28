@@ -1,4 +1,18 @@
+---
+skill_name: docker-claude-stability
+triggers:
+  - Modifying server/Dockerfile.agent
+  - Troubleshooting agent container behavior
+  - Dealing with unexpected Claude CLI version changes inside containers
+summary: Pin Claude Code CLI version in Dockerfile.agent and suppress auto-updates with DISABLE_UPDATES=1.
+---
+
 # Skill: Docker Agent CLI Stability
+
+## Quick Reference
+- Version pin: `npm install -g @anthropic-ai/claude-code@2.90.0` in `server/Dockerfile.agent`
+- Update suppression: `ENV DISABLE_UPDATES=1`
+- Satisfies disallowedTools frontmatter (v2.1.119+) and absolute file_path in hooks
 
 ## When to Use
 When modifying `server/Dockerfile.agent`, troubleshooting agent container behavior, or dealing with unexpected Claude CLI version changes inside containers.

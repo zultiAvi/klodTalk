@@ -1,4 +1,18 @@
+---
+skill_name: disable-skill-shell-exec
+triggers:
+  - Reviewing or updating `.claude/settings.json`
+  - Hardening agent security
+  - Diagnosing why skill inline shell blocks are not executing
+summary: Block inline shell in skills via `disableSkillShellExecution`; force settings refresh via `forceRemoteSettingsRefresh`.
+---
+
 # Skill: disableSkillShellExecution and forceRemoteSettingsRefresh
+
+## Quick Reference
+- Settings in `.claude/settings.json`: `disableSkillShellExecution: true`, `forceRemoteSettingsRefresh: true`
+- Prevents skill files from being used as shell escape vectors
+- Override for dev: set `false` in `.claude/settings.local.json` (not committed)
 
 ## When to Use
 When reviewing or updating `/workspace/.claude/settings.json`, hardening agent security, or diagnosing why skill inline shell blocks are not executing.

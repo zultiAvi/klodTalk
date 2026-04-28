@@ -2,6 +2,7 @@
 
 ## Prerequisites
 
+- **Claude Code Plan** — Claude Code requires an Anthropic **Max 5x** plan ($100/month) or higher. Sign up at [anthropic.com/pricing](https://anthropic.com/pricing).
 - **Docker** — required for agent isolation
 - **Python 3.9+** — required for the server
 - **Git** — required for workspace management
