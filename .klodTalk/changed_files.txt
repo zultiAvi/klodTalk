@@ -1,6 +1,6 @@
-teams/roles/qa_analyst.md
-teams/teams/plan-code-qa-review.md
-teams/roles/reviewer.md
-CLAUDE/skills/gh-skill-lifecycle.md
-docs/install.md
-helpers/linux/install.sh
+teams/roles/planner.md
+.claude/settings.json
+CLAUDE/skills/disable-skill-shell-exec.md
+.klodTalk/instincts.md
+server/utils/rate_limit_utils.py
+CLAUDE/skills/rate-limit-awareness.md

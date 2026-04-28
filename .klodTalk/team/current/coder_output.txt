@@ -1,54 +1,53 @@
-Coder Output — 2026-04-28
+Coder Output — Nightly Scout Top 3 Implementation
+===================================================
 
-## Summary
+## Idea 1: Planner Role — Parallel Sub-Task Decomposition
 
-Implemented the top 3 ideas from evaluated_ideas.md. All changes are bounded to role definitions, team definitions, a skill file, and install documentation. No server code was modified.
+Enhanced `teams/roles/planner.md` with:
+- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
+- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
+- Dependency note guidance after numbered steps identifying parallelizable steps.
+- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
 
-## Idea 1: QA Analyst Role
+Files modified: teams/roles/planner.md
 
-Created a read-only QA analyst role that identifies test coverage gaps, missing edge case tests, and regression scenarios. Integrated it into a new team pipeline and updated the reviewer to check QA findings.
+## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
 
-Files created/modified:
-- teams/roles/qa_analyst.md — New role with disallowedTools: [Write, Edit, MultiEdit, NotebookEdit, Bash] (fully read-only). Analyzes changed files against the test suite and outputs structured results with QA RESULT: PASS/GAPS FOUND.
-- teams/teams/plan-code-qa-review.md — New team definition. Pipeline: planner -> coder -> qa_analyst -> reviewer. Review loop with max 3 iterations.
-- teams/roles/reviewer.md — Added one line under Must-check: if qa_analyst_output.txt exists and shows QA RESULT: GAPS FOUND, treat unaddressed gaps as WARNING items.
+Added to `.claude/settings.json`:
+- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
+- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
 
-## Idea 2: gh skill Lifecycle Management Skill
+Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
 
-Created a skill file documenting the gh skill CLI protocol for installing, updating, listing, and publishing Claude Code skills.
+Files modified: .claude/settings.json
+Files created: CLAUDE/skills/disable-skill-shell-exec.md
 
-Files created:
-- CLAUDE/skills/gh-skill-lifecycle.md — Three-tier progressive disclosure (frontmatter, Quick Reference, full instructions). 47 lines, under the 50-line guideline. Includes KlodTalk-specific notes about disableSkillShellExecution security.
+## Idea 3: Rate Limit Adaptive Awareness
 
-## Idea 3: Claude Code Plan Subscription Prerequisite Note
+Created `server/utils/rate_limit_utils.py` with three functions:
+- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
+- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
+- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
 
-Updated install documentation and the Linux installer script to warn about the Max 5x plan requirement.
+Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
 
-Files modified:
-- docs/install.md — Added "Claude Code Plan" as the first prerequisite, noting Max 5x ($100/month) requirement with link to anthropic.com/pricing.
-- helpers/linux/install.sh — Added a warning about the plan requirement immediately after the installer banner, before any installation steps begin.
+Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+
+Files modified: .klodTalk/instincts.md
+Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
 
 ## Deviations from Plan
 
-None. All steps implemented as specified in the evaluator's plan.
-
-## Known Limitations
-
-- The gh-skill-lifecycle skill documents the CLI protocol but does not validate whether gh skill commands are available in the user's environment.
-- The plan prerequisite note uses pricing as of April 2026; pricing may change.
+None. All changes match the evaluator's specification.
 
 ## Source Attribution
 
-1. QA Analyst Role
-   - Source: awesome-claude-code-subagents
-   - URL: https://github.com/VoltAgent/awesome-claude-code-subagents
-   - Stars: ~18,100
+1. **Planner Role — Parallel Sub-Task Decomposition**
+   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
+   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
 
-2. gh skill Lifecycle Management Skill
-   - Source: anthropics/skills (Official Anthropic Skills Repository)
-   - URL: https://github.com/anthropics/skills
+2. **Agent Security Hardening — disableSkillShellExecution**
+   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
 
-3. Claude Code Plan Subscription Prerequisite Note
-   - Source: Pricing change report
-   - URL: https://www.wheresyoured.at/news-anthropic-removes-pro-cc/
-   - Site: anthropic.com/pricing (2026-04-21)
+3. **Rate Limit Adaptive Awareness**
+   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
