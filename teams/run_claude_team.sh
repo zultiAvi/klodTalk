@@ -14,7 +14,6 @@
 #   CURRENT_BRANCH   - Current git branch
 #   MERGE_STATUS     - "ok" or "conflicts"
 #   CLAUDE_MODEL     - Override orchestrator model (default: claude-opus-4-7)
-#   CLAUDE_TIMEOUT   - Timeout in seconds (default: 3600)
 
 set -euo pipefail
 
@@ -42,7 +41,6 @@ RESULTS_FOLDER="${RESULTS_FOLDER:-$(jq -r '.results_folder // ""' "${2:-/workspa
 #   - claude-sonnet-4-20250514: retiring June 15 2026 — migrate to claude-sonnet-4-6
 #   - claude-opus-4-20250514: retiring June 15 2026 — migrate to claude-opus-4-7
 CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-7}"
-CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-3600}"
 
 # ─────────────────────────────────────────────────────────────
 # Validate inputs
@@ -222,26 +220,17 @@ echo "=== Claude Team Orchestrator ==="
 echo "Team: ${TEAM_NAME}"
 echo "Model: ${CLAUDE_MODEL}"
 echo "Branch: ${CURRENT_BRANCH}"
-echo "Timeout: $((CLAUDE_TIMEOUT / 60)) minutes"
+echo "Timeout: none"
 echo "================================"
 
 CLAUDE_OUTPUT_FILE="${WORKSPACE}/.klodTalk/team/current/claude_orchestrator_output.json"
 CLAUDE_EXIT=0
-timeout "${CLAUDE_TIMEOUT}" claude \
+claude \
     --model "${CLAUDE_MODEL}" \
     --dangerously-skip-permissions \
     --output-format json \
     -p "${PROMPT}" \
     > "${CLAUDE_OUTPUT_FILE}" || CLAUDE_EXIT=$?
-
-if [[ ${CLAUDE_EXIT} -eq 124 ]]; then
-    echo "ERROR: Orchestrator timed out after $((CLAUDE_TIMEOUT / 60)) minutes"
-    # Write a timeout message if no output was produced
-    if [[ ! -f "${WORKSPACE}/.klodTalk/out_messages/out_message.txt" ]]; then
-        echo "The team orchestrator timed out before completing. Partial work may have been committed to branch ${CURRENT_BRANCH}." \
-            > "${WORKSPACE}/.klodTalk/out_messages/out_message.txt"
-    fi
-fi
 
 # ─────────────────────────────────────────────────────────────
 # Verify required output files exist
