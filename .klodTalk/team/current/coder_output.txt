@@ -1,53 +1,47 @@
-Coder Output — Nightly Scout Top 3 Implementation
-===================================================
+Coder summary — Route hook events to per-session hook_events.jsonl
+=================================================================
 
-## Idea 1: Planner Role — Parallel Sub-Task Decomposition
+Implemented all steps in the plan exactly. No deviations.
 
-Enhanced `teams/roles/planner.md` with:
-- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
-- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
-- Dependency note guidance after numbered steps identifying parallelizable steps.
-- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
+Step A2 — server/session_log.py
+  Added `append_hook_event(session_id, line)` between `append_raw` and
+  `read_events`. Writes to `<session_log_dir>/hook_events.jsonl` (per-session,
+  capital-T path). Wrapped in try/except — never raises. Uses the existing
+  `session_log_dir` helper and module logger.
 
-Files modified: teams/roles/planner.md
+Step A1 — server/server.py (~line 1258)
+  Replaced `session_log.log_event(session_id, "hook", line)` with
+  `session_log.append_hook_event(session_id, line)`. Surrounding try/except,
+  the offset bookkeeping, and the "Stop advancing on logging failure so we
+  retry next poll" behaviour are unchanged.
 
-## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
+Step B1 — clients/web/index.html
+  - Added defensive guard at top of `case 'new_message':`:
+        if (msg.role === 'hook') return;
+  - Added defensive filter on history load so old sessions whose
+    `events.jsonl` already contains `role: "hook"` rows render cleanly:
+        sessionMessages[s.session_id] = (s.messages || []).filter(m => m && m.role !== 'hook');
+  - Removed dead CSS rule `.log-role-badge.hook` (line 563).
+  - Did NOT modify the Logs overlay code (`renderLogEvents`,
+    `showAgentLogs`, ~lines 2627-2807).
 
-Added to `.claude/settings.json`:
-- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
-- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
+Step C1 — Documentation
+  - Updated server/CLAUDE.md: bullet for `session_log.py` now documents
+    that hook events go to a sibling `hook_events.jsonl` via
+    `append_hook_event`, NOT into `events.jsonl`/`log.txt`, and notes the
+    Logs UI button is unrelated to this sink.
+  - Appended new instinct bullet to .klodTalk/instincts.md describing
+    the hook-event sink and warning against regression.
 
-Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
+Pre-commit self-check
+  - Grep for `log_event\([^)]*hook`  ->  0 matches.
+  - Grep for `log-role-badge.hook`   ->  0 matches.
+  - python3 -c "import ast; ast.parse(...)" on session_log.py and server.py: OK.
+  - No TODO/FIXME/HACK/XXX/PLACEHOLDER markers introduced.
+  - PostToolUse hook script untouched (still exits 0).
+  - All session_log.* call sites in server.py remain wrapped in try/except.
+  - Path format `/tmp/klodTalk/<id>.klodTalk/` (capital T, suffix) preserved.
 
-Files modified: .claude/settings.json
-Files created: CLAUDE/skills/disable-skill-shell-exec.md
-
-## Idea 3: Rate Limit Adaptive Awareness
-
-Created `server/utils/rate_limit_utils.py` with three functions:
-- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
-- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
-- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
-
-Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
-
-Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
-
-Files modified: .klodTalk/instincts.md
-Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
-
-## Deviations from Plan
-
-None. All changes match the evaluator's specification.
-
-## Source Attribution
-
-1. **Planner Role — Parallel Sub-Task Decomposition**
-   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
-   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
-
-2. **Agent Security Hardening — disableSkillShellExecution**
-   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
-
-3. **Rate Limit Adaptive Awareness**
-   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
+Note: Existing closed sessions whose `events.jsonl` already contains
+`role: "hook"` rows are left intact on disk. The new UI filter hides them
+on reopen, so users see a clean replay without us mutating historical data.

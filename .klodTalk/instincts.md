@@ -3,3 +3,6 @@
 - Hook group objects in .claude/settings.json require a `matcher` field (use empty string to match all); see server/run_agent.py for the canonical format.
 - The Anthropic Rate Limits API (GET /v1/rate_limits, requires x-api-key header) allows proactive throttling before 429s hit. Use server/utils/rate_limit_utils.py:query_rate_limit_headroom() before spawning agent batches in session_manager.py. Always handle the case where the API key is absent (OAuth sessions have no API key) -- fall back to reactive 429 handling.
 - disableSkillShellExecution=true in .claude/settings.json blocks inline shell execution in skill files; forceRemoteSettingsRefresh=true ensures long-lived containers always get the latest policy settings.
+- Per-session logs persist at /tmp/klodTalk/<id>.klodTalk/ (capital T); funnel via session_log.log_event in _broadcast_to_session_users — never delete on session delete.
+- All session_log.* calls in server.py/session_manager.py must be wrapped in try/except so logging failures never break the WebSocket broker.
+- Hook events go to `/tmp/klodTalk/<id>.klodTalk/hook_events.jsonl` via `session_log.append_hook_event`, NOT to `events.jsonl` / `log.txt`. The watcher in `server/server.py` (~line 1258) MUST call `append_hook_event`, not `log_event(..., "hook", ...)`. Reverting this re-pollutes the chat replay.

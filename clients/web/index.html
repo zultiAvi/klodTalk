@@ -560,7 +560,6 @@
   .log-role-badge.assistant { background: var(--msg-agent); color: #8af; }
   .log-role-badge.tool { background: var(--msg-coder); color: #8ff; }
   .log-role-badge.system { background: var(--msg-system); color: #aaa; }
-  .log-role-badge.hook { background: var(--msg-review); color: #c8a; }
   .log-role-badge.unknown { background: #333; color: #888; }
   .log-event-preview { color: #aaa; flex: 1; min-width: 0; }
   .log-content-summary { font-size: 12px; color: #8af; margin-bottom: 2px; font-weight: 500; }
@@ -1311,6 +1310,7 @@ function handleMessage(msg) {
       break;
 
     case 'new_message': {
+      if (msg.role === 'hook') return; // hook events are debug-only, not user-visible
       const sid = msg.session_id;
       if (!sessionMessages[sid]) sessionMessages[sid] = [];
       const _entry = {
@@ -1365,7 +1365,8 @@ function handleMessage(msg) {
           system: s.system || false,
         };
         if (s.working) workingSessions.add(s.session_id);
-        sessionMessages[s.session_id] = s.messages || [];
+        // Defensive: drop legacy role==='hook' entries persisted in old events.jsonl files.
+        sessionMessages[s.session_id] = (s.messages || []).filter(m => m && m.role !== 'hook');
         rebuildSessionTokens(s.session_id, false); // rebuild without touching weekly usage
       });
       saveTokenState();

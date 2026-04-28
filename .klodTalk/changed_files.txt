@@ -1,6 +1,5 @@
-teams/roles/planner.md
-.claude/settings.json
-CLAUDE/skills/disable-skill-shell-exec.md
+server/session_log.py
+server/server.py
+clients/web/index.html
+server/CLAUDE.md
 .klodTalk/instincts.md
-server/utils/rate_limit_utils.py
-CLAUDE/skills/rate-limit-awareness.md

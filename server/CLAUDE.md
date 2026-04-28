@@ -19,7 +19,7 @@ The WebSocket server and Docker agent runtime. This is the brain of the system �
 - **run_agent.sh** — Shell-based agent executor (legacy, still supported)
 - **session_manager.py** — Session lifecycle: workspace copy, branch creation, container management
 - **history_store.py** — Session history in JSONL format
-- **session_log.py** — Durable per-session log directory at `/tmp/klodTalk/<session_id>.klodTalk/`, populated by every server event (user/BTW messages, progress/planner/coder/review/idea broadcasts, agent stdout/stderr, lifecycle events, errors, hook events). Survives `delete_session` so closed/deleted sessions still show their history. Read on reopen via `session_replay`.
+- **session_log.py** — Durable per-session log directory at `/tmp/klodTalk/<session_id>.klodTalk/`, populated by every server event (user/BTW messages, progress/planner/coder/review/idea broadcasts, agent stdout/stderr, lifecycle events, errors). Survives `delete_session` so closed/deleted sessions still show their history. Read on reopen via `session_replay`. Hook events from `post_tool_use_logger.sh` are tailed by the watcher and written to a sibling file `hook_events.jsonl` inside the same per-session directory via `append_hook_event`. They are intentionally **not** written to `events.jsonl` / `log.txt` so they don't pollute the user-visible chat replay. The "Logs" button in the UI (`get_agent_logs`) reads from Claude's own JSONL archives and is unrelated to this sink.
 - **token_store.py** — Cumulative token usage tracking
 - **unread_state.py** — Per-user unread message tracking
 - **copy_tree.py** — Git-aware directory copy utility

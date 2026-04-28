@@ -147,6 +147,26 @@ def append_raw(session_id: str, stream: str, data: str) -> None:
         log.error("Failed to append agent_%s.log for %s: %s", stream, session_id, e)
 
 
+def append_hook_event(session_id: str, line: str) -> None:
+    """Append a single hook line to /tmp/klodTalk/<id>.klodTalk/hook_events.jsonl.
+
+    Intentionally separate from log_event/events.jsonl: hook output is high
+    frequency, low signal, and must never appear in the user-visible chat
+    replay. Stored per-session so the Logs view stays clean while the data
+    remains available for ad-hoc debugging.
+
+    Never raises.
+    """
+    if not session_id or not line:
+        return
+    try:
+        d = session_log_dir(session_id)
+        with open(os.path.join(d, "hook_events.jsonl"), "a", encoding="utf-8") as f:
+            f.write(line if line.endswith("\n") else line + "\n")
+    except Exception as e:
+        log.error("Failed to append hook_events.jsonl for %s: %s", session_id, e)
+
+
 def read_events(session_id: str) -> list[dict]:
     """Return all structured events for a session, oldest first.
 

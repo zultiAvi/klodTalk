@@ -1255,8 +1255,8 @@ async def watch_out_messages():
                                         line = raw.rstrip("\n")
                                         if line.strip():
                                             try:
-                                                session_log.log_event(
-                                                    session_id, "hook", line,
+                                                session_log.append_hook_event(
+                                                    session_id, line,
                                                 )
                                             except Exception:
                                                 # Stop advancing on logging
