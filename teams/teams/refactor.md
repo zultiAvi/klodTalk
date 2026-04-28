@@ -6,12 +6,12 @@ Two-phase refactoring team. First refactor the code, then validate with tests.
 
 | Name | Role | Model | Optional |
 |------|------|-------|----------|
-| planner | planner | sonnet | |
-| coder | coder | opus | |
-| reviewer | reviewer | sonnet | |
-| test_coder | coder_unit_test | opus | |
-| test_reviewer | reviewer_test_runner | sonnet | |
-| executor | executor | sonnet | yes |
+| planner | planner | opus  | |
+| coder | coder | opus  | |
+| reviewer | reviewer | opus  | |
+| test_coder | coder_unit_test | opus  | |
+| test_reviewer | reviewer_test_runner | opus  | |
+| executor | executor | opus  | yes |
 
 ## Pipeline
 
