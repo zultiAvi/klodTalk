@@ -114,6 +114,8 @@ if [ -n "$REPOS_JSON" ] && [ "$REPOS_JSON" != "[]" ]; then
 else
     SKILLS_DIR="${WORKSPACE}/CLAUDE/skills"
 fi
+# Ensure the skills directory exists so the orchestrator can always write to it
+mkdir -p "${SKILLS_DIR}"
 SKILLS_CONTENT=""
 SKILLS_LIST=""
 

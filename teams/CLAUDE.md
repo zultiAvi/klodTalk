@@ -48,3 +48,7 @@ Edit the role's `.md` file in `roles/`. All teams referencing that role automati
 ## Adding a New Role
 
 Create a `.md` file in `roles/` describing the role's behavior. Reference it from any team's members table.
+
+## Skills
+
+Skills are stored in the **first repo's** `CLAUDE/skills/` folder. The orchestrator's Step 6 reflects on every completed task and writes new skill files there when a reusable pattern emerges (or logs a one-line justification when none does). Step 6.5 commits any new skill files in a follow-up commit (`Add skills: ...`) so they are persisted with the repo. The directory is auto-created by `run_claude_team.sh` if it does not yet exist.
