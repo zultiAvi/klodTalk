@@ -25,6 +25,10 @@ echo "║     KlodTalk Installer — Linux       ║"
 echo "╚══════════════════════════════════════╝"
 echo -e "${NC}"
 
+warn "Claude Code requires an Anthropic Max 5x plan (\$100/month) or higher."
+warn "Sign up at: https://anthropic.com/pricing"
+echo ""
+
 # ── 1. Docker ────────────────────────────────────────────────────────────────
 
 step "Checking Docker"

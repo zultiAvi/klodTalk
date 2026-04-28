@@ -1,70 +1,54 @@
-Coder Output — 2026-04-27
+Coder Output — 2026-04-28
 
 ## Summary
 
-Implemented the top 3 ideas from evaluated_ideas.md. All changes are bounded to skill files, team/role definitions, and config documentation. No server code was modified.
+Implemented the top 3 ideas from evaluated_ideas.md. All changes are bounded to role definitions, team definitions, a skill file, and install documentation. No server code was modified.
 
-## Idea 1: Progressive Disclosure Architecture for Skill Files
+## Idea 1: QA Analyst Role
 
-Added YAML frontmatter (skill_name, triggers, summary) and a Quick Reference section to all 8 existing skill .md files in CLAUDE/skills/. Updated README.md to document the three-tier structure (frontmatter metadata -> Quick Reference -> full instructions).
-
-All existing content below the Quick Reference section was preserved unchanged.
-
-Files modified:
-- CLAUDE/skills/rate-limit-awareness.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/hook-event-logging.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/docker-per-agent-images.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/placeholder-guard.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/disallowed-tools-frontmatter.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/disable-skill-shell-exec.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/docker-claude-stability.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/mcp-frontmatter.md — Added frontmatter + Quick Reference
-- CLAUDE/skills/README.md — Documented the three-tier structure in the file format section
-
-## Idea 2: Model Deprecation Audit + effort Parameter Migration Skill
-
-Audit results:
-- Searched all files under teams/, config/, server/ for retired model strings.
-- Found references ONLY in documentation/comments (teams/run_claude_team.sh lines 41-43 listing deprecated models, config/CLAUDE.md lines 119-121 listing deprecated models). These are intentional deprecation warnings, not active model references. No fixes needed.
-- Searched all .py files in server/ for budget_tokens. None found — confirmed clean.
-- Team definition .md files all use shorthands (opus, sonnet, haiku), not full model IDs. No retired references.
-
-Changes made:
-- config/server_config.yaml — Added documentation comment block documenting model shorthand resolution (opus/sonnet/haiku -> full model IDs) and listing retired models.
-- CLAUDE/skills/model-version-hygiene.md — New skill file documenting active models, retired models with retirement dates, effort parameter values (low/medium/high), and where/how to check for deprecations.
-
-## Idea 3: CI Test-Runner Step in the Nightly Scout Pipeline
-
-Created a new test_runner role and an extended nightly-scout team definition that includes the test-runner step.
+Created a read-only QA analyst role that identifies test coverage gaps, missing edge case tests, and regression scenarios. Integrated it into a new team pipeline and updated the reviewer to check QA findings.
 
 Files created/modified:
-- teams/roles/test_runner.md — New role file with disallowedTools: [Write, Edit, MultiEdit, NotebookEdit] (read+execute only). Runs pytest tests/ -v, outputs structured results with TEST_RESULT: PASS/FAIL and failing test details.
-- teams/teams/nightly-scout-with-tests.md — New team definition extending nightly-scout.md. Pipeline: website_scout -> scout -> evaluator -> coder -> test_runner -> reviewer. Test-fix loop (max 2 iterations) if tests fail.
-- teams/roles/reviewer.md — Added one line under Must-check: verify test_runner_output.txt shows TEST_RESULT: PASS before approving (when test_runner is part of the pipeline).
+- teams/roles/qa_analyst.md — New role with disallowedTools: [Write, Edit, MultiEdit, NotebookEdit, Bash] (fully read-only). Analyzes changed files against the test suite and outputs structured results with QA RESULT: PASS/GAPS FOUND.
+- teams/teams/plan-code-qa-review.md — New team definition. Pipeline: planner -> coder -> qa_analyst -> reviewer. Review loop with max 3 iterations.
+- teams/roles/reviewer.md — Added one line under Must-check: if qa_analyst_output.txt exists and shows QA RESULT: GAPS FOUND, treat unaddressed gaps as WARNING items.
 
-The original nightly-scout.md was left unchanged so the simpler pipeline remains available.
+## Idea 2: gh skill Lifecycle Management Skill
+
+Created a skill file documenting the gh skill CLI protocol for installing, updating, listing, and publishing Claude Code skills.
+
+Files created:
+- CLAUDE/skills/gh-skill-lifecycle.md — Three-tier progressive disclosure (frontmatter, Quick Reference, full instructions). 47 lines, under the 50-line guideline. Includes KlodTalk-specific notes about disableSkillShellExecution security.
+
+## Idea 3: Claude Code Plan Subscription Prerequisite Note
+
+Updated install documentation and the Linux installer script to warn about the Max 5x plan requirement.
+
+Files modified:
+- docs/install.md — Added "Claude Code Plan" as the first prerequisite, noting Max 5x ($100/month) requirement with link to anthropic.com/pricing.
+- helpers/linux/install.sh — Added a warning about the plan requirement immediately after the installer banner, before any installation steps begin.
 
 ## Deviations from Plan
 
-- Idea 2: No code fixes were needed because the audit found zero active references to retired models or budget_tokens. All matches were in documentation that intentionally warns about deprecated models. This is the expected outcome given that team definitions use shorthands.
-- Idea 3: The evaluator's plan mentioned creating CLAUDE/skills/test-runner-role.md. This was not created because the role file (teams/roles/test_runner.md) and team definition (teams/teams/nightly-scout-with-tests.md) are self-documenting and the pattern is straightforward. Adding a skill file for a single role would be redundant with the role file itself.
+None. All steps implemented as specified in the evaluator's plan.
+
+## Known Limitations
+
+- The gh-skill-lifecycle skill documents the CLI protocol but does not validate whether gh skill commands are available in the user's environment.
+- The plan prerequisite note uses pricing as of April 2026; pricing may change.
 
 ## Source Attribution
 
-1. Progressive Disclosure Architecture for Skill Files
-   - Source: travisvn/awesome-claude-skills
-   - URL: https://github.com/travisvn/awesome-claude-skills
-   - Stars: ~7,500
+1. QA Analyst Role
+   - Source: awesome-claude-code-subagents
+   - URL: https://github.com/VoltAgent/awesome-claude-code-subagents
+   - Stars: ~18,100
 
-2. Model Deprecation Audit + effort Parameter Migration Skill
-   - Source 1: "Model Deprecations and Retirements -- Action Required"
-   - URL: https://platform.claude.com/docs/en/about-claude/model-deprecations
-   - Site: docs.anthropic.com (2026-04-14)
-   - Source 2: "Effort Parameter Generally Available"
-   - URL: https://docs.anthropic.com/en/release-notes/api
-   - Site: docs.anthropic.com (~2026-04)
+2. gh skill Lifecycle Management Skill
+   - Source: anthropics/skills (Official Anthropic Skills Repository)
+   - URL: https://github.com/anthropics/skills
 
-3. CI Test-Runner Step in the Nightly Scout Pipeline
-   - Source: ComposioHQ/agent-orchestrator
-   - URL: https://github.com/ComposioHQ/agent-orchestrator
-   - Stars: ~4,900
+3. Claude Code Plan Subscription Prerequisite Note
+   - Source: Pricing change report
+   - URL: https://www.wheresyoured.at/news-anthropic-removes-pro-cc/
+   - Site: anthropic.com/pricing (2026-04-21)
