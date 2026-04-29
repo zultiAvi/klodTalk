@@ -23,14 +23,42 @@ import os
 from datetime import datetime
 from typing import Any, Optional
 
+import yaml
+
 log = logging.getLogger("klodtalk.session_log")
 
-# Use capital T in the directory name per user request:
-#   "/tmp/klodTalk/{id}.klodTalk/"
-# Note: this is intentionally distinct from session_manager.TEMP_BASE
-# (which uses lowercase "klodtalk" for session workspaces). The log dir
-# is a separate path so deleting a workspace does not delete the logs.
-LOG_BASE = os.environ.get("KLODTALK_LOG_BASE", "/tmp/klodTalk")
+_DEFAULT_SESSION_DATA_PATH = "/tmp/klodTalk"
+_CONFIG_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "config", "server_config.yaml")
+)
+
+
+def _resolve_log_base() -> str:
+    """Resolve the per-session log base directory.
+
+    Precedence: KLODTALK_LOG_BASE env var (used by tests) >
+    server.session_data_path/logs from server_config.yaml >
+    /tmp/klodTalk/logs.
+    """
+    env = os.environ.get("KLODTALK_LOG_BASE")
+    if env:
+        return env
+    try:
+        with open(_CONFIG_PATH) as f:
+            cfg = yaml.safe_load(f) or {}
+        base = (cfg.get("server") or {}).get("session_data_path")
+        if base:
+            return os.path.join(base, "logs")
+    except Exception:
+        pass
+    return os.path.join(_DEFAULT_SESSION_DATA_PATH, "logs")
+
+
+# Per-session durable log directory: ``<LOG_BASE>/<session_id>.klodTalk/``.
+# Kept under ``<session_data_path>/logs/`` so it lives beside (but not inside)
+# the workspace copies under ``<session_data_path>/workspaces/`` —
+# deleting a workspace does not delete the logs.
+LOG_BASE = _resolve_log_base()
 
 # Truncate human-readable lines after this many bytes (full body still in JSONL).
 _HUMAN_LINE_LIMIT = 4096

@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Optional
 
+import yaml
+
 from copy_tree import copy_git_tracked
 import session_log
 from utils.docker import get_docker_utils
@@ -26,7 +28,32 @@ STATE_DIR = os.path.join(BASE_DIR, ".klodTalk", "state")
 os.makedirs(STATE_DIR, exist_ok=True)
 SESSIONS_PATH = os.path.join(STATE_DIR, "sessions.json")
 COUNTERS_PATH = os.path.join(STATE_DIR, "session_counters.json")
-TEMP_BASE = os.path.join(tempfile.gettempdir(), "klodtalk")
+
+_SERVER_CONFIG_PATH = os.path.join(CONFIG_DIR, "server_config.yaml")
+_DEFAULT_SESSION_DATA_PATH = "/tmp/klodTalk"
+
+
+def _resolve_temp_base() -> str:
+    """Resolve the per-session workspace-copy base directory.
+
+    Precedence: KLODTALK_TEMP_BASE env var > server.session_data_path/workspaces
+    from server_config.yaml > <tempdir>/klodTalk/workspaces.
+    """
+    env = os.environ.get("KLODTALK_TEMP_BASE")
+    if env:
+        return env
+    try:
+        with open(_SERVER_CONFIG_PATH) as f:
+            cfg = yaml.safe_load(f) or {}
+        base = (cfg.get("server") or {}).get("session_data_path")
+        if base:
+            return os.path.join(base, "workspaces")
+    except Exception:
+        pass
+    return os.path.join(_DEFAULT_SESSION_DATA_PATH, "workspaces")
+
+
+TEMP_BASE = _resolve_temp_base()
 
 DOCKER_IMAGE_NAME = "klodtalk-agent"
 CONTAINER_PREFIX = "klodtalk_session_"
