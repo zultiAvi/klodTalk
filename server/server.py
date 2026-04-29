@@ -592,6 +592,14 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
         repos_json = json.dumps(project.get("repos", []) if project else [])
         if team_name:
             results_folder = get_results_folder(project) if project else None
+            if results_folder:
+                results_folder = os.path.join(results_folder, session_id)
+                try:
+                    os.makedirs(results_folder, exist_ok=True)
+                    if HOST_UID is not None and HOST_GID is not None:
+                        os.chown(results_folder, HOST_UID, HOST_GID)
+                except OSError as e:
+                    log.warning("Could not create per-session results folder '%s': %s", results_folder, e)
             team_data = {"name": team_name, "results_folder": results_folder or ""}
 
             team_json_dir = os.path.join(session.workspace_path, KLODTALK_DIR, "team")
