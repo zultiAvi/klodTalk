@@ -2986,17 +2986,30 @@ function showSessionAnalysis(msg) {
         html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
       });
     }
+    if (task.token_saving_suggestions && task.token_saving_suggestions.length > 0) {
+      html += '<div class="analysis-task-tokens"><b>Save tokens:</b></div>';
+      task.token_saving_suggestions.forEach(function(sug) {
+        html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
+      });
+    }
     html += '</div></div>';
   });
 
   // Overall suggestions
   var overall = analysis.overall_suggestions || [];
-  if (overall.length > 0 || analysis.team_recommendation) {
+  var tokenSavings = analysis.token_saving_suggestions || [];
+  if (overall.length > 0 || tokenSavings.length > 0 || analysis.team_recommendation) {
     html += '<div class="analysis-overall">';
     html += '<div class="analysis-overall-title">Overall Suggestions</div>';
     overall.forEach(function(sug) {
       html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
     });
+    if (tokenSavings.length > 0) {
+      html += '<div class="analysis-overall-title" style="margin-top:8px;">Token Savings</div>';
+      tokenSavings.forEach(function(sug) {
+        html += '<div class="analysis-suggestion">&#8226; ' + escapeHtml(sug) + '</div>';
+      });
+    }
     if (analysis.team_recommendation) {
       html += '<div class="analysis-team-rec"><b>Recommended team:</b> ' + escapeHtml(analysis.team_recommendation) + '</div>';
     }
