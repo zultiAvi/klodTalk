@@ -4,6 +4,7 @@ server:
   docker: true
   ssl_cert: ""   # Path to server.crt — leave empty for plain ws://
   ssl_key: ""    # Path to server.key — leave empty for plain ws://
+  session_data_path: "/tmp/klodTalk"   # Base dir for per-session logs (<path>/logs/) and workspace copies (<path>/workspaces/)
 
 claude:
   auth_method: "session"    # "session" | "api_key"

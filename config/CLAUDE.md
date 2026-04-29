@@ -32,6 +32,7 @@ server:
   docker: true        # start agent containers on boot
   ssl_cert: ""        # Path to server.crt — leave empty for plain ws://
   ssl_key: ""         # Path to server.key — leave empty for plain ws://
+  session_data_path: "/tmp/klodTalk"  # base dir for per-session logs (<path>/logs/) and workspace copies (<path>/workspaces/)
 
 routine:
   enabled: false            # opt-in nightly GitHub scouting routine
