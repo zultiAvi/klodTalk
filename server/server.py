@@ -332,18 +332,16 @@ def load_team(team_name: str) -> dict:
             content = f.read()
         name = team_name
         description = ""
-        disabled = False
         description_found = False
-        # The `disabled:` flag may appear anywhere (even commented as
-        # `# disabled: true`), so we cannot stop at the first description.
+        state_heading = None  # "enabled", "disabled", or None
         for i, line in enumerate(content.splitlines()):
             stripped = line.strip()
-            flag = stripped.lstrip("#").strip().lower()
-            if flag.startswith("disabled:"):
-                disabled = flag.split(":", 1)[1].strip() in ("true", "yes", "1")
+            heading_check = stripped.lower()
+            if heading_check == "## enabled":
+                state_heading = "enabled"
                 continue
-            if flag == "disabled":
-                disabled = True
+            if heading_check == "## disabled":
+                state_heading = "disabled"
                 continue
             if line.startswith("# Team:"):
                 name = line.replace("# Team:", "").strip()
@@ -358,6 +356,14 @@ def load_team(team_name: str) -> dict:
             ):
                 description = stripped
                 description_found = True
+        if state_heading is None:
+            log.warning(
+                "Team '%s' missing mandatory '## enabled' or '## disabled' heading; treating as disabled",
+                team_name,
+            )
+            disabled = True
+        else:
+            disabled = state_heading == "disabled"
         return {
             "name": team_name,
             "display_name": name,

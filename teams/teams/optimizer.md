@@ -4,6 +4,8 @@ Iterative optimization team. Tunes configuration and optionally code to improve 
 
 **Type: optimizer** — This team uses a special iterative loop instead of a linear pipeline.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

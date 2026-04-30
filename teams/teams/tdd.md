@@ -2,6 +2,8 @@
 
 Test-driven development team. The coder follows strict red-green-refactor methodology.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

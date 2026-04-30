@@ -1,53 +1,99 @@
-Coder Output — Nightly Scout Top 3 Implementation
-===================================================
+CODER OUTPUT — Replace `disabled:` line flag with mandatory `## enabled` / `## disabled` H2 heading
 
-## Idea 1: Planner Role — Parallel Sub-Task Decomposition
+## Summary
+Replaced the freeform `disabled:` line flag mechanism with a mandatory H2 heading
+(`## enabled` or `## disabled`) inside every team `.md` file. The heading is placed
+between the team's one-line description and the `## Members` section. A team file
+without one of these two headings is now treated as disabled and a warning is logged
+by the server. No backward compatibility is preserved.
 
-Enhanced `teams/roles/planner.md` with:
-- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
-- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
-- Dependency note guidance after numbered steps identifying parallelizable steps.
-- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
+## Files changed
 
-Files modified: teams/roles/planner.md
+### Server
+- /workspace/server/server.py
+  - Rewrote `load_team()` (lines ~325-369). Removed all `disabled:` line parsing.
+  - New scanner detects `## enabled` / `## disabled` via
+    `stripped.lower() == "## enabled" / "## disabled"`. Heading lines are skipped
+    (so they cannot be picked up as the description).
+  - When neither heading is found, logs:
+    `Team '<name>' missing mandatory '## enabled' or '## disabled' heading; treating as disabled`
+    and returns `disabled=True`.
+  - Returned dict shape unchanged: `{name, display_name, description, disabled}`.
+  - `get_available_teams()` left untouched — it already filters on `disabled`.
+  - Session-start path (server.py:612) intentionally not touched per project instinct.
 
-## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
+### Tests
+- /workspace/tests/test_team_loading.py
+  - Test 14 `test_load_team_detects_disabled_flag`: fixture now uses `## disabled` heading.
+  - Test 15 `test_get_available_teams_excludes_disabled`: enabled fixture uses `## enabled`,
+    disabled fixture uses `## disabled`.
+  - Test 16 `test_load_team_disabled_does_not_eat_description`: fixture rewritten with
+    description on its own line and `## disabled` heading later in the file.
+  - Added new test `test_load_team_missing_state_heading_is_disabled` that creates a file
+    with neither heading and asserts `disabled is True` plus a warning is logged via
+    `caplog` with `"missing mandatory"` and the team name.
+  - All 17 tests pass.
 
-Added to `.claude/settings.json`:
-- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
-- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
+### Team .md files (19 total)
+Inserted `## enabled` between description and `## Members` for these 17:
+- /workspace/teams/teams/code-review-only.md
+- /workspace/teams/teams/debug.md
+- /workspace/teams/teams/documentation.md
+- /workspace/teams/teams/github-scout.md
+- /workspace/teams/teams/migration.md
+- /workspace/teams/teams/nightly-scout-with-tests.md
+- /workspace/teams/teams/nightly-scout.md
+- /workspace/teams/teams/optimizer.md
+- /workspace/teams/teams/plan-code-review.md
+- /workspace/teams/teams/plan-code.md
+- /workspace/teams/teams/refactor.md
+- /workspace/teams/teams/security.md
+- /workspace/teams/teams/solo-general.md
+- /workspace/teams/teams/solo-planner.md
+- /workspace/teams/teams/super-planner.md
+- /workspace/teams/teams/tdd.md
+- /workspace/teams/teams/unit-test.md
 
-Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
+Inserted `## disabled` for these 2:
+- /workspace/teams/teams/plan-code-qa-review.md
+- /workspace/teams/teams/plan-code-review-execute.md
 
-Files modified: .claude/settings.json
-Files created: CLAUDE/skills/disable-skill-shell-exec.md
+No pre-existing `disabled: true` / `disabled: false` lines were present in any team
+.md file (verified with grep before editing).
 
-## Idea 3: Rate Limit Adaptive Awareness
+### Documentation
+- /workspace/docs/add_team.md
+  - Added `## enabled` to the Step 1 team-file template.
+  - Rewrote the "Disabling a team" section as "Enabling / disabling a team" describing
+    the new mandatory H2 heading mechanism, allowed values, placement, and missing-heading
+    behavior (treated as disabled with logged warning).
 
-Created `server/utils/rate_limit_utils.py` with three functions:
-- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
-- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
-- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
+### Skill
+- /workspace/CLAUDE/skills/team-disable-flag.md
+  - Rewrote entirely. Notes that the term "flag" in the filename is historical.
+  - Documents: mandatory; allowed values are exactly `## enabled` and `## disabled`
+    (case-insensitive after trim); placed between description and `## Members`;
+    missing -> disabled with warning.
+  - Cites `plan-code-qa-review` and `plan-code-review-execute` as canonical disabled
+    examples. Documents `load_team()` behavior, code paths, testing pattern, and the
+    session-start scope boundary.
+  - Filename unchanged.
 
-Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
+## Verification
 
-Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+1. `grep -rn "disabled: true|disabled: false"` over server.py, tests, docs, skill,
+   and teams/teams/*.md -> CLEAN.
+2. Every team file in `/workspace/teams/teams/` has exactly one of `## enabled` /
+   `## disabled` (verified via per-file grep loop).
+3. Exactly two team files contain `## disabled`:
+   - plan-code-qa-review.md
+   - plan-code-review-execute.md
+4. `python3 -m pytest tests/test_team_loading.py -v` -> 17 passed, 0 failed.
 
-Files modified: .klodTalk/instincts.md
-Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
-
-## Deviations from Plan
-
-None. All changes match the evaluator's specification.
-
-## Source Attribution
-
-1. **Planner Role — Parallel Sub-Task Decomposition**
-   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
-   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
-
-2. **Agent Security Hardening — disableSkillShellExecution**
-   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
-
-3. **Rate Limit Adaptive Awareness**
-   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
+## Notes
+- No backward compatibility kept; the `disabled:` line parsing is completely removed.
+- `get_available_teams()` continues to filter on `data.get("disabled")` truthy and
+  exposes only `{name, description}` to clients — the `disabled` key never leaks.
+- The session-start project-pinned-team path (server.py:612) is intentionally NOT
+  touched, matching the user's spec ("would not show in the drop down box") and
+  the project instinct that flagged it as out of scope.

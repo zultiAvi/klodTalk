@@ -2,6 +2,8 @@
 
 Single-agent team with a general-purpose role. The agent has no fixed specialty — it reads the request and decides for itself how to handle it (plan, code, review, run, document, or any combination).
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

@@ -2,6 +2,8 @@
 
 The default balanced team. A planner designs the approach, a coder implements it, and a reviewer verifies the result. Optionally includes execution, validation, and security review when the task warrants it.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

@@ -153,13 +153,13 @@ def test_description_extracted_from_md():
     )
 
 
-# ── 14. load_team detects `disabled: true` flag ──────────────────────────────
+# ── 14. load_team detects `## disabled` heading ──────────────────────────────
 
 def test_load_team_detects_disabled_flag(tmp_path, monkeypatch):
     import server
     monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
     (tmp_path / "team_x.md").write_text(
-        "# Team X\nA short description.\ndisabled: true\n"
+        "# Team X\nA short description.\n\n## disabled\n\n## Members\n"
     )
     result = server.load_team("team_x")
     assert result.get("disabled") is True
@@ -170,9 +170,11 @@ def test_load_team_detects_disabled_flag(tmp_path, monkeypatch):
 def test_get_available_teams_excludes_disabled(tmp_path, monkeypatch):
     import server
     monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
-    (tmp_path / "enabled.md").write_text("# Enabled\nA live team.\n")
+    (tmp_path / "enabled.md").write_text(
+        "# Enabled\nA live team.\n\n## enabled\n\n## Members\n"
+    )
     (tmp_path / "disabled.md").write_text(
-        "# Disabled\nShould not be listed.\ndisabled: true\n"
+        "# Disabled\nShould not be listed.\n\n## disabled\n\n## Members\n"
     )
     teams = server.get_available_teams()
     names = [t["name"] for t in teams]
@@ -180,15 +182,33 @@ def test_get_available_teams_excludes_disabled(tmp_path, monkeypatch):
     assert "disabled" not in names
 
 
-# ── 16. disabled flag is not consumed as the description ─────────────────────
+# ── 16. disabled heading is not consumed as the description ──────────────────
 
 def test_load_team_disabled_does_not_eat_description(tmp_path, monkeypatch):
     import server
     monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
     (tmp_path / "team_y.md").write_text(
-        "# Team Y\ndisabled: true\nThis is the real description.\n"
+        "# Team Y\nThis is the real description.\n\n## disabled\n\n## Members\n"
     )
     result = server.load_team("team_y")
     assert result.get("disabled") is True
     assert result.get("description") == "This is the real description."
     assert "disabled" not in result.get("description", "").lower()
+
+
+# ── 17. missing state heading is treated as disabled ─────────────────────────
+
+def test_load_team_missing_state_heading_is_disabled(tmp_path, monkeypatch, caplog):
+    import logging
+    import server
+    monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
+    (tmp_path / "team_z.md").write_text(
+        "# Team Z\nA description without state heading.\n\n## Members\n"
+    )
+    with caplog.at_level(logging.WARNING):
+        result = server.load_team("team_z")
+    assert result.get("disabled") is True
+    assert any(
+        "missing mandatory" in record.message and "team_z" in record.message
+        for record in caplog.records
+    )

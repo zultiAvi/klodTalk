@@ -2,6 +2,8 @@
 
 A quality-focused team. A planner designs the approach, a coder implements it, a QA analyst identifies test coverage gaps, and a reviewer verifies the result. The QA step catches missing tests before the reviewer signs off.
 
+## disabled
+
 ## Members
 
 | Name | Role | Model | Optional |

@@ -2,6 +2,8 @@
 
 Write comprehensive unit tests for existing code. Does not modify implementation.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

@@ -2,6 +2,8 @@
 
 Fast two-role team for straightforward implementation tasks. No review step.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

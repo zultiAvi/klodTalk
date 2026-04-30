@@ -2,6 +2,8 @@
 
 Combined nightly scouting team. A website scout checks Claude/Anthropic official channels, a GitHub scout searches for community repos, an evaluator ranks all findings together, a coder implements the best ones, and a reviewer verifies.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

@@ -2,6 +2,8 @@
 
 An ideation-focused team that does NOT write any code. It generates, critiques, and refines implementation ideas over multiple rounds, then produces a detailed plan for another team to execute.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

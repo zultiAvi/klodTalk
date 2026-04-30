@@ -2,6 +2,8 @@
 
 Security-focused team. Uses Opus throughout for deeper threat analysis and secure implementation.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

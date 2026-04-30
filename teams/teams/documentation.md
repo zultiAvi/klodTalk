@@ -2,6 +2,8 @@
 
 A read-only documentation team. Reads source code and produces documentation without modifying any executable code. Uses Sonnet for efficient documentation generation and review.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

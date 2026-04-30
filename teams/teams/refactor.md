@@ -2,6 +2,8 @@
 
 Two-phase refactoring team. First refactor the code, then validate with tests.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

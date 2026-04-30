@@ -2,6 +2,8 @@
 
 A debugging-focused team. The debugger reproduces the issue and diagnoses the root cause, then the coder fixes it following the debugger's suggested fix. The reviewer verifies the fix is correct. Optionally includes execution and validation.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

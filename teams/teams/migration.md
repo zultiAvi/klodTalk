@@ -2,6 +2,8 @@
 
 A safety-first team for database schema migrations, API migrations, and data transformations. Uses Opus throughout for high-stakes planning, implementation, and review. Enforces idempotency, rollback plans, and backward compatibility.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |
