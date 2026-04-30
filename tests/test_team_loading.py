@@ -151,3 +151,44 @@ def test_description_extracted_from_md():
     assert has_description, (
         "At least one team should have a description extracted from .md"
     )
+
+
+# ── 14. load_team detects `disabled: true` flag ──────────────────────────────
+
+def test_load_team_detects_disabled_flag(tmp_path, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
+    (tmp_path / "team_x.md").write_text(
+        "# Team X\nA short description.\ndisabled: true\n"
+    )
+    result = server.load_team("team_x")
+    assert result.get("disabled") is True
+
+
+# ── 15. get_available_teams excludes disabled teams ──────────────────────────
+
+def test_get_available_teams_excludes_disabled(tmp_path, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
+    (tmp_path / "enabled.md").write_text("# Enabled\nA live team.\n")
+    (tmp_path / "disabled.md").write_text(
+        "# Disabled\nShould not be listed.\ndisabled: true\n"
+    )
+    teams = server.get_available_teams()
+    names = [t["name"] for t in teams]
+    assert "enabled" in names
+    assert "disabled" not in names
+
+
+# ── 16. disabled flag is not consumed as the description ─────────────────────
+
+def test_load_team_disabled_does_not_eat_description(tmp_path, monkeypatch):
+    import server
+    monkeypatch.setattr(server, "TEAMS_DIR", str(tmp_path))
+    (tmp_path / "team_y.md").write_text(
+        "# Team Y\ndisabled: true\nThis is the real description.\n"
+    )
+    result = server.load_team("team_y")
+    assert result.get("disabled") is True
+    assert result.get("description") == "This is the real description."
+    assert "disabled" not in result.get("description", "").lower()

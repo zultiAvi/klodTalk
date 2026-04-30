@@ -114,3 +114,7 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
 - `claude-sonnet-4-20250514` — retiring June 15, 2026; use `sonnet` alias instead
 - `claude-opus-4-20250514` — retiring June 15, 2026; use `opus` alias instead
+
+## Disabling a team
+
+Add a line `disabled: true` anywhere in the team's `.md` file. Disabled teams are skipped by the server and do not appear in the client's team dropdown. Remove the line (or set `disabled: false`) to re-enable.

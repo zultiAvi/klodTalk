@@ -332,16 +332,38 @@ def load_team(team_name: str) -> dict:
             content = f.read()
         name = team_name
         description = ""
-        lines = content.splitlines()
-        for i, line in enumerate(lines):
+        disabled = False
+        description_found = False
+        # The `disabled:` flag may appear anywhere (even commented as
+        # `# disabled: true`), so we cannot stop at the first description.
+        for i, line in enumerate(content.splitlines()):
+            stripped = line.strip()
+            flag = stripped.lstrip("#").strip().lower()
+            if flag.startswith("disabled:"):
+                disabled = flag.split(":", 1)[1].strip() in ("true", "yes", "1")
+                continue
+            if flag == "disabled":
+                disabled = True
+                continue
             if line.startswith("# Team:"):
                 name = line.replace("# Team:", "").strip()
             elif line.startswith("# ") and i == 0:
                 name = line.lstrip("# ").strip()
-            if i > 0 and line.strip() and not line.startswith("#") and not line.startswith("---"):
-                description = line.strip()
-                break
-        return {"name": team_name, "display_name": name, "description": description}
+            if (
+                not description_found
+                and i > 0
+                and stripped
+                and not line.startswith("#")
+                and not line.startswith("---")
+            ):
+                description = stripped
+                description_found = True
+        return {
+            "name": team_name,
+            "display_name": name,
+            "description": description,
+            "disabled": disabled,
+        }
     except Exception as e:
         log.error("Failed to load team '%s': %s", team_name, e)
         return {}
@@ -356,7 +378,7 @@ def get_available_teams() -> list:
         if f.endswith(".md"):
             team_name = f[:-3]
             data = load_team(team_name)
-            if data:
+            if data and not data.get("disabled"):
                 teams.append({"name": data["name"], "description": data.get("description", "")})
     return teams
 
