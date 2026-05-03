@@ -2,6 +2,8 @@
 
 Five-role pipeline with execution and validation. The planner designs the approach, the coder implements it, the reviewer checks code quality, the executor runs everything, and the validator verifies the results.
 
+## disabled
+
 ## Members
 
 | Name | Role | Model |

@@ -231,3 +231,58 @@ class TestCopyGitTracked:
         assert (dst / "sub" / "nested.txt").is_file()
         assert _read(dst / "sub" / "nested.txt") == "nested content"
         assert progress.files_copied == 2  # tracked.txt + sub/nested.txt
+
+    def test_clones_submodules(self, tmp_path):
+        # 1. Build submodule_src/ as a tiny git repo with lib.txt
+        submodule_src = tmp_path / "submodule_src"
+        submodule_src.mkdir()
+        subprocess.run(["git", "init", str(submodule_src)], capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=str(submodule_src), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=str(submodule_src), capture_output=True)
+        (submodule_src / "lib.txt").write_text("library")
+        subprocess.run(["git", "add", "lib.txt"], cwd=str(submodule_src),
+                       capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(submodule_src),
+                       capture_output=True)
+
+        # 2. Build outer/ as a git repo with tracked.txt
+        outer = tmp_path / "outer"
+        outer.mkdir()
+        subprocess.run(["git", "init", str(outer)], capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=str(outer), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=str(outer), capture_output=True)
+        (outer / "tracked.txt").write_text("outer")
+        subprocess.run(["git", "add", "tracked.txt"], cwd=str(outer),
+                       capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(outer),
+                       capture_output=True)
+
+        # 3. Add the submodule via file:// URL (allow protocol.file).
+        try:
+            subprocess.run(
+                ["git", "-c", "protocol.file.allow=always", "submodule", "add",
+                 f"file://{submodule_src.resolve()}", "sub"],
+                cwd=str(outer),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+        except subprocess.CalledProcessError:
+            pytest.skip("file:// submodule add not allowed in sandbox")
+
+        subprocess.run(["git", "commit", "-m", "add submodule"],
+                       cwd=str(outer), capture_output=True)
+
+        # 5. Run copy_git_tracked.
+        dst = tmp_path / "dst"
+        progress = copy_git_tracked(str(outer), str(dst))
+
+        # 6. Assertions.
+        assert (dst / "sub" / "lib.txt").is_file()
+        assert _read(dst / "sub" / "lib.txt") == "library"
+        assert (dst / ".gitmodules").is_file()
+        assert progress.files_copied >= 2

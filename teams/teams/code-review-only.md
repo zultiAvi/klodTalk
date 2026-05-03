@@ -2,6 +2,8 @@
 
 Single-agent review team. Performs a thorough code review of the current branch without making any code changes. Produces a structured report suitable for PR review or code audit.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

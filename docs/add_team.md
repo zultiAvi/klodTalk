@@ -23,6 +23,8 @@ Create `teams/teams/my-team.md`:
 
 A description of what this team does.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |
@@ -114,3 +116,25 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
 - `claude-sonnet-4-20250514` — retiring June 15, 2026; use `sonnet` alias instead
 - `claude-opus-4-20250514` — retiring June 15, 2026; use `opus` alias instead
+
+## Enabling / disabling a team
+
+Every team `.md` file MUST contain exactly one of two H2 headings, placed between the team description and the `## Members` section:
+
+```markdown
+## enabled
+```
+
+or
+
+```markdown
+## disabled
+```
+
+The body under the heading is empty — the heading itself is the signal. The matching is exact (case-insensitive) on the trimmed line: only `## enabled` and `## disabled` are recognized.
+
+- `## enabled` — the team appears in the client's team dropdown.
+- `## disabled` — the server skips the team and it does not appear in the client's team dropdown.
+- **Missing heading** — the server logs a warning (`Team '<name>' missing mandatory '## enabled' or '## disabled' heading; treating as disabled`) and treats the team as disabled. Every team file must declare its state explicitly; there is no default.
+
+To toggle a team between enabled and disabled, edit the heading in the `.md` file. There is no separate flag line — only the H2 heading is recognized.

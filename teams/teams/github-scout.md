@@ -2,6 +2,8 @@
 
 Automated GitHub scouting team for the nightly routine. A scout searches GitHub for relevant repos and ideas, an evaluator ranks them, a coder implements the best ones, and a reviewer verifies.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |

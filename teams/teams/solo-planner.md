@@ -2,6 +2,8 @@
 
 Single-agent planning team. Analyzes a task and delivers a detailed plan to the user. No code execution.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model |

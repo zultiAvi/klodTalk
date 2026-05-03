@@ -2,6 +2,8 @@
 
 Combined nightly scouting team with a test-runner step. A website scout checks Claude/Anthropic official channels, a GitHub scout searches for community repos, an evaluator ranks all findings together, a coder implements the best ones, a test runner verifies tests pass, and a reviewer verifies quality.
 
+## enabled
+
 ## Members
 
 | Name | Role | Model | Optional |
