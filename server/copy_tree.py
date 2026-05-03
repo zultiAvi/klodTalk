@@ -202,7 +202,26 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
         shutil.rmtree(str(dst_git), ignore_errors=True)
         return copy_tree(src, dst)
 
-    # 3. Count restored files for progress reporting
+    # 2b. Initialize submodules (if any) so working trees are populated.
+    if (dst_path / ".gitmodules").is_file():
+        log.info("Initializing submodules in '%s'", dst)
+        try:
+            sub_result = subprocess.run(
+                ["git", "submodule", "update", "--init", "--recursive"],
+                cwd=str(dst_path),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if sub_result.returncode != 0:
+                log.warning(
+                    "git submodule update --init --recursive failed in '%s': %s",
+                    dst, sub_result.stderr.strip(),
+                )
+        except (FileNotFoundError, subprocess.SubprocessError) as exc:
+            log.warning("Failed to initialize submodules in '%s': %s", dst, exc)
+
+    # 3. Count restored files for progress reporting (outer + submodules)
     result = subprocess.run(
         ["git", "ls-files"],
         cwd=str(dst_path),
@@ -211,6 +230,22 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
         check=True,
     )
     tracked = [f for f in result.stdout.splitlines() if f]
+
+    # Append submodule files when present.
+    if (dst_path / ".gitmodules").is_file():
+        try:
+            sub_files = subprocess.run(
+                ["git", "submodule", "foreach", "--quiet", "--recursive",
+                 "git ls-files | sed \"s|^|$displaypath/|\""],
+                cwd=str(dst_path),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if sub_files.returncode == 0:
+                tracked.extend(f for f in sub_files.stdout.splitlines() if f)
+        except (FileNotFoundError, subprocess.SubprocessError) as exc:
+            log.warning("Failed to enumerate submodule files in '%s': %s", dst, exc)
 
     total_bytes = sum(
         (dst_path / f).stat().st_size
