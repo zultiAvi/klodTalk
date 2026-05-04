@@ -1,101 +1,53 @@
-Coder output -- 2026-05-04
-==========================
+Coder Output — Nightly Scout Top 3 Implementation
+===================================================
 
-Plan executed: /workspace/.klodTalk/team/current/plan.md
-Branch: KlodTalk_zulti_klod_talk_004
+## Idea 1: Planner Role — Parallel Sub-Task Decomposition
 
-Steps performed
----------------
+Enhanced `teams/roles/planner.md` with:
+- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
+- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
+- Dependency note guidance after numbered steps identifying parallelizable steps.
+- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
 
-Step 1 -- /workspace/server/copy_tree.py
-- Updated `copy_git_tracked()` signature to `(src, dst, extra_files=None) -> CopyProgress`.
-- Extended docstring to document `extra_files` semantics (gitignored files,
-  missing entries warn, absolute paths and `..` traversal rejected).
-- Commented out the submodule init block (was lines 205-222) under a
-  `DISABLED 2026-05-04` marker explaining why and how to re-enable.
-- Commented out the submodule file enumeration block (was lines 234-248) under
-  the same `DISABLED 2026-05-04` marker.
-- Inserted new "2c. Copy extra (often gitignored) files" block after the
-  (now-disabled) submodule init and before the file count step. The block:
-    - Skips empty / non-string entries with a warning.
-    - Skips absolute paths and `..` traversal with a warning.
-    - For files: makes parent dirs and `shutil.copy2`, counts size.
-    - For dirs: `shutil.copytree(..., dirs_exist_ok=True)`, walks rglob to
-      tally individual file count + bytes.
-    - Missing source: warning, non-fatal.
-    - Any exception: warning, non-fatal.
-- Updated final progress assignment to add `extra_count` and `extra_bytes`
-  to `files_copied` and `total_bytes`.
-- `os` and `Path` were already imported; `Optional` was already imported.
+Files modified: teams/roles/planner.md
 
-Step 2 -- /workspace/server/session_manager.py
-- Added module-level helper `_extract_extra_files(spec) -> list[str]` that:
-    - Returns `[]` for falsy spec.
-    - Returns clean `list[str]` (filtering out non-strings / empties) for lists.
-    - Logs a warning and returns `[]` for any other type.
-- `create_session()`:
-    - Reads `top_level_extras = _extract_extra_files(project_config.get("extra_files"))`.
-    - When `repos` is set: warns if both top-level and per-repo extras exist;
-      passes `repo.get("extra_files")` (extracted) per repo to `copy_git_tracked`.
-    - When no `repos`: passes `top_level_extras` to `copy_git_tracked`.
-- `create_system_session()`:
-    - Passes `_extract_extra_files(project_config.get("extra_files"))` to
-      `copy_git_tracked`. (System sessions are single-folder, no `repos`
-      iteration.)
+## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
 
-Step 3 -- /workspace/tests/test_copy_tree.py
-- Renamed `test_clones_submodules` -> `test_does_not_init_submodules`. The
-  setup is identical (still validates the .gitmodules path is restored), but
-  the assertion is inverted: the submodule's working tree must remain
-  unpopulated since init was disabled 2026-05-04. Replaces the old
-  `assert (dst / "sub" / "lib.txt").is_file()` with
-  `assert not (dst / "sub" / "lib.txt").exists()`.
-- Added `test_copy_git_tracked_extra_files`: creates a repo with `secret.env`
-  in `.gitignore`, writes the secret AFTER commit (so `git reset --hard`
-  would discard it), then verifies extra_files copies it. Also asserts
-  `progress.files_copied == 3` (`.gitignore` + `tracked.txt` + `secret.env`).
-- Added `test_copy_git_tracked_extra_files_missing_is_warning`: passes a
-  non-existent extra; asserts no exception and dst file absent.
-- Added `test_copy_git_tracked_extra_files_rejects_traversal`: passes
-  `["../etc/passwd", "/etc/passwd"]`; asserts no traversal occurs.
-- Added `test_copy_git_tracked_extra_dir`: gitignored `local_cfg/` directory
-  with two files; verifies recursive copy.
+Added to `.claude/settings.json`:
+- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
+- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
 
-Step 3.2 -- /workspace/tests/test_copy_tree_2.py
-- No changes required: file contains no submodule-dependent assertions.
+Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
 
-Step 4 -- /workspace/config/CLAUDE.md
-- Added an `extra_files` section between `allowed_external_paths` and `team`,
-  documenting both single-repo (top-level list) and multi-repo (per-repo
-  entry) usage with JSON examples. Notes the precedence rule: if both
-  top-level and `repos` are set, top-level is ignored with a warning. Notes
-  safety: missing entries are warnings; absolute paths and `..` rejected.
+Files modified: .claude/settings.json
+Files created: CLAUDE/skills/disable-skill-shell-exec.md
 
-Tests
------
-`pytest tests/test_copy_tree.py tests/test_copy_tree_2.py -x -q` -> 55 passed
-(0 failures, 0 skipped, only pre-existing pathspec deprecation warnings).
+## Idea 3: Rate Limit Adaptive Awareness
 
-Placeholder self-check
-----------------------
-Ran grep for TODO|FIXME|HACK|XXX|PLACEHOLDER over the modified production
-files (`server/copy_tree.py`, `server/session_manager.py`,
-`tests/test_copy_tree.py`) -- no matches. The DISABLED comment blocks in
-`copy_tree.py` are intentional preserved-but-disabled code, not placeholders;
-they are documented with a date and rationale per the plan.
+Created `server/utils/rate_limit_utils.py` with three functions:
+- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
+- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
+- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
 
-Deviations from plan
---------------------
-- Plan referenced "3 call sites" in `session_manager.py`. There are 2 call
-  sites textually, but `create_session` has an if/else that makes it 3
-  invocations of `copy_git_tracked` -- all updated as specified. No semantic
-  deviation.
-- Replaced em-dashes with `--` in log messages and the new docstring section
-  for ASCII consistency with the rest of the file.
+Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
 
-Files changed
--------------
-server/copy_tree.py
-server/session_manager.py
-tests/test_copy_tree.py
-config/CLAUDE.md
+Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+
+Files modified: .klodTalk/instincts.md
+Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
+
+## Deviations from Plan
+
+None. All changes match the evaluator's specification.
+
+## Source Attribution
+
+1. **Planner Role — Parallel Sub-Task Decomposition**
+   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
+   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
+
+2. **Agent Security Hardening — disableSkillShellExecution**
+   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
+
+3. **Rate Limit Adaptive Awareness**
+   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
