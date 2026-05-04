@@ -94,6 +94,29 @@ When `writable` is `true`, the path is mounted read-write (`rw`) in the containe
 
 When `results` is `true`, the path is designated as the project's **results folder** — the location where agents should save all output/result files (reports, generated assets, exports, etc.). A results entry is always mounted read-write regardless of the `writable` setting. Only one entry should be marked as results. Example: `{"path": "/home/avi/KlodTalk/out/designs", "writable": true, "results": true}`.
 
+`extra_files` (optional) — a list of paths (relative to the project's `folder`, or relative to a repo for multi-repo projects) to copy from the original folder into the session workspace after `git reset --hard` reconstructs tracked files. Use this for gitignored files you want every session to start with (e.g. `.env`, local config). Missing entries are logged as warnings and skipped — they are never fatal. Absolute paths and `..` traversal are rejected.
+
+**Single-repo:**
+```json
+{
+  "folder": "/home/me/proj",
+  "extra_files": [".env", "config/local.json"]
+}
+```
+
+**Multi-repo (place inside each `repos` entry):**
+```json
+{
+  "folder": "/home/me/proj",
+  "repos": [
+    {"path": "frontend", "extra_files": [".env.local"]},
+    {"path": "backend",  "extra_files": [".env"]}
+  ]
+}
+```
+
+If both top-level `extra_files` and `repos` are provided, the top-level value is ignored with a warning.
+
 `team` (optional) — references a file in `teams/teams/` by **basename without `.md`** (e.g. `"plan-code-review"` loads `teams/teams/plan-code-review.md`). When set, the multi-agent team pipeline is used instead of a single Claude invocation. Omit or set to `null` for direct mode. When `team` is set, `code_review` is redundant (the Reviewer is already part of the pipeline) and can be left `false`. Per-role model assignments live in the team definition, not in `projects.json`.
 
 Each workspace gets a `.klodTalk/` directory (gitignored automatically) containing `in_messages/`, `out_messages/`, `pr_messages/`, `history/`, and `team/` (team pipeline session files).

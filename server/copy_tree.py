@@ -156,7 +156,11 @@ def _copy_tree_recursive(
                 progress.record(entry.stat(follow_symlinks=False).st_size)
 
 
-def copy_git_tracked(src: str, dst: str) -> CopyProgress:
+def copy_git_tracked(
+    src: str,
+    dst: str,
+    extra_files: Optional[list[str]] = None,
+) -> CopyProgress:
     """Copy a git repo by copying ``.git/`` and reconstructing the working tree.
 
     Copies only the ``.git`` directory from *src* to *dst*, then runs
@@ -164,6 +168,16 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
     files with correct content, permissions, and symlinks.
 
     Falls back to ``copy_tree(src, dst)`` if *src* is not a git repository.
+
+    Args:
+        src: Source repository path.
+        dst: Destination path.
+        extra_files: Optional list of paths (relative to *src*) to copy
+            verbatim from the original folder after the working tree is
+            reconstructed. Useful for gitignored files that the user wants
+            present in the session (e.g. ``.env``, local config). Missing
+            entries are skipped with a warning. Absolute paths and ``..``
+            traversal are rejected.
 
     Returns:
         CopyProgress with the number of files restored and total bytes.
@@ -202,24 +216,60 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
         shutil.rmtree(str(dst_git), ignore_errors=True)
         return copy_tree(src, dst)
 
-    # 2b. Initialize submodules (if any) so working trees are populated.
-    if (dst_path / ".gitmodules").is_file():
-        log.info("Initializing submodules in '%s'", dst)
-        try:
-            sub_result = subprocess.run(
-                ["git", "submodule", "update", "--init", "--recursive"],
-                cwd=str(dst_path),
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if sub_result.returncode != 0:
-                log.warning(
-                    "git submodule update --init --recursive failed in '%s': %s",
-                    dst, sub_result.stderr.strip(),
-                )
-        except (FileNotFoundError, subprocess.SubprocessError) as exc:
-            log.warning("Failed to initialize submodules in '%s': %s", dst, exc)
+    # DISABLED 2026-05-04: submodules are intentionally NOT initialized during session
+    # copy (per user request -- submodules in repos cause friction). Block kept commented
+    # so it can be re-enabled by uncommenting if requirements change.
+    # # 2b. Initialize submodules (if any) so working trees are populated.
+    # if (dst_path / ".gitmodules").is_file():
+    #     log.info("Initializing submodules in '%s'", dst)
+    #     try:
+    #         sub_result = subprocess.run(
+    #             ["git", "submodule", "update", "--init", "--recursive"],
+    #             cwd=str(dst_path),
+    #             capture_output=True,
+    #             text=True,
+    #             check=False,
+    #         )
+    #         if sub_result.returncode != 0:
+    #             log.warning(
+    #                 "git submodule update --init --recursive failed in '%s': %s",
+    #                 dst, sub_result.stderr.strip(),
+    #             )
+    #     except (FileNotFoundError, subprocess.SubprocessError) as exc:
+    #         log.warning("Failed to initialize submodules in '%s': %s", dst, exc)
+
+    # 2c. Copy extra (often gitignored) files from src that the user wants in the session.
+    extra_count = 0
+    extra_bytes = 0
+    if extra_files:
+        for rel in extra_files:
+            if not isinstance(rel, str) or not rel:
+                log.warning("Skipping invalid extra_files entry: %r", rel)
+                continue
+            if os.path.isabs(rel) or ".." in Path(rel).parts:
+                log.warning("Skipping unsafe extra_files entry: %s", rel)
+                continue
+            src_file = src_path / rel
+            dst_file = dst_path / rel
+            try:
+                if src_file.is_file():
+                    dst_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(str(src_file), str(dst_file))
+                    size = src_file.stat().st_size
+                    extra_count += 1
+                    extra_bytes += size
+                    log.info("Copied extra file '%s' (%d bytes)", rel, size)
+                elif src_file.is_dir():
+                    shutil.copytree(str(src_file), str(dst_file), dirs_exist_ok=True)
+                    for sub in src_file.rglob("*"):
+                        if sub.is_file():
+                            extra_count += 1
+                            extra_bytes += sub.stat().st_size
+                    log.info("Copied extra dir '%s'", rel)
+                else:
+                    log.warning("extra_files entry not found, skipping: %s", src_file)
+            except Exception as exc:
+                log.warning("Failed to copy extra '%s': %s", rel, exc)
 
     # 3. Count restored files for progress reporting (outer + submodules)
     result = subprocess.run(
@@ -231,21 +281,24 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
     )
     tracked = [f for f in result.stdout.splitlines() if f]
 
-    # Append submodule files when present.
-    if (dst_path / ".gitmodules").is_file():
-        try:
-            sub_files = subprocess.run(
-                ["git", "submodule", "foreach", "--quiet", "--recursive",
-                 "git ls-files | sed \"s|^|$displaypath/|\""],
-                cwd=str(dst_path),
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if sub_files.returncode == 0:
-                tracked.extend(f for f in sub_files.stdout.splitlines() if f)
-        except (FileNotFoundError, subprocess.SubprocessError) as exc:
-            log.warning("Failed to enumerate submodule files in '%s': %s", dst, exc)
+    # DISABLED 2026-05-04: submodule file enumeration removed alongside submodule init
+    # (see 2b). With submodules no longer checked out, `git submodule foreach` would
+    # either no-op or error.
+    # # Append submodule files when present.
+    # if (dst_path / ".gitmodules").is_file():
+    #     try:
+    #         sub_files = subprocess.run(
+    #             ["git", "submodule", "foreach", "--quiet", "--recursive",
+    #              "git ls-files | sed \"s|^|$displaypath/|\""],
+    #             cwd=str(dst_path),
+    #             capture_output=True,
+    #             text=True,
+    #             check=False,
+    #         )
+    #         if sub_files.returncode == 0:
+    #             tracked.extend(f for f in sub_files.stdout.splitlines() if f)
+    #     except (FileNotFoundError, subprocess.SubprocessError) as exc:
+    #         log.warning("Failed to enumerate submodule files in '%s': %s", dst, exc)
 
     total_bytes = sum(
         (dst_path / f).stat().st_size
@@ -254,8 +307,8 @@ def copy_git_tracked(src: str, dst: str) -> CopyProgress:
     )
 
     progress = CopyProgress(total=len(tracked))
-    progress.files_copied = len(tracked)
-    progress.total_bytes = total_bytes
+    progress.files_copied = len(tracked) + extra_count
+    progress.total_bytes = total_bytes + extra_bytes
     progress.done()
     return progress
 

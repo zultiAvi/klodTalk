@@ -232,7 +232,12 @@ class TestCopyGitTracked:
         assert _read(dst / "sub" / "nested.txt") == "nested content"
         assert progress.files_copied == 2  # tracked.txt + sub/nested.txt
 
-    def test_clones_submodules(self, tmp_path):
+    def test_does_not_init_submodules(self, tmp_path):
+        """Submodule init was DISABLED 2026-05-04 per user request.
+
+        The submodule directory should remain unpopulated -- only the
+        ``.gitmodules`` file in the outer repo is restored.
+        """
         # 1. Build submodule_src/ as a tiny git repo with lib.txt
         submodule_src = tmp_path / "submodule_src"
         submodule_src.mkdir()
@@ -279,10 +284,85 @@ class TestCopyGitTracked:
 
         # 5. Run copy_git_tracked.
         dst = tmp_path / "dst"
-        progress = copy_git_tracked(str(outer), str(dst))
+        copy_git_tracked(str(outer), str(dst))
 
-        # 6. Assertions.
-        assert (dst / "sub" / "lib.txt").is_file()
-        assert _read(dst / "sub" / "lib.txt") == "library"
+        # 6. Assertions: .gitmodules is restored, but the submodule's
+        # working tree is NOT populated (init disabled 2026-05-04).
         assert (dst / ".gitmodules").is_file()
-        assert progress.files_copied >= 2
+        assert not (dst / "sub" / "lib.txt").exists()
+
+    def test_copy_git_tracked_extra_files(self, tmp_path):
+        """extra_files copies gitignored files from src into dst."""
+        src = tmp_path / "src"
+        dst = tmp_path / "dst"
+        src.mkdir()
+        subprocess.run(["git", "init", str(src)], capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=str(src), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=str(src), capture_output=True)
+        (src / ".gitignore").write_text("secret.env\n")
+        (src / "tracked.txt").write_text("tracked content")
+        subprocess.run(["git", "add", ".gitignore", "tracked.txt"],
+                       cwd=str(src), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"],
+                       cwd=str(src), capture_output=True)
+        # Write the gitignored file AFTER commit so `git reset --hard`
+        # would not restore it.
+        (src / "secret.env").write_text("API_KEY=abc123")
+
+        progress = copy_git_tracked(str(src), str(dst), extra_files=["secret.env"])
+
+        assert (dst / "tracked.txt").is_file()
+        assert (dst / "secret.env").is_file()
+        assert _read(dst / "secret.env") == "API_KEY=abc123"
+        # files_copied counts tracked + extras (.gitignore + tracked.txt + secret.env = 3)
+        assert progress.files_copied == 3
+
+    def test_copy_git_tracked_extra_files_missing_is_warning(self, git_repo, tmp_path):
+        """Missing extra_files entries are non-fatal warnings."""
+        dst = tmp_path / "dst"
+        # Should not raise
+        copy_git_tracked(str(git_repo), str(dst), extra_files=["nonexistent.env"])
+        assert (dst / "tracked.txt").is_file()
+        assert not (dst / "nonexistent.env").exists()
+
+    def test_copy_git_tracked_extra_files_rejects_traversal(self, git_repo, tmp_path):
+        """Absolute paths and ``..`` traversal in extra_files are rejected."""
+        dst = tmp_path / "dst"
+        copy_git_tracked(
+            str(git_repo), str(dst),
+            extra_files=["../etc/passwd", "/etc/passwd"],
+        )
+        # Tracked file still copied, traversal entries refused.
+        assert (dst / "tracked.txt").is_file()
+        assert not (dst / ".." / "etc" / "passwd").exists()
+        # /etc/passwd-style absolute is also skipped (we never write to it).
+        # We just verify dst doesn't gain an unexpected sibling.
+
+    def test_copy_git_tracked_extra_dir(self, tmp_path):
+        """A directory listed in extra_files is copied recursively."""
+        src = tmp_path / "src"
+        dst = tmp_path / "dst"
+        src.mkdir()
+        subprocess.run(["git", "init", str(src)], capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=str(src), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=str(src), capture_output=True)
+        (src / ".gitignore").write_text("local_cfg/\n")
+        (src / "tracked.txt").write_text("tracked")
+        subprocess.run(["git", "add", ".gitignore", "tracked.txt"],
+                       cwd=str(src), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"],
+                       cwd=str(src), capture_output=True)
+        # Build the gitignored directory AFTER commit
+        (src / "local_cfg").mkdir()
+        (src / "local_cfg" / "a.json").write_text("{\"a\": 1}")
+        (src / "local_cfg" / "b.json").write_text("{\"b\": 2}")
+
+        copy_git_tracked(str(src), str(dst), extra_files=["local_cfg"])
+
+        assert (dst / "local_cfg" / "a.json").is_file()
+        assert (dst / "local_cfg" / "b.json").is_file()
+        assert _read(dst / "local_cfg" / "a.json") == "{\"a\": 1}"
