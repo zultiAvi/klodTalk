@@ -48,6 +48,7 @@ keystore.properties
 # Runtime state (inside .klodTalk/state/, covered by .klodTalk/ pattern)
 # Legacy locations kept for safety
 .klodTalk/
+config/server_config.yaml
 
 # Runtime temp files
 /tmp/klodtalk/
