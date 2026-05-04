@@ -76,6 +76,16 @@ def sanitize_image_name(project_name: str) -> str:
     name = name.strip('_')
     return f"klodtalk_{name}"
 
+def _extract_extra_files(spec) -> list[str]:
+    """Return a clean list[str] of relative paths from a project config spec."""
+    if not spec:
+        return []
+    if isinstance(spec, list):
+        return [str(p) for p in spec if isinstance(p, str) and p]
+    log.warning("extra_files must be a list, got %r -- ignoring", type(spec).__name__)
+    return []
+
+
 def _normalize_external_paths(raw_list):
     """Normalize allowed_external_paths entries to [{"path": str, "writable": bool, "results": bool}, ...]."""
     result = []
@@ -210,17 +220,25 @@ class SessionManager:
         log.info("Creating session %s for project '%s' (branch=%s)", session_id, project_name, branch_name)
 
         repos = project_config.get("repos")
+        top_level_extras = _extract_extra_files(project_config.get("extra_files"))
 
         # 1. Copy workspace
         try:
             os.makedirs(temp_path, exist_ok=True)
             if repos:
+                if top_level_extras:
+                    log.warning(
+                        "project '%s' has both top-level extra_files and repos; "
+                        "top-level extra_files is ignored -- put them inside repos[i].extra_files",
+                        project_name,
+                    )
                 for repo in repos:
                     src = os.path.join(folder.rstrip('/'), repo["path"])
                     dst = os.path.join(temp_path, repo["path"])
-                    copy_git_tracked(src, dst)
+                    repo_extras = _extract_extra_files(repo.get("extra_files"))
+                    copy_git_tracked(src, dst, extra_files=repo_extras)
             else:
-                copy_git_tracked(folder, temp_path)
+                copy_git_tracked(folder, temp_path, extra_files=top_level_extras)
         except Exception as e:
             log.error("Failed to copy workspace: %s", e)
             return None
@@ -327,7 +345,8 @@ class SessionManager:
         # Create workspace directory and copy workspace
         os.makedirs(temp_path, exist_ok=True)
         try:
-            copy_git_tracked(folder, temp_path)
+            extras = _extract_extra_files(project_config.get("extra_files"))
+            copy_git_tracked(folder, temp_path, extra_files=extras)
         except Exception as e:
             log.error("Failed to copy workspace for system session: %s", e)
             return None
