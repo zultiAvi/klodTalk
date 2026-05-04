@@ -2,29 +2,31 @@
 skill_name: git-submodule-init-after-clone
 triggers:
   - Modifying `server/copy_tree.py` or any session-workspace copy logic
-  - Reproducing a git repo from a copied `.git/` directory
+  - Considering whether to (re-)enable submodule initialization in `copy_git_tracked`
   - Diagnosing empty submodule directories after a fresh checkout/copy
-summary: After `git reset --hard HEAD`, submodules are NOT auto-initialized; run `git submodule update --init --recursive` separately.
+summary: Submodule init in `copy_git_tracked` is INTENTIONALLY DISABLED (2026-05-04). Do not re-enable without owner sign-off; use `extra_files` for gitignored content.
 ---
 
-# Skill: Initialize Submodules After Repo Reconstruction
+# Skill: Submodule Init in copy_git_tracked is Disabled
 
 ## Quick Reference
-- `git reset --hard HEAD` restores `.gitmodules` but leaves submodule paths as empty gitlinks.
-- Run `git submodule update --init --recursive` after the reset to populate working trees.
-- Gate on `(dst_path / ".gitmodules").is_file()` to keep non-submodule repos a no-op.
-- Failure should be warning-only (`check=False`, log via `log.warning`), never abort the outer copy.
+- As of 2026-05-04, `copy_git_tracked` does NOT run `git submodule update --init --recursive`. Both the init block and the `git submodule foreach` enumeration block are commented out under `# DISABLED 2026-05-04:` markers in `server/copy_tree.py`.
+- Decision is owner-driven: submodules in repos cause friction during session creation. Empty submodule directories are an accepted side effect.
+- For gitignored files (e.g. `.env`, local configs) that the user wants in every session, use the `extra_files` config — see `extra-files-config.md`.
+- Test `tests/test_copy_tree.py:test_does_not_init_submodules` positively asserts the disabled behavior. Inverting it without an explicit user request is a regression.
 
 ## When to Use
-When writing or reviewing logic that reconstructs a git working tree from a copied `.git/` directory (e.g. `server/copy_tree.py:copy_git_tracked()`), or whenever a "session workspace looks empty" symptom points at submodules.
+When working on `copy_git_tracked` or surrounding session-copy logic, when reviewing PRs that touch the submodule blocks, or when a future request asks "why are submodules empty in my session" — the answer is intentional.
 
-## Pattern
+## How to Re-Enable (if a future request asks)
+
+Both blocks are preserved as comments in `server/copy_tree.py`. To re-enable, uncomment them and remove the `# DISABLED 2026-05-04:` headers. Then update `test_does_not_init_submodules` accordingly. Confirm with the project owner first — disabling was an explicit decision.
+
+## Original Pattern (kept for reference)
 
 ```python
-# After: subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=str(dst_path), check=True)
-
+# 2b. Initialize submodules (if any) so working trees are populated.
 if (dst_path / ".gitmodules").is_file():
-    log.info("Initializing submodules in '%s'", dst)
     try:
         sub_result = subprocess.run(
             ["git", "submodule", "update", "--init", "--recursive"],
@@ -37,32 +39,6 @@ if (dst_path / ".gitmodules").is_file():
         log.warning("Failed to initialize submodules in '%s': %s", dst, exc)
 ```
 
-## Counting submodule files
+## Counting submodule files (if re-enabled)
 
-`git ls-files` on the outer repo only lists the gitlink path (e.g. `sub`), not the submodule's tracked files. To include them in a progress count:
-
-```python
-sub_files = subprocess.run(
-    ["git", "submodule", "foreach", "--quiet", "--recursive",
-     'git ls-files | sed "s|^|$displaypath/|"'],
-    cwd=str(dst_path), capture_output=True, text=True, check=False,
-)
-```
-
-`$displaypath` is git's per-submodule-relative path inside `foreach`. The shell expansion is platform-sensitive — if portability matters, parse `.gitmodules` and run `git ls-files` per submodule directory in Python instead.
-
-## Testing pattern (file:// submodule)
-
-```python
-subprocess.run(
-    ["git", "-c", "protocol.file.allow=always", "submodule", "add",
-     f"file://{submodule_src}", "sub"],
-    cwd=str(outer), check=True,
-)
-```
-
-Wrap in `try/except subprocess.CalledProcessError` -> `pytest.skip(...)` because some sandboxed CI environments forbid `file://` submodules.
-
-## Why warning-only
-
-The outer-repo copy is independently useful even when submodule init fails (no network, bad URL, missing submodule remote). Aborting would regress the existing single-repo behavior.
+`git ls-files` on the outer repo only lists the gitlink path. Use `git submodule foreach --quiet --recursive 'git ls-files | sed "s|^|$displaypath/|"'` to enumerate submodule files. `$displaypath` is shell-expanded inside `foreach`; if portability matters, parse `.gitmodules` and run `git ls-files` per submodule directory in Python instead.
