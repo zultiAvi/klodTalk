@@ -532,7 +532,22 @@ class SessionManager:
         try:
             r = subprocess.run(["nvidia-smi"], capture_output=True)
             if r.returncode == 0:
-                gpu_args = ["--gpus", "all"]
+                # Prefer the legacy `nvidia` runtime when registered: on some
+                # hosts (cgroup-v2 + certain toolkit versions) `--gpus all`
+                # fails with "Failed to initialize NVML: Unknown Error" while
+                # `--runtime=nvidia` + NVIDIA_VISIBLE_DEVICES works.
+                info = subprocess.run(
+                    ["docker", "info", "--format", "{{json .Runtimes}}"],
+                    capture_output=True, text=True,
+                )
+                if info.returncode == 0 and '"nvidia"' in info.stdout:
+                    gpu_args = [
+                        "--runtime", "nvidia",
+                        "-e", "NVIDIA_VISIBLE_DEVICES=all",
+                        "-e", "NVIDIA_DRIVER_CAPABILITIES=all",
+                    ]
+                else:
+                    gpu_args = ["--gpus", "all"]
         except FileNotFoundError:
             pass
 

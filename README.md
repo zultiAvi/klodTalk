@@ -165,7 +165,7 @@ Teams are the heart of KlodTalk. Each team is a simple Markdown file that define
 
 | Team | What It Does |
 |------|-------------|
-| `plan-code-review` | The default. Planner → Coder → Reviewer, with optional execution and security review. |
+| `cross-modules` | The default. Planner → Coder → Reviewer, with optional execution and security review. |
 | `plan-code` | Fast path. Planner → Coder, no review. |
 | `plan-code-review-execute` | Full pipeline with execution and validation after review. |
 | `tdd` | Test-driven development — red, green, refactor. |

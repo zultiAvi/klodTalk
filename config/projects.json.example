@@ -5,7 +5,7 @@
     "description": "My first project",
     "folder": "/path/to/my/project",
     "base_branch": "main",
-    "team": "plan-code-review",
+    "team": "cross-modules",
     "docker_commit": true,
     "docker_socket": false,
     "allowed_external_paths": [

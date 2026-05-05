@@ -17,7 +17,7 @@ teams/
 ├── orchestrator.md          # Master orchestration instructions
 ├── run_claude_team.sh       # Entry point (shell -> Claude)
 ├── teams/                   # Team definitions (one per workflow)
-│   ├── plan-code-review.md  # Default: planner -> coder -> reviewer
+│   ├── cross-modules.md  # Default: planner -> coder -> reviewer
 │   ├── plan-code.md         # Fast: planner -> coder
 │   ├── tdd.md               # Test-driven development
 │   ├── unit-test.md         # Write unit tests
