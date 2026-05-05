@@ -325,12 +325,45 @@ class SessionManager:
         # Check if this system session already exists
         existing = self._sessions.get(session_id)
         if existing:
-            # Update users list to include any new users
-            for u in all_users:
-                if u not in existing.users:
-                    existing.users.append(u)
-            self.save_sessions()
-            return existing
+            # If the stored workspace_path is stale (missing, or rooted outside the
+            # currently-configured TEMP_BASE — e.g. an old /tmp/klodTalk path after
+            # the operator moved server.session_data_path in server_config.yaml),
+            # discard the stale record and rebuild the workspace under TEMP_BASE.
+            stored_path = existing.workspace_path or ""
+            expected_path = os.path.join(TEMP_BASE, session_id)
+            try:
+                stored_norm = os.path.normpath(stored_path) if stored_path else ""
+                temp_base_norm = os.path.normpath(TEMP_BASE)
+            except Exception:
+                stored_norm = stored_path
+                temp_base_norm = TEMP_BASE
+            stale = (
+                not stored_path
+                or not os.path.isdir(stored_path)
+                or os.path.dirname(stored_norm) != temp_base_norm
+            )
+            if not stale:
+                # Update users list to include any new users
+                for u in all_users:
+                    if u not in existing.users:
+                        existing.users.append(u)
+                self.save_sessions()
+                return existing
+            log.warning(
+                "System session '%s' has stale workspace_path=%r (TEMP_BASE=%r); "
+                "rebuilding under current session_data_path",
+                session_id, stored_path, TEMP_BASE,
+            )
+            # Try to stop any leftover container so a fresh one can be started below.
+            # stop_container does `docker rm -f` so the name is freed.
+            try:
+                docker = get_docker_utils()
+                if existing.container_name:
+                    docker.stop_container(existing.container_name)
+            except Exception as e:
+                log.debug("Cleanup of stale system container failed (non-fatal): %s", e)
+            # Drop the stale entry; the recreate path below will replace it.
+            self._sessions.pop(session_id, None)
 
         folder = project_config.get("folder", "")
         if not folder:
