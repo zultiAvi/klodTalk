@@ -115,7 +115,7 @@ def test_claude_team_script_at_correct_path():
 
 def test_team_md_files_exist():
     teams_dir = os.path.join(BASE_DIR, "teams", "teams")
-    expected = ["tdd.md", "plan-code-review.md", "plan-code.md"]
+    expected = ["tdd.md", "cross-modules.md", "plan-code.md"]
     for name in expected:
         path = os.path.join(teams_dir, name)
         assert os.path.isfile(path), (

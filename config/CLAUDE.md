@@ -76,7 +76,7 @@ routine:
       {"path": "/home/avi/docs/specs.pdf", "writable": false},
       "/home/avi/legacy"
     ],
-    "team": "plan-code-review",
+    "team": "cross-modules",
     "created": "<ISO timestamp>"
   }
 ]
@@ -117,13 +117,13 @@ When `results` is `true`, the path is designated as the project's **results fold
 
 If both top-level `extra_files` and `repos` are provided, the top-level value is ignored with a warning.
 
-`team` (optional) — references a file in `teams/teams/` by **basename without `.md`** (e.g. `"plan-code-review"` loads `teams/teams/plan-code-review.md`). When set, the multi-agent team pipeline is used instead of a single Claude invocation. Omit or set to `null` for direct mode. When `team` is set, `code_review` is redundant (the Reviewer is already part of the pipeline) and can be left `false`. Per-role model assignments live in the team definition, not in `projects.json`.
+`team` (optional) — references a file in `teams/teams/` by **basename without `.md`** (e.g. `"cross-modules"` loads `teams/teams/cross-modules.md`). When set, the multi-agent team pipeline is used instead of a single Claude invocation. Omit or set to `null` for direct mode. When `team` is set, `code_review` is redundant (the Reviewer is already part of the pipeline) and can be left `false`. Per-role model assignments live in the team definition, not in `projects.json`.
 
 Each workspace gets a `.klodTalk/` directory (gitignored automatically) containing `in_messages/`, `out_messages/`, `pr_messages/`, `history/`, and `team/` (team pipeline session files).
 
 ### Team definitions (`teams/teams/<name>.md`)
 
-Each team is a Markdown file. The filename stem is the team name (e.g. `plan-code-review.md` is team `plan-code-review`).
+Each team is a Markdown file. The filename stem is the team name (e.g. `cross-modules.md` is team `cross-modules`).
 
 Team `.md` files define members (name, role, model) in a Markdown table and the pipeline as an ordered list. The Claude orchestrator reads these directly. See `docs/add_team.md` for the format.
 
