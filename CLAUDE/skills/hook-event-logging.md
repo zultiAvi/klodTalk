@@ -13,6 +13,8 @@ summary: PostToolUse/PostToolUseFailure hooks log tool calls to JSONL; always ex
 - Hook script: `server/utils/hooks/post_tool_use_logger.sh`
 - Registration: `.claude/settings.json` with `"matcher": ""`
 - Rule: hooks MUST exit 0 -- non-zero blocks Claude's tool pipeline
+- Logged JSONL fields: `timestamp`, `tool_name`, `duration_ms`, `file_path`, `exit_code`, `effort_level`
+- `effort_level` is sourced from `$CLAUDE_EFFORT` (available in hook env since Claude Code v2.1.133+); `null` on older CLIs or when not set
 
 ## When to Use
 When adding new Claude Code hooks, debugging hook behavior, or extending agent observability in KlodTalk.
@@ -55,3 +57,6 @@ Hook groups in `.claude/settings.json` MUST include `"matcher": ""`:
 2. Follow the exit-0 discipline from `post_tool_use_logger.sh`
 3. Register in `.claude/settings.json` with `"matcher": ""`
 4. For event-specific hooks, set matcher to the tool name (e.g., `"matcher": "Write"`)
+
+### Environment Variables in Hooks
+- `$CLAUDE_EFFORT` — current effort level for the agent invocation. Injected into all hook scripts since Claude Code v2.1.136 (source: https://github.com/anthropics/claude-code/releases/tag/v2.1.136). Capture defensively: `EFFORT="${CLAUDE_EFFORT:-}"` and emit as `null` when empty. Note: hook env is distinct from Bash-tool env — `CLAUDE_CODE_SESSION_ID` is NOT available here (see `session-id-in-bash-tools` skill).

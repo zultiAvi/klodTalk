@@ -15,6 +15,14 @@ disallowedTools:
 ---
 
 <!-- inherits: base.md -->
+<!--
+  Read-only hardening: see CLAUDE/skills/auto-mode-hard-deny.md
+  In addition to the `disallowedTools` frontmatter above, this role is a candidate
+  for `autoMode.hard_deny: true` in the operator-level .claude/settings.json of
+  the reviewer's agent container (defense-in-depth, settings-level lock).
+  The KlodTalk orchestrator does not yet parse a `settings:` frontmatter key, so
+  do NOT add `settings:` here until that support lands.
+-->
 
 # Code Reviewer Role
 
