@@ -225,11 +225,21 @@ echo "================================"
 
 CLAUDE_OUTPUT_FILE="${WORKSPACE}/.klodTalk/team/current/claude_orchestrator_output.json"
 CLAUDE_EXIT=0
+
+# Pass the prompt via stdin instead of as a command-line argument.
+# Inlining "${PROMPT}" as -p's value caused "Argument list too long" (E2BIG)
+# once the composed orchestrator prompt (orchestrator.md + team + roles + skills
+# + user request) grew past the kernel ARG_MAX limit (~2 MB on Linux).
+PROMPT_FILE=$(mktemp -t klodtalk_prompt.XXXXXX)
+trap 'rm -f "${PROMPT_FILE}"' EXIT
+printf '%s' "${PROMPT}" > "${PROMPT_FILE}"
+
 claude \
     --model "${CLAUDE_MODEL}" \
     --dangerously-skip-permissions \
     --output-format json \
-    -p "${PROMPT}" \
+    -p \
+    < "${PROMPT_FILE}" \
     > "${CLAUDE_OUTPUT_FILE}" || CLAUDE_EXIT=$?
 
 # ─────────────────────────────────────────────────────────────
