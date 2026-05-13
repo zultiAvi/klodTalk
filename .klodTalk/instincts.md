@@ -1,8 +1,7 @@
-- PostToolUse/PostToolUseFailure hooks must always exit 0 -- a non-zero exit blocks Claude's tool pipeline.
+- PostToolUse/PostToolUseFailure hooks must exit 0 -- non-zero blocks Claude's tool pipeline -- UNLESS the hook entry sets `continueOnBlock: true` (Claude Code v2.1.139+); see CLAUDE/skills/continue-on-block-hooks.md.
 - disallowedTools frontmatter is fully supported; Dockerfile.agent is pinned to @2.90.0 which exceeds the v2.1.119 threshold.
 - Hook group objects in .claude/settings.json require a `matcher` field (use empty string to match all); see server/run_agent.py for the canonical format.
 - The Anthropic Rate Limits API (GET /v1/rate_limits, requires x-api-key header) allows proactive throttling before 429s hit. Use server/utils/rate_limit_utils.py:query_rate_limit_headroom() before spawning agent batches in session_manager.py. Always handle the case where the API key is absent (OAuth sessions have no API key) -- fall back to reactive 429 handling.
 - disableSkillShellExecution=true in .claude/settings.json blocks inline shell execution in skill files; forceRemoteSettingsRefresh=true ensures long-lived containers always get the latest policy settings.
 - Claude Haiku 3 (claude-3-haiku-20240307) is RETIRED as of April 2026; Sonnet 4 / Opus 4 (*-20250514) retire June 15 2026 — audit team .md files and config/ for these IDs before that date.
 - Role YAML frontmatter currently only forwards `mcpServers` and `disallowedTools` to the agent runtime; other keys like `settings:` are silently ignored — verify orchestrator support before adding new frontmatter keys.
-- PostToolUse hooks must still exit 0 UNLESS the hook entry sets `continueOnBlock: true` (Claude Code v2.1.139+) to deliberately block and feed a reason back to Claude.
