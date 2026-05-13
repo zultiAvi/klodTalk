@@ -34,6 +34,7 @@ PostToolUse and PostToolUseFailure hooks log tool calls to JSONL for per-session
 3. Use `jq` for JSON parsing with a raw fallback if jq is unavailable
 4. Write to `/workspace/.klodTalk/team/current/hook_events.jsonl`
 5. Use `|| true` on every write operation
+6. **Exception — enforcement hooks**: hooks that intentionally block a tool call and return feedback to Claude should set `"continueOnBlock": true` on the hook entry (Claude Code v2.1.139+) and exit non-zero with a stderr reason. See `continue-on-block-hooks.md`. The exit-0 rule above still applies to all purely observational hooks.
 
 ### Registration Format
 Hook groups in `.claude/settings.json` MUST include `"matcher": ""`:
