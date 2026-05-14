@@ -1,3 +1,6 @@
-teams/roles/interactive_debugger.md
-teams/teams/interactive-debug.md
-server/server.py
+teams/roles/planner.md
+.claude/settings.json
+CLAUDE/skills/disable-skill-shell-exec.md
+.klodTalk/instincts.md
+server/utils/rate_limit_utils.py
+CLAUDE/skills/rate-limit-awareness.md
