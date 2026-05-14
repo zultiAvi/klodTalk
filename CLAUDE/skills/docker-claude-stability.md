@@ -50,5 +50,33 @@ To update the CLI version in containers:
 - Always test a new CLI version locally before pinning it in the Dockerfile
 - Per-project images (created via `docker commit`) inherit this env var from the base image
 
+### `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE` (v2.1.129+)
+Claude Code v2.1.129 introduced a second, complementary environment variable:
+`CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE`. Set it to `false` to instruct the CLI's
+package-manager-driven update path to skip auto-updating the installed npm package
+inside the container.
+
+- **Recommended value in Dockerfile.agent**: `ENV CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=false`
+- **Relationship to `DISABLE_UPDATES=1`**: keep both. `DISABLE_UPDATES=1` suppresses
+  the CLI's internal update checks; `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=false`
+  belt-and-braces the package-manager update path. Either alone may not cover all
+  update triggers across CLI versions.
+- **Build interaction**: the variable does not affect `npm install -g ...@X.Y.Z`
+  at image-build time -- it only governs runtime auto-update behavior inside the
+  running container.
+
+### `--plugin-url` Flag (v2.1.129+)
+The same release added a `--plugin-url` flag, allowing distribution of custom
+Claude Code plugins from a URL when invoking the CLI. If KlodTalk ever ships its
+own plugin (e.g., a KlodTalk-specific slash command), agent containers can load it
+via `claude --plugin-url <url>` instead of baking the plugin into the image.
+
+### Tracking Stable CLI Versions
+The `claude-agent-sdk-python` release cadence is a reliable proxy for stable
+Claude Code CLI versions: the SDK is pinned to a tested CLI version at each
+release, so its release notes are a good signal for when to bump the version
+pinned in `server/Dockerfile.agent`.
+
 ### Source
 Inspired by Claude Code CLI changelog (github.com/anthropics/claude-code, ~115,000 stars).
+- Claude Code v2.1.129 release notes (`CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE`, `--plugin-url`): https://github.com/anthropics/claude-code/releases/tag/v2.1.129
