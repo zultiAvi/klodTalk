@@ -1,53 +1,167 @@
-Coder Output — Nightly Scout Top 3 Implementation
-===================================================
+Interactive-debug team implementation (Option A1 — reuse debugger broadcast role and BTW button).
 
-## Idea 1: Planner Role — Parallel Sub-Task Decomposition
+## What was changed and why
 
-Enhanced `teams/roles/planner.md` with:
-- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
-- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
-- Dependency note guidance after numbered steps identifying parallelizable steps.
-- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
+Implemented all three changes called out in plan.md:
 
-Files modified: teams/roles/planner.md
+1. Created `teams/roles/interactive_debugger.md` — new long-running role that
+   investigates a reported issue and pauses at logical checkpoints, writing
+   `## Team: interactive-debug (claude)` + `## Debug Pause — Checkpoint <N>`
+   payloads atomically (`.tmp` + rename) to
+   `/workspace/.klodTalk/out_messages/debugger_message.txt`, then polls
+   `/workspace/.klodTalk/in_messages/debug_reply.txt` every ~500 ms with a
+   1800 s hard cap. Reserved replies are `continue` (advance) and `exit`
+   (finalize); anything else is a free-form follow-up. The role refuses to
+   modify source unless the user reply contains `fix it`, `apply`, or
+   `make the change`. YAML frontmatter declares the filesystem MCP server
+   pointed at `/workspace` (same pattern as `coder.md`). The file inherits
+   the base conventions via `<!-- inherits: base.md -->` and includes the
+   required malware-policy reminder.
 
-## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
+2. Created `teams/teams/interactive-debug.md` — team definition with title,
+   one-line description, `## enabled` H2 heading (per the team-disable-flag
+   skill), a `## Members` table with the single `interactive_debugger` member
+   on model `opus`, a single-step long-running `## Pipeline`, and a
+   `## Special Rules` block enumerating: no code edits without explicit
+   trigger phrase, pause only at meaningful checkpoints, channel files
+   restricted to `debugger_message.txt` (out) and `debug_reply.txt` (in),
+   reserved replies `continue`/`exit`, 4 KB caps on summary/evidence, 1800 s
+   timeout.
 
-Added to `.claude/settings.json`:
-- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
-- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
+3. Modified `server/server.py` `handle_btw` (around line 1457) to be
+   team-aware. After the existing "session must be running" check, the
+   handler now resolves the active team using the same precedence as
+   `trigger_session_agent` and `handle_new_session`
+   (`_session_team_override.get(session_id)` falling back to
+   `get_project_record(session.project_name).get("team")`). If the active
+   team is `interactive-debug`, the handler:
+     - logs the reply to `history_store` and `session_log` as
+       `user_debug_reply` with content prefix `[DebugReply]`,
+     - broadcasts the user's message to session users via
+       `_broadcast_to_session_users` with role=`user` and the
+       `[DebugReply] <content>` prefix (so the user sees their own reply in
+       the chat),
+     - atomically writes `content` to
+       `/workspace/.klodTalk/in_messages/debug_reply.txt` (`.tmp` + rename),
+     - sends an `ack` to the websocket and returns early — `_run_btw_agent`
+       is NOT spawned.
+   For all other team values, the original BTW behaviour is preserved
+   unchanged (the new branch is purely additive above the existing code).
 
-Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
+## Files created or modified
 
-Files modified: .claude/settings.json
-Files created: CLAUDE/skills/disable-skill-shell-exec.md
+- `teams/roles/interactive_debugger.md` (new) — interactive debug role.
+- `teams/teams/interactive-debug.md` (new) — interactive-debug team
+  definition.
+- `server/server.py` (modified) — team-aware BTW routing.
 
-## Idea 3: Rate Limit Adaptive Awareness
+## Decisions / deviations from the plan
 
-Created `server/utils/rate_limit_utils.py` with three functions:
-- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
-- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
-- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
+- None of substance. The plan said "Wrap the new branch above the existing
+  path so the old path is untouched on the non-debug branch" — done; the
+  existing BTW code path is byte-identical for the non-debug case.
+- For atomic write of the reply file, I create the parent directory first
+  (`os.makedirs(..., exist_ok=True)`), matching defensive-coding patterns
+  elsewhere in the file (e.g. `ensure_klodtalk_dir`).
+- On atomic-write failure, the handler logs and returns an error to the
+  websocket rather than silently swallowing the exception.
 
-Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
+## Verification performed
 
-Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
+- `python3 -m py_compile /workspace/server/server.py` -> OK.
+- `grep '^## enabled' teams/teams/interactive-debug.md` -> line 5 (present).
+- `yaml.safe_load` of the frontmatter block in
+  `teams/roles/interactive_debugger.md` -> valid (single `mcpServers` key).
+- No new TODO / FIXME / HACK / PLACEHOLDER / changeme / your-api-key-here
+  markers introduced.
+- No client / Android / run_agent / `_OUT_MESSAGE_EXCLUDED` changes (per
+  plan).
 
-Files modified: .klodTalk/instincts.md
-Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
+## Known limitations
 
-## Deviations from Plan
+- The debug payload broadcast to clients depends on the existing
+  `debugger_message.txt` -> client wiring; per the plan that wiring was
+  declared already-in-place and explicitly out of scope for this change.
+  If a future change needs to surface checkpoints in the web/Android
+  clients, a debugger broadcast block (similar to the coder/idea blocks)
+  would need to be added to `server.py` and the `TEAM_ROLES_SET` /
+  Android `TEAM_ROLES` lists — but that is outside this task's scope.
+- The role uses substring matching for the trigger phrases (`fix it`,
+  `apply`, `make the change`); a user could in principle hit these by
+  accident in a follow-up. The role's pause-after-change rule mitigates
+  this.
 
-None. All changes match the evaluator's specification.
+## Round 2 fixes
 
-## Source Attribution
+Addressed the reviewer's BLOCKER plus the two cheap WARNINGs and the two
+small SUGGESTIONs.
 
-1. **Planner Role — Parallel Sub-Task Decomposition**
-   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
-   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
+1. **BLOCKER — `debugger_message.txt` broadcast handler (server/server.py).**
+   Added a dedicated handler block in `watch_out_messages` immediately after
+   the `coder_message.txt` block (now around lines 1014-1045). The block
+   mirrors the `coder_message.txt` template exactly:
+     - builds the path via `os.path.join(message_folder, "debugger_message.txt")`,
+     - reads + `os.remove`s the file with try/except logging,
+     - resolves team via `_session_team_override.get(session_id, "")` with
+       fallback to `get_project_record(session.project_name).get("team", "")`,
+     - calls `history_store.append(session_id, workspace, "debugger", content,
+       model=_models.get("debugger", ""))`,
+     - calls `session_log.log_event(session_id, "debugger", content, model=...)`
+       inside a try/except,
+     - broadcasts via `_broadcast_to_session_users` with role `"debugger"` and
+       the same field shape as the coder block.
+   With this, the interactive-debugger checkpoint payloads now reach the user
+   end-to-end. The `debugger` role is already known to both clients
+   (`TEAM_ROLES_SET` in web, `TEAM_ROLES` in Android) so no client edits are
+   needed.
 
-2. **Agent Security Hardening — disableSkillShellExecution**
-   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
+2. **WARNING #1 — defensive try/except around team resolution in `handle_btw`.**
+   Wrapped the `get_project_record` + override-precedence block (server.py
+   ~lines 1479-1494) in `try/except`. On exception we log a warning and set
+   `active_team_name = None`, which routes the BTW message through the
+   original (non-debug) path. This bounds the blast radius of a misconfigured
+   project so it cannot break BTW for unrelated teams.
 
-3. **Rate Limit Adaptive Awareness**
-   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
+3. **WARNING #2 — document the intentional history role.**
+   Added a one-line comment above the `history_store.append(... "user" ...)`
+   call in the interactive-debug branch explaining that the role string is
+   deliberately `"user"` (with a `[DebugReply]` prefix) so the reply surfaces
+   in the natural user-message stream for clients and replay, while
+   `session_log.log_event` distinguishes it via the `"user_debug_reply"`
+   event type. Did NOT change the history role string (Option A, as the
+   reviewer requested).
+
+4. **SUGGESTION — `teams/roles/interactive_debugger.md` polling instructions.**
+   Replaced the ambiguous "`time.sleep(0.5)` in a Python loop, or `sleep 0.5`
+   in a bash loop" sentence with an explicit Bash tool example:
+   ```bash
+   while [ ! -s /workspace/.klodTalk/in_messages/debug_reply.txt ]; do sleep 0.5; done
+   ```
+   and tightened "delete it (or truncate it to empty)" to
+   "delete it (`rm /workspace/.klodTalk/in_messages/debug_reply.txt`)", as
+   requested.
+
+### WARNING explicitly NOT acted on
+- **QA test gap** — left as recommended follow-up. Adding
+  `tests/test_handle_btw_interactive_debug.py` (happy-path BTW debug reply,
+  atomic-write failure, team-resolution sub-cases, non-debug regression) is
+  the right next step, but per the review note it is a WARNING not a
+  BLOCKER, and the round-2 mandate is to keep the diff minimal. Tracking
+  this here so the next coder/QA pass can pick it up.
+
+### Verification
+- `python3 -m py_compile /workspace/server/server.py` -> OK.
+- `grep -n "debugger_message" /workspace/server/server.py` shows BOTH the
+  new handler block (lines ~1014-1045) AND the existing
+  `_OUT_MESSAGE_EXCLUDED` entry on line 69 — both present, as the reviewer
+  required.
+- No new TODO / FIXME / HACK / XXX / PLACEHOLDER markers introduced. The
+  comment added for WARNING #2 is documentary, not a stub marker.
+- No new empty bodies, stub returns, or commented-out blocks.
+
+### Files changed in round 2
+- `server/server.py` — new `debugger_message.txt` broadcast handler in
+  `watch_out_messages`; try/except around team resolution in `handle_btw`;
+  one-line comment documenting intentional `"user"` history role.
+- `teams/roles/interactive_debugger.md` — tightened polling instructions
+  (explicit bash snippet, explicit `rm` for the reply file).

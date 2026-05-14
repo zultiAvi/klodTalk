@@ -72,9 +72,12 @@ Increment `<N>` on every new checkpoint within the session (Checkpoint 1, Checkp
 
 After writing the checkpoint, poll `/workspace/.klodTalk/in_messages/debug_reply.txt`:
 
-- Sleep ~500 ms between polls (`time.sleep(0.5)` in a Python loop, or `sleep 0.5` in a bash loop).
-- Hard cap: **1800 seconds (30 minutes)**.
-- The instant the file exists and is non-empty, read its full contents, then delete it (or truncate it to empty) so the next pause starts clean.
+- Sleep ~500 ms between polls. Use the Bash tool to run a shell loop, e.g.:
+  ```bash
+  while [ ! -s /workspace/.klodTalk/in_messages/debug_reply.txt ]; do sleep 0.5; done
+  ```
+- Hard cap: **1800 seconds (30 minutes)**. Bound the loop accordingly (e.g. a counter or a `timeout 1800 bash -c '...'` wrapper).
+- The instant the file exists and is non-empty, read its full contents, then delete it (`rm /workspace/.klodTalk/in_messages/debug_reply.txt`) so the next pause starts clean.
 
 If the 30-minute cap is reached with no reply:
 1. Write a final `out_messages/out_message.txt` (atomic) starting with `## Team: interactive-debug (claude)` followed by a brief summary explaining the timeout and what was learned up to that point.
