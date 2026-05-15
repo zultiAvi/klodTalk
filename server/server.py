@@ -1011,6 +1011,38 @@ async def watch_out_messages():
                             "team": _team_c,
                         })
 
+                # debugger_message
+                debugger_msg_path = os.path.join(message_folder, "debugger_message.txt")
+                if os.path.isfile(debugger_msg_path):
+                    try:
+                        content = open(debugger_msg_path).read()
+                        os.remove(debugger_msg_path)
+                    except Exception as e:
+                        log.error("Error reading debugger_message for session '%s': %s", session_id, e)
+                        content = None
+
+                    if content:
+                        _models = _session_team_models.get(session_id, {})
+                        _team_d = _session_team_override.get(session_id, "")
+                        if not _team_d:
+                            _p_d = get_project_record(session.project_name)
+                            _team_d = _p_d.get("team", "") if _p_d else ""
+                        history_store.append(session_id, workspace, "debugger", content, model=_models.get("debugger", ""))
+                        try:
+                            session_log.log_event(session_id, "debugger", content, model=_models.get("debugger", ""))
+                        except Exception:
+                            pass
+                        await _broadcast_to_session_users(session_id, {
+                            "type": "new_message",
+                            "session_id": session_id,
+                            "project": session.project_name,
+                            "role": "debugger",
+                            "content": content,
+                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "model": _models.get("debugger", ""),
+                            "team": _team_d,
+                        })
+
                 # idea_message
                 idea_path = os.path.join(message_folder, "idea_message.txt")
                 if os.path.isfile(idea_path):
@@ -1474,6 +1506,75 @@ async def handle_btw(ws, user_name: str, data: dict):
         return
     if session_id not in running_sessions:
         await ws.send(json.dumps({"type": "error", "message": "Session is not running"}))
+        return
+
+    # Resolve the active team for this session the same way handle_new_session /
+    # trigger_session_agent do (override takes precedence over the project's team).
+    # Wrapped in try/except so a misconfigured project cannot break BTW for all teams.
+    try:
+        _active_project = get_project_record(session.project_name)
+        active_team_name = _session_team_override.get(session_id) or (
+            _active_project.get("team") if _active_project else None
+        )
+    except Exception as e:
+        log.warning("BTW team resolution failed for session '%s': %s", session_id, e)
+        active_team_name = None
+
+    # Interactive-debug team: BTW button is repurposed as the debug reply
+    # channel. Do NOT spawn a parallel BTW agent — just hand the reply file
+    # to the running long-running debugger agent.
+    if active_team_name == "interactive-debug":
+        # Log to history and durable log.
+        # Intentional: history role is "user" (with a [DebugReply] prefix) so the
+        # reply appears in the natural user-message stream for clients/replay,
+        # while session_log distinguishes it via the "user_debug_reply" event type.
+        history_store.append(
+            session_id, session.workspace_path, "user", f"[DebugReply] {content}"
+        )
+        try:
+            session_log.log_event(
+                session_id, "user_debug_reply", content, extra={"user": user_name}
+            )
+        except Exception:
+            pass
+
+        # Broadcast the user's reply so it appears in their chat (like the
+        # normal BTW path does), but with a [DebugReply] prefix instead of [BTW].
+        await _broadcast_to_session_users(session_id, {
+            "type": "new_message",
+            "session_id": session_id,
+            "project": session.project_name,
+            "role": "user",
+            "content": f"[DebugReply] {content}",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+        # Atomic write of the reply file (.tmp + rename) so the agent never
+        # sees a partial payload.
+        reply_path = klodtalk_path(
+            session.workspace_path, "in_messages", "debug_reply.txt"
+        )
+        tmp_path = reply_path + ".tmp"
+        try:
+            os.makedirs(os.path.dirname(reply_path), exist_ok=True)
+            with open(tmp_path, "w") as f:
+                f.write(content)
+            os.rename(tmp_path, reply_path)
+        except Exception as e:
+            log.error(
+                "Failed to write debug_reply for session '%s': %s", session_id, e
+            )
+            await ws.send(json.dumps({
+                "type": "error",
+                "message": "Could not deliver debug reply",
+            }))
+            return
+
+        await ws.send(json.dumps({
+            "type": "ack",
+            "session_id": session_id,
+            "content": "Debug reply sent to agent.",
+        }))
         return
 
     # Log BTW message to history
