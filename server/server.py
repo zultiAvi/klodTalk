@@ -1382,6 +1382,7 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "users": session.users,
         "working": session.session_id in running_sessions,
         "system": getattr(session, 'system', False),
+        "comment": getattr(session, 'comment', ''),
     }
     if include_messages:
         # Prefer the durable per-session log when present — this is the
@@ -2044,6 +2045,50 @@ async def handle_add_user_to_session(ws, user_name: str, data: dict):
             }))
         except Exception:
             pass
+
+
+async def handle_set_session_comment(ws, user_name: str, data: dict):
+    """Set the free-text comment on a session.
+
+    Permission: caller must be in session.users (same model as messaging).
+    Broadcasts session_comment_updated to every connected user in session.users.
+    """
+    session_id = data.get("session_id", "")
+    comment = data.get("comment", "")
+    if not isinstance(comment, str):
+        comment = str(comment)
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Not authorized to edit this session"}))
+        return
+
+    session_manager.set_session_comment(session_id, comment)
+    new_comment = getattr(session, 'comment', '')
+
+    payload = json.dumps({
+        "type": "session_comment_updated",
+        "session_id": session_id,
+        "comment": new_comment,
+        "updated_by": user_name,
+    })
+
+    # Broadcast to every connected user in session.users (caller + collaborators).
+    for u in list(session.users):
+        target_ws = connected_clients.get(u)
+        if target_ws is None:
+            continue
+        try:
+            await target_ws.send(payload)
+        except Exception:
+            pass
+
+    log.info("User '%s' updated comment on session '%s' (%d chars)",
+             user_name, session_id, len(new_comment))
 
 
 async def handle_remove_user_from_session(ws, user_name: str, data: dict):
@@ -2930,6 +2975,9 @@ async def handle_client(websocket):
 
             elif msg_type == "remove_user_from_session":
                 await handle_remove_user_from_session(websocket, client_name, msg)
+
+            elif msg_type == "set_session_comment":
+                await handle_set_session_comment(websocket, client_name, msg)
 
             elif msg_type == "get_agent_logs":
                 await handle_get_agent_logs(websocket, client_name, msg)

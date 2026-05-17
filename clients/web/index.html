@@ -507,6 +507,24 @@
     font-size: 14px; padding: 0 2px; line-height: 1;
   }
   .user-chip .remove-user-btn:hover { color: var(--red); }
+  /* ── Session comment (sessions list + history header) ── */
+  .session-comment {
+    font-size: 12px; color: var(--text); font-style: italic;
+    margin: 2px 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0.85;
+  }
+  .history-comment-row {
+    margin-top: 4px; display: flex;
+  }
+  .history-comment-input {
+    flex: 1; padding: 4px 8px;
+    background: var(--surface2); color: var(--text);
+    border: 1px solid #444; border-radius: 6px;
+    font-size: 12px; font-style: italic;
+    outline: none;
+  }
+  .history-comment-input:focus { border-color: var(--green); }
   .add-user-row {
     display: inline-flex; gap: 6px; align-items: center;
   }
@@ -750,6 +768,12 @@
       <div class="history-status" id="history-status">—</div>
       <div class="history-times" id="history-times" style="display:none;">Created: <span id="ht-created">—</span> · Modified: <span id="ht-modified">—</span></div>
       <div class="history-tokens" id="history-tokens" style="display:none;">In: <b id="st-in">—</b> · Out: <b id="st-out">—</b> · <b id="st-cost">—</b></div>
+      <div class="history-comment-row">
+        <input type="text" id="history-comment-input" class="history-comment-input"
+               placeholder="Add a comment about this session…" maxlength="500"
+               onblur="saveSessionComment()"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" />
+      </div>
     </div>
     <button class="diff-btn" id="history-diff-btn" onclick="requestDiff()" title="Show Diff">Diff</button>
     <button class="diff-btn" id="history-logs-btn" onclick="requestAgentLogs()" title="Agent Logs">Logs</button>
@@ -1032,6 +1056,12 @@ function goToHistory(sessionId) {
     if (micBtn) micBtn.style.display = '';
   }
 
+  // Populate the comment input (without clobbering an in-progress edit)
+  const _commentEl = document.getElementById('history-comment-input');
+  if (_commentEl && document.activeElement !== _commentEl) {
+    _commentEl.value = (s.comment || '');
+  }
+
   // Mark as read
   if (unreadSessions.has(sessionId)) {
     unreadSessions.delete(sessionId);
@@ -1050,6 +1080,23 @@ function goToHistory(sessionId) {
   const _ta = document.getElementById('msg-input');
   _ta.value = '';
   autoResizeTextarea(_ta);
+}
+
+// ── Session comment ───────────────────────────────────────────────────────
+function saveSessionComment() {
+  if (!currentSessionId) return;
+  const el = document.getElementById('history-comment-input');
+  if (!el) return;
+  const val = el.value.trim();
+  const cur = (sessions[currentSessionId] && sessions[currentSessionId].comment) || '';
+  if (val === cur) return; // no-op
+  if (ws && isConnected) {
+    ws.send(JSON.stringify({
+      type: 'set_session_comment',
+      session_id: currentSessionId,
+      comment: val,
+    }));
+  }
 }
 
 // ── WSS hint ──────────────────────────────────────────────────────────────
@@ -1259,6 +1306,21 @@ function handleMessage(msg) {
           document.getElementById('history-close-btn').classList.remove('hidden');
           document.getElementById('history-reopen-btn').classList.add('hidden');
         }
+      }
+      break;
+
+    case 'session_comment_updated':
+      if (sessions[msg.session_id]) {
+        sessions[msg.session_id].comment = msg.comment || '';
+        if (currentSessionId === msg.session_id) {
+          const el = document.getElementById('history-comment-input');
+          // Only overwrite if the field is not currently focused (avoid clobbering local edit)
+          if (el && document.activeElement !== el) {
+            el.value = msg.comment || '';
+          }
+        }
+        saveState();
+        renderSessionsList();
       }
       break;
 
@@ -1587,6 +1649,9 @@ function renderSessionsList() {
     const usersLine = (!isSystem && s.users && s.users.length > 0)
       ? `<div class="session-users-line">${s.users.map(u => esc(u)).join(', ')}</div>`
       : '';
+    const commentLine = (s.comment && String(s.comment).trim())
+      ? `<div class="session-comment">${esc(s.comment)}</div>`
+      : '';
 
     const isClosed = s.status === 'closed';
     const closingClass = isClosing ? ' closing' : '';
@@ -1611,6 +1676,7 @@ function renderSessionsList() {
       <div class="session-info">
         <div class="${nameClass}">${displayName} ${unreadBadge}</div>
         ${usersLine}
+        ${commentLine}
         <div class="session-branch">${branchDisplay} · ${branchStatus}</div>
         ${preview ? `<div class="session-time">${esc(preview)}</div>` : `<div class="session-time">${created}</div>`}
         ${tokenLine}
