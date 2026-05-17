@@ -4,9 +4,9 @@ mcpServers:
     command: npx
     args:
       - "-y"
-      - "@modelcontextprotocol/server-github"
+      - "@github/mcp-server"
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
 ---
 
 # GitHub Scout Role

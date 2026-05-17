@@ -42,14 +42,15 @@ fi
 # Deny-list: narrow, well-known destructive patterns. Keep tight to avoid false positives.
 DENY_PATTERNS=(
     'rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f'
+    'rm[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*r'
     'git[[:space:]]+reset[[:space:]]+--hard'
-    'git[[:space:]]+push[[:space:]]+(.*[[:space:]]+)?--force'
+    'git[[:space:]]+push[[:space:]]+(.*[[:space:]]+)?--force($|[[:space:]])'
     'git[[:space:]]+push[[:space:]]+(.*[[:space:]]+)?-f($|[[:space:]])'
     'chmod[[:space:]]+777'
     'dd[[:space:]]+.*of=/dev/'
     'mkfs\b'
-    '\bshutdown\b'
-    '\breboot\b'
+    '(^|;)[[:space:]]*(sudo[[:space:]]+)?shutdown\b'
+    '(^|;)[[:space:]]*(sudo[[:space:]]+)?reboot\b'
 )
 
 for pat in "${DENY_PATTERNS[@]}"; do

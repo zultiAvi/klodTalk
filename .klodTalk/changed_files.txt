@@ -1,5 +1,7 @@
-teams/roles/github_scout.md
-CLAUDE/skills/github-mcp-scout.md
-CLAUDE/skills/three-tier-model-routing.md
 server/utils/hooks/pre_tool_use_guard.sh
 CLAUDE/skills/pre-tool-use-guard.md
+CLAUDE/skills/github-mcp-scout.md
+CLAUDE/skills/three-tier-model-routing.md
+teams/roles/github_scout.md
+.klodTalk/changed_files.txt
+.klodTalk/team/current/coder_output.txt
