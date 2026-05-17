@@ -22,4 +22,5 @@ object MsgType {
     const val SESSION_USER_ADDED = "session_user_added"
     const val SESSION_USER_REMOVED = "session_user_removed"
     const val SESSION_COMMENT_UPDATED = "session_comment_updated"
+    const val SUMMARIZE_MY_REQUESTS_RESULT = "summarize_my_requests_result"
 }

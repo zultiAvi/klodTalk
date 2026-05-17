@@ -1,6 +1,5 @@
-teams/roles/planner.md
-.claude/settings.json
-CLAUDE/skills/disable-skill-shell-exec.md
-.klodTalk/instincts.md
-server/utils/rate_limit_utils.py
-CLAUDE/skills/rate-limit-awareness.md
+server/prompts/summarize_my_requests.md
+server/server.py
+clients/web/index.html
+clients/android/KlodTalk/app/src/main/java/com/klodtalk/app/network/MsgType.kt
+clients/android/KlodTalk/app/src/main/java/com/klodtalk/app/network/WebSocketClient.kt

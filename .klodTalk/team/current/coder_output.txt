@@ -1,53 +1,88 @@
-Coder Output — Nightly Scout Top 3 Implementation
-===================================================
+Coder Output — "Summarize My Requests" button + server handler
+================================================================
 
-## Idea 1: Planner Role — Parallel Sub-Task Decomposition
+Implemented per /workspace/.klodTalk/team/current/plan.md.
 
-Enhanced `teams/roles/planner.md` with:
-- PARALLEL_GROUPS metadata field in plan_meta.txt spec, with encoding rules and examples.
-- Dependency Graph section: for COMPLEX tasks, each file is classified as "independent" or "depends on: [file(s)]".
-- Dependency note guidance after numbered steps identifying parallelizable steps.
-- Exit condition requirement: plans must end with a "DONE WHEN:" testable sentence.
+Summary
+-------
+Added a new direct WebSocket request/response (not a broadcast role): the user
+clicks "Summarize My Requests" on the session header; the server filters the
+session history to messages with role == "user" (owned by the session owner),
+runs Claude (prompt piped via stdin to avoid ARG_MAX), and returns the summary
+in a dedicated overlay panel on the web client. Android wires the message-type
+constant + send helper + a no-op receive branch for forward compatibility (no
+Android UI — matches existing Analyze convention).
 
-Files modified: teams/roles/planner.md
+Files touched
+-------------
+NEW   server/prompts/summarize_my_requests.md
+MOD   server/server.py
+        - Added module-level caches:
+            _session_user_summaries: dict[tuple[str, str], tuple[str, int]]
+            _session_user_summaries_running: set[tuple[str, str]]
+        - Added handle_summarize_my_requests(ws, user_name, data)
+            * validates session exists, user is a member, user IS session owner
+            * loads history (closed -> archive jsonl; open -> history_store)
+            * filters role == "user"; returns error if empty
+            * cache key = (session_id, user_name); cache hit returns cached=True
+            * if a run is in flight, returns status=running
+            * otherwise launches asyncio.create_task(_run_user_summary(...))
+        - Added _run_user_summary(...)
+            * loads prompt from server/prompts/summarize_my_requests.md
+            * builds history_text (truncated at 100_000 chars)
+            * invokes claude with -p "-" and input=full_prompt (stdin pipe —
+              follows skill claude-prompt-stdin-arg-max)
+            * parses JSON output -> result
+            * stores in cache, sends complete only to the requesting user via
+              connected_clients[user_name] (per-user, not broadcast)
+            * on exception sends status=error to the requesting user
+            * finally removes running flag
+        - Registered dispatcher in handle_client:
+            elif msg_type == "summarize_my_requests":
+                await handle_summarize_my_requests(websocket, client_name, msg)
 
-## Idea 2: Agent Security Hardening — disableSkillShellExecution Setting
+MOD   clients/web/index.html
+        - Added button: id="history-summarize-btn" labeled
+          "Summarize My Requests" next to the existing Analyze button.
+        - Added <div class="analysis-overlay hidden" id="summary-panel"> (re-uses
+          existing analysis-overlay CSS — no new CSS required).
+        - Added WebSocket dispatch case
+          'summarize_my_requests_result' -> showRequestsSummary(msg).
+        - Added JS functions:
+            requestSummarizeMyRequests(), showRequestsSummary(msg),
+            closeSummaryPanel().
 
-Added to `.claude/settings.json`:
-- `"disableSkillShellExecution": true` — blocks inline shell execution in skill .md files.
-- `"forceRemoteSettingsRefresh": true` — forces containers to re-fetch policy settings on startup.
+MOD   clients/android/.../network/MsgType.kt
+        - Added SUMMARIZE_MY_REQUESTS_RESULT = "summarize_my_requests_result".
 
-Created `CLAUDE/skills/disable-skill-shell-exec.md` documenting both settings, their purpose for KlodTalk's Docker-based agent architecture, override instructions for development, and relationship to disallowedTools frontmatter.
+MOD   clients/android/.../network/WebSocketClient.kt
+        - Added no-op receive branch for MsgType.SUMMARIZE_MY_REQUESTS_RESULT
+          (recognized so it does NOT trigger an "Unknown message type" warning).
+        - Added sendSummarizeMyRequests(sessionId) helper, modeled on
+          sendSetSessionComment.
 
-Files modified: .claude/settings.json
-Files created: CLAUDE/skills/disable-skill-shell-exec.md
+Verification
+------------
+- python3 -c "import ast; ast.parse(open('server/server.py').read())" -> OK.
+- Pre-commit self-scan for TODO/FIXME/HACK/XXX/PLACEHOLDER/NotImplementedError
+  on changed regions: none introduced.
+- No stub returns, no empty bodies, no placeholder strings, no commented-out
+  code blocks of 3+ lines.
 
-## Idea 3: Rate Limit Adaptive Awareness
+Deviations from plan
+--------------------
+None of substance. The plan offered two cache schemas (session_id key vs.
+(session_id, user_name) key); I implemented the per-(session, user) keying as
+recommended for correctness. The plan also offered two filter strategies
+(restrict to session owner, or add per-message author tracking); I implemented
+strategy (a) — owner-only — as the plan specified, returning a friendly error
+to non-owners ("Only the session owner can summarize their requests.").
 
-Created `server/utils/rate_limit_utils.py` with three functions:
-- `query_rate_limit_headroom(api_key)` — queries GET /v1/rate_limits, returns requests_remaining, tokens_remaining, reset_at, raw. Returns None if no API key or on failure.
-- `should_throttle(headroom, min_requests=5, min_tokens=10_000)` — returns True if headroom is below thresholds; False if headroom is None (no API key).
-- `wait_for_reset(headroom, max_wait_s=60)` — sleeps until reset_at or uses 5s exponential backoff fallback.
-
-Appended instinct to `.klodTalk/instincts.md` covering the Rate Limits API, the utility module, and the OAuth fallback caveat.
-
-Created `CLAUDE/skills/rate-limit-awareness.md` documenting the utility, key functions, integration point, recommended thresholds, and fallback behavior.
-
-Files modified: .klodTalk/instincts.md
-Files created: server/utils/rate_limit_utils.py, CLAUDE/skills/rate-limit-awareness.md
-
-## Deviations from Plan
-
-None. All changes match the evaluator's specification.
-
-## Source Attribution
-
-1. **Planner Role — Parallel Sub-Task Decomposition**
-   - wshobson/agents (GitHub, ~1,200 stars): https://github.com/wshobson/agents
-   - oh-my-claudecode (GitHub, ~450 stars): https://github.com/nicepkg/oh-my-claudecode
-
-2. **Agent Security Hardening — disableSkillShellExecution**
-   - Claude Code CLI v2.1.107+ changelog: https://docs.anthropic.com/en/release-notes/api
-
-3. **Rate Limit Adaptive Awareness**
-   - Anthropic Rate Limits API (April 2026): https://docs.anthropic.com/en/release-notes/api
+Follow-ups (not in scope)
+-------------------------
+- Android UI for displaying the summary (this PR only wires the message type
+  and send helper; HistoryScreen has no UI yet — matches Analyze convention).
+- Multi-author support would require extending history_store to record the
+  author of each user message; then the filter could become
+  m.get("role") == "user" AND m.get("author") == user_name and the
+  owner-only gate could be relaxed.

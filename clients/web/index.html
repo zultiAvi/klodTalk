@@ -779,6 +779,7 @@
     <button class="diff-btn" id="history-logs-btn" onclick="requestAgentLogs()" title="Agent Logs">Logs</button>
     <button class="diff-btn" id="history-tokens-btn" onclick="requestSessionTokens()" title="Token Breakdown">Tokens</button>
     <button class="diff-btn" id="history-analyze-btn" onclick="requestAnalyzeSession()" title="Analyze Session">Analyze</button>
+    <button class="diff-btn" id="history-summarize-btn" onclick="requestSummarizeMyRequests()" title="Summarize My Requests">Summarize My Requests</button>
     <button class="history-close-btn hidden" id="history-close-btn" onclick="promptCloseSession(currentSessionId)" title="Close session">✕</button>
     <button class="history-reopen-btn hidden" id="history-reopen-btn" onclick="reopenSession(currentSessionId)" title="Reopen session">↻</button>
   </div>
@@ -846,6 +847,14 @@
     <button class="analysis-close-btn" onclick="closeAnalysisPanel()">&#10005;</button>
   </div>
   <div class="analysis-content" id="analysis-panel-content"></div>
+</div>
+
+<div class="analysis-overlay hidden" id="summary-panel">
+  <div class="analysis-header">
+    <div class="analysis-header-title" id="summary-panel-title">My Requests Summary</div>
+    <button class="analysis-close-btn" onclick="closeSummaryPanel()">&#10005;</button>
+  </div>
+  <div class="analysis-content" id="summary-panel-content"></div>
 </div>
 
 <!-- Confirm close session dialog -->
@@ -1500,6 +1509,10 @@ function handleMessage(msg) {
 
     case 'session_analysis':
       showSessionAnalysis(msg);
+      break;
+
+    case 'summarize_my_requests_result':
+      showRequestsSummary(msg);
       break;
 
     case 'error':
@@ -3092,6 +3105,46 @@ function showSessionAnalysis(msg) {
 
 function closeAnalysisPanel() {
   document.getElementById('analysis-panel').classList.add('hidden');
+}
+
+function requestSummarizeMyRequests() {
+  if (!currentSessionId || !ws) return;
+  var btn = document.getElementById('history-summarize-btn');
+  if (btn) { btn.textContent = 'Summarizing...'; btn.disabled = true; }
+  ws.send(JSON.stringify({ type: 'summarize_my_requests', session_id: currentSessionId }));
+}
+
+function showRequestsSummary(msg) {
+  var btn = document.getElementById('history-summarize-btn');
+  if (btn) { btn.textContent = 'Summarize My Requests'; btn.disabled = false; }
+
+  var panel = document.getElementById('summary-panel');
+  var content = document.getElementById('summary-panel-content');
+
+  if (msg.status === 'running') {
+    content.innerHTML = '<div class="analysis-loading">Summarizing your requests... This may take a moment.</div>';
+    panel.classList.remove('hidden');
+    if (btn) { btn.textContent = 'Summarizing...'; btn.disabled = true; }
+    return;
+  }
+  if (msg.status === 'error') {
+    content.innerHTML = '<div class="analysis-loading" style="color:var(--red);">'
+                      + escapeHtml(msg.message || 'Summary failed.') + '</div>';
+    panel.classList.remove('hidden');
+    return;
+  }
+
+  var html = '';
+  if (msg.cached) {
+    html += '<div class="analysis-cached-banner">(cached - no new requests since last summary)</div>';
+  }
+  html += '<div class="analysis-raw">' + escapeHtml(msg.summary || '') + '</div>';
+  content.innerHTML = html;
+  panel.classList.remove('hidden');
+}
+
+function closeSummaryPanel() {
+  document.getElementById('summary-panel').classList.add('hidden');
 }
 
 function escapeHtml(text) {

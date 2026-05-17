@@ -223,6 +223,10 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
                                 updatedBy = json.optString("updated_by", ""),
                             )
                         }
+                        MsgType.SUMMARIZE_MY_REQUESTS_RESULT -> {
+                            // No UI yet — handled in a follow-up. Recognised here to
+                            // avoid "Unknown message type" warnings.
+                        }
                         MsgType.RESPONSE -> {
                             // Legacy compat — treat as new_message with role=agent
                             listener.onNewMessage(
@@ -311,6 +315,10 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
 
     fun sendSetSessionComment(sessionId: String, comment: String): Boolean = send {
         put("type", "set_session_comment"); put("session_id", sessionId); put("comment", comment)
+    }
+
+    fun sendSummarizeMyRequests(sessionId: String): Boolean = send {
+        put("type", "summarize_my_requests"); put("session_id", sessionId)
     }
 
     fun disconnect() {
