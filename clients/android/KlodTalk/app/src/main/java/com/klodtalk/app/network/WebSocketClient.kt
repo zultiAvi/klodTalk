@@ -23,6 +23,7 @@ data class SessionInfo(
     val working: Boolean = false,
     val users: List<String> = emptyList(),
     val system: Boolean = false,
+    val comment: String = "",
 )
 
 data class HistoryMessage(
@@ -52,6 +53,7 @@ interface KlodTalkWebSocketListener {
     fun onSessionWorking(sessionId: String, working: Boolean)
     fun onSessionUserAdded(sessionId: String, targetUser: String, users: List<String>)
     fun onSessionUserRemoved(sessionId: String, targetUser: String, users: List<String>)
+    fun onSessionCommentUpdated(sessionId: String, comment: String, updatedBy: String)
     fun onDisconnected(authFailed: Boolean)
 }
 
@@ -214,6 +216,17 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
                                 users = parseStringArray(json.optJSONArray("users")),
                             )
                         }
+                        MsgType.SESSION_COMMENT_UPDATED -> {
+                            listener.onSessionCommentUpdated(
+                                sessionId = json.optString("session_id", ""),
+                                comment = json.optString("comment", ""),
+                                updatedBy = json.optString("updated_by", ""),
+                            )
+                        }
+                        MsgType.SUMMARIZE_MY_REQUESTS_RESULT -> {
+                            // No UI yet — handled in a follow-up. Recognised here to
+                            // avoid "Unknown message type" warnings.
+                        }
                         MsgType.RESPONSE -> {
                             // Legacy compat — treat as new_message with role=agent
                             listener.onNewMessage(
@@ -300,6 +313,14 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
         put("type", "remove_user_from_session"); put("session_id", sessionId); put("target_user", targetUser)
     }
 
+    fun sendSetSessionComment(sessionId: String, comment: String): Boolean = send {
+        put("type", "set_session_comment"); put("session_id", sessionId); put("comment", comment)
+    }
+
+    fun sendSummarizeMyRequests(sessionId: String): Boolean = send {
+        put("type", "summarize_my_requests"); put("session_id", sessionId)
+    }
+
     fun disconnect() {
         webSocket?.close(1000, "Client disconnected")
         webSocket = null
@@ -330,6 +351,7 @@ class WebSocketClient(private val listener: KlodTalkWebSocketListener) {
         working = json.optBoolean("working", false),
         users = parseStringArray(json.optJSONArray("users")),
         system = json.optBoolean("system", false),
+        comment = json.optString("comment", ""),
     )
 
     private fun parseSessionArray(arr: JSONArray?): List<SessionInfo> {

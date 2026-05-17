@@ -27,6 +27,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
@@ -82,6 +85,18 @@ fun HistoryScreen(viewModel: MainViewModel) {
 
     var showCloseDialog by remember { mutableStateOf(false) }
     var showStopDialog by remember { mutableStateOf(false) }
+
+    // Editable comment state (header). Anti-clobber: don't overwrite while focused.
+    var commentDraft by remember(currentSessionId) {
+        mutableStateOf(session?.comment ?: "")
+    }
+    var commentFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(session?.comment, currentSessionId) {
+        val srv = session?.comment ?: ""
+        if (!commentFocused && srv != commentDraft) {
+            commentDraft = srv
+        }
+    }
 
     BackHandler(enabled = true) {
         viewModel.goToSessions()
@@ -144,6 +159,44 @@ fun HistoryScreen(viewModel: MainViewModel) {
                                     textAlign = TextAlign.Start
                                 )
                             }
+                            // Editable session comment row
+                            OutlinedTextField(
+                                value = commentDraft,
+                                onValueChange = { new ->
+                                    commentDraft = if (new.length > 500) new.take(500) else new
+                                },
+                                placeholder = {
+                                    Text(
+                                        text = "Add a comment about this session…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontStyle = FontStyle.Italic,
+                                    )
+                                },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.labelMedium.copy(fontStyle = FontStyle.Italic),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                keyboardActions = KeyboardActions(onDone = {
+                                    currentSessionId?.let { sid ->
+                                        viewModel.setSessionComment(sid, commentDraft.trim())
+                                    }
+                                }),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 2.dp)
+                                    .onFocusChanged { fs: FocusState ->
+                                        val wasFocused = commentFocused
+                                        commentFocused = fs.isFocused
+                                        if (wasFocused && !fs.isFocused) {
+                                            // Lost focus: persist
+                                            val sid = currentSessionId
+                                            val srv = session?.comment ?: ""
+                                            val trimmed = commentDraft.trim()
+                                            if (sid != null && trimmed != srv) {
+                                                viewModel.setSessionComment(sid, trimmed)
+                                            }
+                                        }
+                                    },
+                            )
                         }
                     }
                 },

@@ -1382,6 +1382,7 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "users": session.users,
         "working": session.session_id in running_sessions,
         "system": getattr(session, 'system', False),
+        "comment": getattr(session, 'comment', ''),
     }
     if include_messages:
         # Prefer the durable per-session log when present — this is the
@@ -2046,6 +2047,50 @@ async def handle_add_user_to_session(ws, user_name: str, data: dict):
             pass
 
 
+async def handle_set_session_comment(ws, user_name: str, data: dict):
+    """Set the free-text comment on a session.
+
+    Permission: caller must be in session.users (same model as messaging).
+    Broadcasts session_comment_updated to every connected user in session.users.
+    """
+    session_id = data.get("session_id", "")
+    comment = data.get("comment", "")
+    if not isinstance(comment, str):
+        comment = str(comment)
+
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Not authorized to edit this session"}))
+        return
+
+    session_manager.set_session_comment(session_id, comment)
+    new_comment = getattr(session, 'comment', '')
+
+    payload = json.dumps({
+        "type": "session_comment_updated",
+        "session_id": session_id,
+        "comment": new_comment,
+        "updated_by": user_name,
+    })
+
+    # Broadcast to every connected user in session.users (caller + collaborators).
+    for u in list(session.users):
+        target_ws = connected_clients.get(u)
+        if target_ws is None:
+            continue
+        try:
+            await target_ws.send(payload)
+        except Exception:
+            pass
+
+    log.info("User '%s' updated comment on session '%s' (%d chars)",
+             user_name, session_id, len(new_comment))
+
+
 async def handle_remove_user_from_session(ws, user_name: str, data: dict):
     """Remove a user from a session.
 
@@ -2562,6 +2607,170 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
         _session_analysis_running.discard(session_id)
 
 
+# (session_id, user_name) -> (summary text, user_message_count at time of summary)
+_session_user_summaries: dict[tuple[str, str], tuple[str, int]] = {}
+# (session_id, user_name) pairs with summary currently running
+_session_user_summaries_running: set[tuple[str, str]] = set()
+
+
+async def handle_summarize_my_requests(ws, user_name: str, data: dict):
+    """Summarize the requesting user's own messages in a session.
+
+    Filters session history to messages authored by `user_name` (role == "user")
+    and runs Claude to produce a summary. Agent responses are excluded.
+    """
+    session_id = data.get("session_id", "")
+    session = session_manager.get_session(session_id)
+    if not session:
+        await ws.send(json.dumps({"type": "error", "message": "Session not found"}))
+        return
+    if user_name not in session.users:
+        await ws.send(json.dumps({"type": "error", "message": "Forbidden"}))
+        return
+
+    # Load history (same closed-vs-open branching as handle_analyze_session)
+    if session.status == "closed":
+        archive = session_manager.get_archive_path(session)
+        archive_file = os.path.join(archive, "session.jsonl") if archive else ""
+        messages = []
+        if archive_file and os.path.isfile(archive_file):
+            with open(archive_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            messages.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            continue
+    else:
+        messages = history_store.read_session(session_id, session.workspace_path)
+
+    # Restrict to session owner (history schema has no per-message author yet).
+    if user_name != session.user_name:
+        await ws.send(json.dumps({
+            "type": "summarize_my_requests_result",
+            "session_id": session_id,
+            "status": "error",
+            "message": "Only the session owner can summarize their requests.",
+        }))
+        return
+
+    user_msgs = [m for m in messages if m.get("role") == "user"]
+    current_count = len(user_msgs)
+
+    cache_key = (session_id, user_name)
+
+    # Cache check
+    if cache_key in _session_user_summaries:
+        cached_text, cached_count = _session_user_summaries[cache_key]
+        if cached_count == current_count:
+            await ws.send(json.dumps({
+                "type": "summarize_my_requests_result",
+                "session_id": session_id,
+                "status": "complete",
+                "summary": cached_text,
+                "cached": True,
+            }))
+            return
+        else:
+            del _session_user_summaries[cache_key]
+
+    if cache_key in _session_user_summaries_running:
+        await ws.send(json.dumps({
+            "type": "summarize_my_requests_result",
+            "session_id": session_id,
+            "status": "running",
+        }))
+        return
+
+    if not user_msgs:
+        await ws.send(json.dumps({
+            "type": "summarize_my_requests_result",
+            "session_id": session_id,
+            "status": "error",
+            "message": "No user messages to summarize.",
+        }))
+        return
+
+    _session_user_summaries_running.add(cache_key)
+    await ws.send(json.dumps({
+        "type": "summarize_my_requests_result",
+        "session_id": session_id,
+        "status": "running",
+    }))
+    asyncio.create_task(_run_user_summary(session_id, user_name, user_msgs, current_count))
+
+
+async def _run_user_summary(session_id: str, user_name: str, user_msgs: list, msg_count: int):
+    """Run Claude to summarize the user's own messages."""
+    cache_key = (session_id, user_name)
+    try:
+        prompt_path = os.path.join(BASE_DIR, "server", "prompts", "summarize_my_requests.md")
+        with open(prompt_path) as f:
+            system_prompt = f.read()
+
+        history_text = ""
+        MAX_HISTORY_CHARS = 100_000
+        for i, msg in enumerate(user_msgs):
+            content = msg.get("content", "")
+            ts = msg.get("timestamp", "")
+            history_text += f"[{i}] ({ts})\n{content}\n\n"
+            if len(history_text) > MAX_HISTORY_CHARS:
+                history_text = history_text[:MAX_HISTORY_CHARS] + "\n\n[... truncated ...]"
+                break
+
+        full_prompt = f"{system_prompt}\n\n---\n\n## User Messages\n\n{history_text}"
+
+        loop = asyncio.get_running_loop()
+
+        def run_claude():
+            # Pipe the prompt via stdin to avoid ARG_MAX (~2 MB) on long histories.
+            result = subprocess.run(
+                [_CLAUDE_CMD, "--dangerously-skip-permissions",
+                 "--output-format", "json", "-p", "-", "--max-turns", "1"],
+                input=full_prompt,
+                capture_output=True, text=True, timeout=120,
+            )
+            return result.stdout.strip()
+
+        raw_output = await loop.run_in_executor(None, run_claude)
+        try:
+            output_data = json.loads(raw_output)
+            summary_text = output_data.get("result", raw_output)
+        except json.JSONDecodeError:
+            summary_text = raw_output
+
+        _session_user_summaries[cache_key] = (summary_text, msg_count)
+
+        # Send only to the requesting user (per-user content).
+        target_ws = connected_clients.get(user_name)
+        if target_ws:
+            try:
+                await target_ws.send(json.dumps({
+                    "type": "summarize_my_requests_result",
+                    "session_id": session_id,
+                    "status": "complete",
+                    "summary": summary_text,
+                }))
+            except Exception:
+                pass
+    except Exception as e:
+        log.error("User summary failed for session=%s user=%s: %s", session_id, user_name, e)
+        target_ws = connected_clients.get(user_name)
+        if target_ws:
+            try:
+                await target_ws.send(json.dumps({
+                    "type": "summarize_my_requests_result",
+                    "session_id": session_id,
+                    "status": "error",
+                    "message": str(e),
+                }))
+            except Exception:
+                pass
+    finally:
+        _session_user_summaries_running.discard(cache_key)
+
+
 MAX_DIFF_BYTES = 500_000  # 500 KB cap on diff output
 
 
@@ -2931,6 +3140,9 @@ async def handle_client(websocket):
             elif msg_type == "remove_user_from_session":
                 await handle_remove_user_from_session(websocket, client_name, msg)
 
+            elif msg_type == "set_session_comment":
+                await handle_set_session_comment(websocket, client_name, msg)
+
             elif msg_type == "get_agent_logs":
                 await handle_get_agent_logs(websocket, client_name, msg)
 
@@ -2942,6 +3154,9 @@ async def handle_client(websocket):
 
             elif msg_type == "analyze_session":
                 await handle_analyze_session(websocket, client_name, msg)
+
+            elif msg_type == "summarize_my_requests":
+                await handle_summarize_my_requests(websocket, client_name, msg)
 
             else:
                 log.warning("Unknown message type '%s' from %s", msg_type, remote[0])
