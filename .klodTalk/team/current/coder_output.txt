@@ -1,150 +1,127 @@
-Coder Output -- 2026-05-12
-Branch: system_nightly_github_check
+Coder Output -- 2026-05-17
+===========================
 
-## Summary
+## What Was Changed and Why
 
-Implemented all three top ideas from the evaluator's shortlist. Idea 3 required the
-documented fallback path because `settings:` is NOT a supported frontmatter key in
-the KlodTalk orchestrator today (verification details below).
+Implemented the top 3 ideas from evaluated_ideas.md:
 
----
+1. **GitHub MCP Server for the Scout Role** -- Replaced fragile WebSearch-based
+   GitHub discovery with the official authenticated MCP server. Added
+   `mcpServers.github` YAML frontmatter to `teams/roles/github_scout.md` (using
+   `npx -y @modelcontextprotocol/server-github`) and updated the role body to
+   prefer MCP tool calls over raw WebSearch. Documented the pattern in a new
+   skill `CLAUDE/skills/github-mcp-scout.md`. Operators must export
+   `GITHUB_PERSONAL_ACCESS_TOKEN` on the host for the env var to propagate into
+   the agent container.
 
-## Idea 1: $CLAUDE_EFFORT in PostToolUse Hook Logger
+2. **Three-Tier Model Routing Skill** -- New skill at
+   `CLAUDE/skills/three-tier-model-routing.md` encoding the Opus/Sonnet/Haiku
+   decision rule: Opus for committed output (Coder/Fixer), Sonnet for
+   reasoning-heavy non-write roles (Planner/Reviewer/Evaluator), Haiku for pure
+   I/O (Scout/Broadcaster). Includes anti-patterns and cost notes that link to
+   `model-version-hygiene.md` for active model IDs.
 
-What changed and why:
-- `server/utils/hooks/post_tool_use_logger.sh`: capture `EFFORT="${CLAUDE_EFFORT:-}"`
-  before the jq pipeline. Added `--arg effort` and an `effort_level` field to the
-  jq object, using `if . == "" then null else . end` so empty values are emitted as
-  JSON null (matches the existing convention for other optional fields).
-- Raw-fallback branch: added `"effort_level":"${EFFORT}"` to the emitted JSON. Also
-  guarded the inner `jq -Rs .` invocation with a fallback to `""` so the fallback
-  path stays robust if jq is partly unavailable.
-- Hook still exits 0 unconditionally; entire body is wrapped in `{ ... } 2>/dev/null`.
-- `CLAUDE/skills/hook-event-logging.md`: documented the new `effort_level` field
-  under Quick Reference, listed all emitted JSONL fields, and added an "Environment
-  Variables in Hooks" subsection covering `$CLAUDE_EFFORT` (Claude Code v2.1.136+)
-  and a cross-reference noting `$CLAUDE_CODE_SESSION_ID` is NOT available in hooks.
+3. **PreToolUse Destructive-Command Blocker Hook** -- New script
+   `server/utils/hooks/pre_tool_use_guard.sh` (executable). Reads stdin JSON,
+   inspects `tool_input.command` only when `tool_name == "Bash"`, and refuses a
+   narrow deny-list (`rm -rf`, `git reset --hard`, `git push --force|-f`,
+   `chmod 777`, `dd ... of=/dev/`, `mkfs`, `shutdown`, `reboot`) by exiting 2
+   with an actionable stderr message. Uses `jq` with a `grep`/`sed` raw
+   fallback (mirrors `post_tool_use_logger.sh`). Smoke-tested:
+   `rm -rf /workspace` blocked, `ls -la` allowed, `git push --force` blocked,
+   non-Bash tool calls passed through. Companion skill
+   `CLAUDE/skills/pre-tool-use-guard.md` documents the hook, the deny-list,
+   the `continueOnBlock: true` + `matcher: "Bash"` registration in
+   `.claude/settings.json`, and the instincts.md-line-7 caveat (role frontmatter
+   does NOT forward `hooks`, so registration is container-level only).
 
-Verification: smoke-tested the script with `CLAUDE_EFFORT=high` (logged
-`effort_level: "high"`) and with the variable unset (logged `effort_level: null`).
-Both invocations exited 0. The two test lines appended to hook_events.jsonl during
-verification were removed afterwards.
+## Files Created / Modified
 
-Files modified:
-- server/utils/hooks/post_tool_use_logger.sh
-- CLAUDE/skills/hook-event-logging.md
+- `teams/roles/github_scout.md` -- added MCP frontmatter; updated search strategy
+  bullet to prefer MCP tools over WebSearch.
+- `CLAUDE/skills/github-mcp-scout.md` (new, ~33 lines) -- documents MCP scout
+  pattern, env-var requirement, caveats, fallback invocation.
+- `CLAUDE/skills/three-tier-model-routing.md` (new, ~36 lines) -- tier table,
+  decision table, anti-patterns, cost notes.
+- `server/utils/hooks/pre_tool_use_guard.sh` (new, executable) -- PreToolUse
+  hook with narrow deny-list and stderr feedback.
+- `CLAUDE/skills/pre-tool-use-guard.md` (new, ~44 lines) -- hook docs,
+  registration snippet, instincts.md caveat, extension guidance.
 
----
+## Deviations From Plan
 
-## Idea 2: New Skill -- CLAUDE_CODE_SESSION_ID in Bash-Tool Scripts
-
-What changed and why:
-- Created `CLAUDE/skills/session-id-in-bash-tools.md` documenting the
-  `CLAUDE_CODE_SESSION_ID` environment variable (Claude Code v2.1.132+) available
-  in Bash-tool subprocesses but NOT in hook scripts. Includes:
-  - Quick reference and the `${CLAUDE_CODE_SESSION_ID:-unknown}` default pattern.
-  - Usage examples for log tagging and temp-file isolation.
-  - Explicit scope note: hooks have a separate env (cross-link to
-    `hook-event-logging` skill / `$CLAUDE_EFFORT`).
-  - Companion variable `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1` with placement
-    guidance (container env, NOT Dockerfile.agent, since the Dockerfile is
-    restricted per `docker-claude-stability`).
-  - See-also cross-link to `session-data-path-propagation`.
-- Skill follows the established frontmatter format (`skill_name`, `triggers`,
-  `summary`) and stays close to the 50-line target.
-
-Files created:
-- CLAUDE/skills/session-id-in-bash-tools.md
-
----
-
-## Idea 3: autoMode.hard_deny for Read-Only Roles -- FALLBACK PATH TAKEN
-
-Verification performed (per operator instructions):
-1. `teams/CLAUDE.md` and `teams/roles/base.md`: NO mention of a `settings:`
-   frontmatter key.
-2. `server/run_agent.py` searched for `settings|frontmatter|mcpServers|disallowedTools|autoMode`:
-   the only `settings` matches are the runtime mutation of `.claude/settings.json`
-   to install hook configurations -- there is NO code that reads role-file
-   frontmatter and forwards a `settings:` block into `.claude/settings.json`.
-3. Grep for `autoMode|hard_deny` across the entire repo returned zero hits.
-4. The existing `mcp-frontmatter` skill explicitly documents that frontmatter is
-   "forward-looking -- not yet parsed natively by orchestrator." The same caveat
-   applies to any hypothetical `settings:` block.
-
-Conclusion: adding `settings: { autoMode: { hard_deny: true } }` to role frontmatter
-today would be a silent no-op. Per the operator's verification protocol, I took the
-fallback path.
-
-What changed and why:
-- Created `CLAUDE/skills/auto-mode-hard-deny.md` documenting:
-  - The setting key (`autoMode.hard_deny: true`) and its semantics.
-  - The verified-correct placement today: operator-level `.claude/settings.json`
-    for the relevant agent container (the same file mutated by
-    `server/run_agent.py`).
-  - The forward-looking role-frontmatter form for when orchestrator parsing lands.
-  - Layering guidance with `disallowedTools` (defense-in-depth).
-  - Explicit "do NOT apply" list (coder, planner, executor, etc.).
-- Added an HTML comment block (between the frontmatter and the heading) to both
-  `teams/roles/reviewer.md` and `teams/roles/qa_analyst.md` pointing at the new
-  skill and warning future editors NOT to add an unsupported `settings:` key until
-  orchestrator support lands. Existing frontmatter (`disallowedTools` and, for
-  reviewer, `mcpServers`) was left untouched.
-
-Files created:
-- CLAUDE/skills/auto-mode-hard-deny.md
-
-Files modified:
-- teams/roles/reviewer.md
-- teams/roles/qa_analyst.md
-
----
-
-## Deviations from the Plan
-
-- Idea 3 was implemented via the documented fallback (skill file + role comment
-  reference) rather than by adding `settings:` frontmatter, because verification
-  confirmed the orchestrator does not parse that key. The reviewer/qa_analyst role
-  comments make this explicit so a future editor does not add dead frontmatter.
-- In the raw-fallback branch of the hook script I additionally hardened the
-  `jq -Rs .` call with a fallback to `""`, since the existing line could emit
-  malformed JSON if jq failed mid-pipeline. Tiny correctness improvement adjacent
-  to Idea 1, not a separate feature.
-
-## Known Limitations / Follow-Up
-
-- `autoMode.hard_deny` is documented but not yet activated. Activation requires an
-  operator-level change to the agent container's `.claude/settings.json`, which is
-  the domain of `server/run_agent.py` (restricted in this nightly run). Flagged
-  for operator action.
-- `CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1` (companion variable mentioned in Idea 2)
-  similarly needs operator-level env injection -- already deferred as D1 in
-  evaluated_ideas.md.
-
-## Pre-Commit Self-Check
-
-Ran a regex scan for TODO/FIXME/HACK/XXX/PLACEHOLDER/example.com/changeme/
-your-api-key-here/lorem ipsum/password123 across all six changed/created files.
-No matches.
-
----
+None. All three Top Candidates implemented as specified. The MCP server
+invocation uses the canonical `@modelcontextprotocol/server-github` npm package
+(per the role brief's guidance for "most stable npm registry presence").
+`.claude/settings.json` was intentionally NOT modified -- the registration
+snippet is documented in the skill instead.
 
 ## Source Attribution
 
-- Idea 1 ($CLAUDE_EFFORT in PostToolUse hook):
-    Claude Code v2.1.136 release
-    https://github.com/anthropics/claude-code/releases/tag/v2.1.136
-    github.com/anthropics/claude-code (~82,000 stars)
+### Idea 1 -- GitHub MCP Server for the Scout Role
+- github/github-mcp-server -- https://github.com/github/github-mcp-server (stars: ~26,000)
 
-- Idea 2 (CLAUDE_CODE_SESSION_ID skill):
-    Claude Code v2.1.132 release
-    https://github.com/anthropics/claude-code/releases/tag/v2.1.132
-    github.com/anthropics/claude-code (~82,000 stars)
+### Idea 2 -- Three-Tier Model Routing Skill
+- wshobson/agents -- https://github.com/wshobson/agents (stars: ~35,500)
 
-- Idea 3 (autoMode.hard_deny skill + role pointers):
-    Claude Code v2.1.136 release
-    https://github.com/anthropics/claude-code/releases/tag/v2.1.136
-    github.com/anthropics/claude-code (~82,000 stars)
-    Pattern reinforced by rohitg00/awesome-claude-code-toolkit guard/lifecycle
-    hooks section
-    https://github.com/rohitg00/awesome-claude-code-toolkit (~1,500 stars)
+### Idea 3 -- PreToolUse Destructive-Command Blocker Hook
+- disler/claude-code-hooks-mastery -- https://github.com/disler/claude-code-hooks-mastery (stars: ~3,700)
+
+## Pre-commit Self-Check
+
+- `git status --short` inspected; pre-existing tracked .klodTalk/ drift
+  (`changed_files.txt`, `instincts.md`, `coder_output.txt`) noted -- only
+  `changed_files.txt` and `coder_output.txt` will be staged (they are this
+  role's outputs); `instincts.md` is NOT modified by this role and will not be
+  staged.
+- Staging uses explicit file paths only (no `-A`, no `.`), per
+  `selective-git-staging-nightly` skill.
+- Skill files scanned for TODO/FIXME/HACK/XXX/PLACEHOLDER markers -- none
+  present.
+- All skill files are under 50 lines as required.
+- Hook script confirmed executable (`chmod +x`).
+- Hook script smoke-tested on four representative inputs (block, allow, block,
+  non-Bash pass-through) -- all four behave correctly.
+
+## Review Request
+
+### Change Summary
+Three orthogonal additions: (1) wire the GitHub Scout role to the official
+GitHub MCP server, (2) document a three-tier model-routing policy, (3) provide
+a PreToolUse destructive-command blocker hook with companion skill. No
+restricted file is touched.
+
+### Files Modified
+- teams/roles/github_scout.md -- adds `mcpServers.github` frontmatter; updates
+  search-strategy bullet to prefer MCP over WebSearch.
+- CLAUDE/skills/github-mcp-scout.md -- new skill (under 50 lines).
+- CLAUDE/skills/three-tier-model-routing.md -- new skill (under 50 lines).
+- server/utils/hooks/pre_tool_use_guard.sh -- new executable hook script with
+  narrow deny-list.
+- CLAUDE/skills/pre-tool-use-guard.md -- new skill (under 50 lines) documenting
+  the hook and its `.claude/settings.json` registration.
+
+### Self-Assessed Risk Areas
+- Deny-list false positives: the regex patterns are intentionally narrow, but
+  worth reviewing whether any legitimate Coder workflow (e.g., a refactor that
+  runs `rm -rf node_modules`) would now be blocked. Mitigation: hook uses
+  `continueOnBlock: true`, so a block is recoverable feedback, not a session
+  kill.
+- MCP env-var propagation: the role frontmatter uses
+  `${GITHUB_PERSONAL_ACCESS_TOKEN}` expansion; per instincts.md line 7 only
+  `mcpServers` and `disallowedTools` are forwarded. Worth a Reviewer check that
+  the env section inside `mcpServers.github` is honoured by the current
+  orchestrator -- if not, the expansion needs to happen at container env level
+  via `server/run_agent.py` (out of scope here).
+- Skill-only changes (idea 2): no functional risk; the risk is that an
+  unreviewed audit step against the 20 existing teams was deferred (mentioned
+  as "secondary step" in evaluated_ideas.md). Listed here as scope, not bug.
+
+### Questions for Reviewer
+- Does the current orchestrator (`teams/run_claude_team.sh` / `run_agent.py`)
+  honour the `env:` sub-block under an `mcpServers.<name>` entry, or does
+  `GITHUB_PERSONAL_ACCESS_TOKEN` need to be exported at the docker-run level
+  instead?
+- Is the deny-list regex for `rm -rf` (`rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f`)
+  acceptably narrow, or should we restrict it further (e.g., require an
+  absolute-path argument) to avoid blocking benign `rm -rf build/`?

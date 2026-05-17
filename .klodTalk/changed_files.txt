@@ -1,6 +1,5 @@
-server/utils/hooks/post_tool_use_logger.sh
-CLAUDE/skills/hook-event-logging.md
-CLAUDE/skills/session-id-in-bash-tools.md
-CLAUDE/skills/auto-mode-hard-deny.md
-teams/roles/reviewer.md
-teams/roles/qa_analyst.md
+teams/roles/github_scout.md
+CLAUDE/skills/github-mcp-scout.md
+CLAUDE/skills/three-tier-model-routing.md
+server/utils/hooks/pre_tool_use_guard.sh
+CLAUDE/skills/pre-tool-use-guard.md
