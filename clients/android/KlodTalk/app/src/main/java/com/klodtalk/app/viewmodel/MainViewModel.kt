@@ -289,6 +289,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
+        override fun onSessionCommentUpdated(sessionId: String, comment: String, updatedBy: String) {
+            mainHandler.post {
+                val existing = _sessions.value[sessionId] ?: return@post
+                _sessions.value = _sessions.value + (sessionId to existing.copy(comment = comment))
+            }
+        }
+
         override fun onDisconnected(authFailed: Boolean) {
             if (!authFailed) {
                 mainHandler.post { scheduleReconnect() }
@@ -422,6 +429,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeUserFromSession(sessionId: String, targetUser: String) {
         wsClient.sendRemoveUserFromSession(sessionId, targetUser)
+    }
+
+    fun setSessionComment(sessionId: String, comment: String) {
+        wsClient.sendSetSessionComment(sessionId, comment)
     }
 
     fun isSessionOwner(sessionId: String): Boolean {

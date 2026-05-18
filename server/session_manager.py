@@ -125,6 +125,7 @@ class Session:
     docker_socket: bool = True
     users: list = field(default_factory=list)
     system: bool = False  # True for system-managed sessions (non-closeable by users)
+    comment: str = ""  # free-text user comment shown on header & sessions list
 
 
 def _guess_role_from_prompt(prompt: str) -> str:
@@ -805,6 +806,25 @@ class SessionManager:
         if user_name not in session.users:
             session.users.append(user_name)
             self.save_sessions()
+        return True
+
+    def set_session_comment(self, session_id: str, comment: str) -> bool:
+        """Set the free-text comment on a session.
+
+        Defensively truncates to 2000 chars to keep sessions.json compact.
+        Returns True if the session exists and the comment was stored.
+        """
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+        if comment is None:
+            comment = ""
+        if not isinstance(comment, str):
+            comment = str(comment)
+        if len(comment) > 2000:
+            comment = comment[:2000]
+        session.comment = comment
+        self.save_sessions()
         return True
 
     def remove_user_from_session(self, session_id: str, user_name: str) -> bool:
