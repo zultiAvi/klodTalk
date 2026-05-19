@@ -5,3 +5,9 @@
 - disableSkillShellExecution=true in .claude/settings.json blocks inline shell execution in skill files; forceRemoteSettingsRefresh=true ensures long-lived containers always get the latest policy settings.
 - Claude Haiku 3 (claude-3-haiku-20240307) is RETIRED as of April 2026; Sonnet 4 / Opus 4 (*-20250514) retire June 15 2026 — audit team .md files and config/ for these IDs before that date.
 - Role YAML frontmatter currently only forwards `mcpServers` and `disallowedTools` to the agent runtime; other keys like `settings:` are silently ignored — verify orchestrator support before adding new frontmatter keys.
+- Nightly Coder roles: run `git status` before `git add` — tracked files under gitignored `.klodTalk/` silently sweep prior working-tree drift into commits.
+- Hook deny-list regex must be flag-order agnostic — `rm -rf` and `rm -fr` are equivalent; one pattern per ordering, or use alternation.
+- Skill frontmatter `summary:` values containing `key: value` substrings (even inside backticks) break YAML parsing — always quote summary strings with embedded colons.
+- Prefer `@github/mcp-server` over deprecated `@modelcontextprotocol/server-github`; env var is `GITHUB_TOKEN` (not `GITHUB_PERSONAL_ACCESS_TOKEN`).
+- Role-file edits that add a new required section MUST also update any embedded output-format code blocks earlier in the file — readers skim the template, not later sections.
+- `ANTHROPIC_WORKSPACE_ID` must be forwarded into Docker containers when the deployment uses workload identity federation (Claude Code v2.1.141+); omit it and federation requests are rejected silently. See CLAUDE/skills/terminal-sequence-hook-output.md.
