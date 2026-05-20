@@ -34,6 +34,18 @@ If the task is SIMPLE: `PARALLEL_GROUPS=[]`
 
 - **If SIMPLE**: Write `SIMPLE TASK: [one sentence description]`.
 - **If COMPLEX**: Write a structured plan with:
+
+  **1. Spec Block** (required for COMPLEX tasks — write this first, before implementation steps):
+  ```
+  GOAL: <one sentence restatement of the user's intent in your own words>
+  CONSTRAINTS:
+    MUST: <what the solution must do — list each>
+    MUST NOT: <what the solution must not do — list each, or "none">
+  UNKNOWNS: <any open questions that would block coding — list each, or "none">
+  ```
+  If any UNKNOWNS exist, stop here and write `SPEC_BLOCKED: <question>` as the only remaining content. Do not write implementation steps when blocked. The orchestrator will surface this to the user.
+
+  **2. Implementation Plan** (only when UNKNOWNS is "none"):
   - **Overview**: What needs to be built/changed and why.
   - **Files to modify or create**: List each file and what changes. For each file, note whether it is **independent** (can be modified in any order relative to other files) or **depends on: [other file(s)]** (must be done after those files are modified).
   - **Step-by-step implementation**: Numbered steps for the Coder.

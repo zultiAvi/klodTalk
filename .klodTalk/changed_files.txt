@@ -1,6 +1,6 @@
-teams/roles/planner.md
-.claude/settings.json
-CLAUDE/skills/disable-skill-shell-exec.md
+CLAUDE/skills/terminal-sequence-hook-output.md
+CLAUDE/skills/canary-phrase-guard.md
+server/utils/hooks/canary_phrase_guard.sh
+teams/roles/memory_curator.md
+teams/teams/memory-curator.md
 .klodTalk/instincts.md
-server/utils/rate_limit_utils.py
-CLAUDE/skills/rate-limit-awareness.md

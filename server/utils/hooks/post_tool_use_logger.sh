@@ -23,6 +23,10 @@
     # Ensure the log directory exists
     mkdir -p "${LOG_DIR}" 2>/dev/null || true
 
+    # Capture optional effort level from Claude Code env (available since v2.1.133+).
+    # Empty when running on older CLI versions or when no explicit effort was set.
+    EFFORT="${CLAUDE_EFFORT:-}"
+
     # Extract fields using jq if available, otherwise fall back to raw logging
     if command -v jq &>/dev/null && [ -n "${INPUT}" ]; then
         TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" 2>/dev/null)" || TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -31,7 +35,8 @@
         # This avoids shell-variable round-tripping that loses null vs "null" distinction
         LOG_ENTRY="$(echo "${INPUT}" | jq -c \
             --arg ts "${TIMESTAMP}" \
-            '{timestamp: $ts, tool_name: (.tool_name // "unknown"), duration_ms: (.duration_ms // null), file_path: (.file_path // null), exit_code: (.exit_code // null)}' 2>/dev/null)" || LOG_ENTRY=""
+            --arg effort "${EFFORT}" \
+            '{timestamp: $ts, tool_name: (.tool_name // "unknown"), duration_ms: (.duration_ms // null), file_path: (.file_path // null), exit_code: (.exit_code // null), effort_level: ($effort | if . == "" then null else . end)}' 2>/dev/null)" || LOG_ENTRY=""
 
         if [ -n "${LOG_ENTRY}" ]; then
             echo "${LOG_ENTRY}" >> "${LOG_FILE}" 2>/dev/null || true
@@ -39,7 +44,7 @@
     elif [ -n "${INPUT}" ]; then
         # Fallback: log the raw input with a timestamp prefix
         TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)" || TIMESTAMP="unknown"
-        echo "{\"timestamp\":\"${TIMESTAMP}\",\"raw\":true,\"data\":$(echo "${INPUT}" | head -c 4096 | jq -Rs .)}" >> "${LOG_FILE}" 2>/dev/null || true
+        echo "{\"timestamp\":\"${TIMESTAMP}\",\"raw\":true,\"effort_level\":\"${EFFORT}\",\"data\":$(echo "${INPUT}" | head -c 4096 | jq -Rs . 2>/dev/null || echo '""')}" >> "${LOG_FILE}" 2>/dev/null || true
     fi
     # If INPUT is empty, silently do nothing
 } 2>/dev/null

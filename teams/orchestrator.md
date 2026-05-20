@@ -57,6 +57,15 @@ Follow the pipeline defined in your team.md. For each step:
 4. **Log to history**: Record what happened (see Reporting).
 5. **Decide next step**: Follow the pipeline. For review loops, check if the reviewer approved or requested changes.
 
+### Inter-Stage Context: Summary-Only
+
+When passing prior-step output into the next sub-agent's prompt, **do not paste the full output file verbatim**. Write a compact summary instead.
+
+- Place the summary under a `## Prior Step Summary (<role>)` heading, **≤15 lines total**.
+- Use 3-5 bullets covering: what was done, key decisions, files changed, blockers if any.
+- The full verbatim output remains in `orchestrator_log.md` and on disk (e.g., `plan.md`, `coder_output.txt`, `reviewer_output.txt`) — sub-agents can read those files directly if they need exact prior context.
+- **Exception — review loop fix rounds**: when invoking the fix role (e.g., coder) after a reviewer flagged blockers, include **ALL `BLOCKER:` lines verbatim** so the fix-role agent receives the exact remediation list. Other reviewer content can still be summarized.
+
 ### Review Loops
 
 When a pipeline step has a review loop:
@@ -588,6 +597,8 @@ Note on ordering: Step 6/6.5 deliberately run **after** the coder's final commit
 ## Context Budget Awareness
 
 Long pipelines accumulate context. When context usage approaches ~80% capacity, Claude's output quality degrades silently — responses shorten, details are omitted, and instructions may be partially followed. Detect and mitigate this proactively.
+
+**Note**: Summary-only inter-stage passing (defined in Step 3 under "Inter-Stage Context: Summary-Only") is the **primary prevention layer** — it stops context blow-up before it starts. The CONTEXT PRESSURE WARNING block below is the **fallback** for when context is already strained despite summary-only passing.
 
 ### Heuristics for Detecting Context Pressure
 

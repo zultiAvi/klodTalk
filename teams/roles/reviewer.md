@@ -15,6 +15,14 @@ disallowedTools:
 ---
 
 <!-- inherits: base.md -->
+<!--
+  Read-only hardening: see CLAUDE/skills/auto-mode-hard-deny.md
+  In addition to the `disallowedTools` frontmatter above, this role is a candidate
+  for `autoMode.hard_deny: true` in the operator-level .claude/settings.json of
+  the reviewer's agent container (defense-in-depth, settings-level lock).
+  The KlodTalk orchestrator does not yet parse a `settings:` frontmatter key, so
+  do NOT add `settings:` here until that support lands.
+-->
 
 # Code Reviewer Role
 
@@ -85,3 +93,17 @@ SUGGESTION: file:line — description. Suggested fix: ...
 - Be specific: "Line 42 in auth.py: password is logged in plaintext" not "security issue exists".
 - Be constructive: explain *why* something is a problem and *how* to fix it.
 - Don't nitpick style unless it causes real confusion.
+- If `/workspace/.klodTalk/team/current/handoff.md` exists from the Coder, read it before inspecting changed files to understand the scope and key decisions. See `CLAUDE/skills/pipeline-handoff.md` for the format. If absent, follow the normal context flow.
+
+## Exit Condition Check
+
+Read the `DONE WHEN:` line from `plan.md`. Score the implementation against it on a 0-10 scale. In your reviewer output, add an `## Exit Condition Check` section after `## Verdict` containing:
+
+```
+EXIT_CONDITION_SCORE: <n>/10 — <one-sentence justification>
+```
+
+Rules:
+- If the score is **below 7**, treat it as a `BLOCKER` regardless of other findings, and write `REVIEW RESULT: CHANGES REQUIRED`.
+- If `plan.md` has no `DONE WHEN:` line, write `EXIT_CONDITION_SCORE: N/A` with a one-sentence reason.
+- See `CLAUDE/skills/reviewer-exit-condition-scoring.md` for the full rubric.

@@ -37,6 +37,10 @@ One file path per line (relative to `/workspace`), listing every file you create
 
 <!-- inherits: base.md -->
 
+## Guidelines
+
+If `/workspace/.klodTalk/team/current/handoff.md` exists from the Planner, read it first for a compact task summary before reading `plan.md` in full. The handoff file follows the convention in `CLAUDE/skills/pipeline-handoff.md` and is meant to let you skip re-reading accumulated BTW context. If the handoff file is absent, load context normally.
+
 ## When Fixing Review Issues
 
 When you receive code review remarks:
