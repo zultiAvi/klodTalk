@@ -1,125 +1,154 @@
-Coder Output -- 2026-05-19
-==========================
+# Coder Output -- Nightly Scout Top 3 Implementation
+Timestamp: 2026-05-25T07:39Z
+Branch: system_nightly_github_check
 
-Implemented the top 3 candidates from /workspace/.klodTalk/team/current/evaluated_ideas.md verbatim.
+## Summary
+Implemented all three top-ranked Nightly Scout ideas as scoped edits to role files,
+the orchestrator, and the CLAUDE/skills/ folder. No server/, Dockerfile.agent/,
+clients/, or auth-code touched. Two new skill files were created. Two existing
+skill files (disallowed-tools-frontmatter.md, auto-mode-hard-deny.md) are referenced
+from the role-file comments for defense-in-depth.
 
-## Idea 1: `terminal-sequence-hook-output` skill + instinct
+## Changes by Idea
 
-What and why:
-- Documented two distinct Claude Code v2.1.141 additions that were not yet captured in
-  KlodTalk's skill library or instinct list:
-  (a) the `terminalSequence` JSON field that hooks may emit to trigger terminal bells,
-      OSC window-title changes, or desktop-notification escape sequences -- the CLI (not
-      the agent) consumes the field, so it is safe to use from observational hooks
-      without changing the exit-0 discipline.
-  (b) the `ANTHROPIC_WORKSPACE_ID` env var, required for workload identity federation
-      deployments. KlodTalk's container env block currently does not forward it, which
-      would cause silent federation rejections under that auth mode.
+### Idea 1 -- disallowedTools Hardening
+Audit findings (which roles already had frontmatter vs. which were missing):
+- planner.md         -> MISSING -> added (MultiEdit, NotebookEdit only; see deviation)
+- super_planner.md   -> MISSING -> added (Bash, Edit, MultiEdit, NotebookEdit)
+- qa_analyst.md      -> ALREADY PRESENT (read-only block) -> no edit
+- validator.md       -> ALREADY PRESENT (read-only block) -> no edit
+- documenter.md      -> MISSING -> added (MultiEdit, NotebookEdit only; see deviation)
+- debugger.md        -> MISSING -> intentionally LEFT unrestricted (see deviation)
+- general.md         -> MISSING -> intentionally LEFT unrestricted per role conv.
+- reviewer.md        -> ALREADY PRESENT (read-only block) -> no edit
+- executor.md        -> ALREADY PRESENT per disallowed-tools-frontmatter.md table
 
-Files created/modified:
-- CLAUDE/skills/terminal-sequence-hook-output.md  (new skill, ~60 lines, three-tier format,
-  frontmatter summary double-quoted because it contains a colon)
-- .klodTalk/instincts.md  (appended one line about ANTHROPIC_WORKSPACE_ID forwarding,
-  cross-referencing the new skill)
+Each modified role file got an HTML comment block referencing
+CLAUDE/skills/disallowed-tools-frontmatter.md and CLAUDE/skills/auto-mode-hard-deny.md
+for defense-in-depth, as requested.
 
+#### Deviations from evaluated_ideas.md proposal
+1. **planner.md**: evaluator suggested blocking `Write/Edit/MultiEdit/NotebookEdit`,
+   but the Planner role MUST write `plan.md` and `plan_meta.txt`, and for SIMPLE
+   tasks it implements code directly (see planner.md "For SIMPLE tasks: Implement
+   directly"). Blocking Write/Edit would break both. Restriction narrowed to
+   `MultiEdit, NotebookEdit` only. Rationale documented in the role's comment block.
+2. **super_planner.md**: kept Write (needed for coder_output.txt) but blocked
+   Bash/Edit/MultiEdit/NotebookEdit -- this matches the role's "Do NOT Write Code"
+   contract and its "Do NOT commit" rule.
+3. **documenter.md**: evaluator suggested blocking Bash, but the Documenter role
+   explicitly performs a git commit step which requires Bash. Restriction narrowed
+   to `MultiEdit, NotebookEdit` only; the operator-level
+   `autoMode.hard_deny` (settings layer) remains the correct place for a stronger
+   lock. Rationale documented in the role's comment block.
+4. **debugger.md**: left unrestricted because the role legitimately needs Bash
+   (to run tests / reproduce), Write/Edit (to add temporary debug prints), and
+   only NotebookEdit could conceivably be blocked. Adding a frontmatter block
+   that only blocks NotebookEdit was judged not worth the file churn; deferred to
+   a future cycle if a notebook-relevant case emerges.
 
-## Idea 2: `canary-phrase-guard` skill + hook script
+### Idea 2 -- Multi-Agent Hook Observability
+- Created `CLAUDE/skills/multi-agent-hook-observability.md` (under 50 lines).
+- Added a `### Post-Pipeline Hook Event Summary` bullet to `teams/orchestrator.md`
+  between the "Final Summary" subsection and `## Step 5: Output Files`. The
+  addition does NOT renumber steps and is a single self-contained paragraph
+  that references the new skill.
 
-What and why:
-- Added a PostToolUse Write/Edit hook with `continueOnBlock: true` that detects
-  placeholder/stub code in tool input (raise NotImplementedError, # TODO:, pass  #
-  placeholder, FIXME:, XXX:, etc.) and exits non-zero with a stderr reason so Claude
-  receives the rejection and retries.
-- Capped at 3 consecutive blocks per file (counter file under /tmp/) to stay well
-  below the v2.1.143 Stop-hook 8-block termination limit. After the cap is reached
-  the hook logs a `canary_cap_reached` event to hook_events.jsonl and exits 0
-  (pass-through).
-- Follows the pre_tool_use_guard.sh style: jq with raw-fallback parsing, narrow regex
-  deny-list, exit 2 with a stderr reason on match.
-
-Files created:
-- CLAUDE/skills/canary-phrase-guard.md  (new skill, three-tier format, summary
-  double-quoted because it contains colons inside backticked phrases)
-- server/utils/hooks/canary_phrase_guard.sh  (new, executable, ~140 lines, bash -n
-  syntax-checked clean)
-
-
-## Idea 3: Memory-Curation team + role
-
-What and why:
-- Added a standalone "dreaming" memory-curation team that reads completed-session
-  artifacts (hook_events.jsonl, coder_output.txt, handoff.md, reviewer_output.txt,
-  evaluated_ideas.md) and recent git log, then proposes additions to instincts.md
-  and CLAUDE/skills/. The role writes Markdown only -- no executable code changes.
-- The team file uses `## disabled` as its team-disable marker so it does not appear
-  in default listings or get scheduled until explicitly toggled to `## enabled`.
-- Single-member, no-review-loop pipeline; sonnet model (reasoning-heavy but no code).
-
-Files created:
-- teams/roles/memory_curator.md  (new role, model: sonnet, Markdown-only writes)
-- teams/teams/memory-curator.md  (new team, single member, disabled by default)
-
+### Idea 3 -- Tool Search MCP (Beta) Token Reduction
+- Created `CLAUDE/skills/tool-search-mcp-token-reduction.md` (under 50 lines,
+  includes BETA CAVEAT block and the distinction between Tool Search and
+  Programmatic Tool Calling).
+- Added an `## Optimization` one-paragraph note referencing the new skill to
+  `teams/roles/github_scout.md` and `teams/roles/website_scout.md`.
 
 ## Source Attribution
 
-| # | Idea | Source | URL | Stars / Site |
-|---|------|--------|-----|--------------|
-| 1 | terminal-sequence-hook-output skill + ANTHROPIC_WORKSPACE_ID instinct | Claude Code v2.1.141 release notes | https://github.com/anthropics/claude-code/releases/tag/v2.1.141 | github.com/anthropics/claude-code (website scout finding #3) |
-| 2 | canary-phrase-guard skill + hook | mann1x/claude-hooks -- stop-phrase canary detection (quality regression detection by effort level) | https://github.com/mann1x/claude-hooks | 21 stars (github scout finding #8) |
-| 3 | Memory-Curation team + role | affaan-m/everything-claude-code -- continuous-learning skill (pattern extraction into reusable instincts) | https://github.com/affaan-m/everything-claude-code | 187k stars (github scout finding #7); cross-reinforced by Anthropic Managed Agents "dreaming" autonomous between-session memory curation |
+### Idea 1 -- disallowedTools Hardening
+- Source A: VoltAgent/awesome-claude-code-subagents
+  URL: https://github.com/VoltAgent/awesome-claude-code-subagents
+  Stars: unconfirmed at scout time, active VoltAgent org.
+- Source B: sangrokjung/claude-forge
+  URL: https://github.com/sangrokjung/claude-forge
+  Stars: active, recently updated May 2026.
 
+### Idea 2 -- Multi-Agent Hook Observability
+- Source A: disler/claude-code-hooks-multi-agent-observability
+  URL: https://github.com/disler/claude-code-hooks-multi-agent-observability
+  Stars: low (companion repo).
+- Source B: disler/claude-code-hooks-mastery
+  URL: https://github.com/disler/claude-code-hooks-mastery
+  Stars: ~3,000.
 
-## Deviations from the Plan
+### Idea 3 -- Tool Search MCP (Beta) Token Reduction
+- Source: Anthropic Platform Docs -- "Programmatic Tool Calling (GA) + Tool Search (Beta)"
+  URL: https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling
+  Site: docs.anthropic.com (platform.claude.com).
 
-None. All three ideas were implemented exactly as specified in evaluated_ideas.md:
-- Idea 1: skill file at the requested path + one-line instinct appended.
-- Idea 2: skill + executable hook script with the specified canary list, continueOnBlock,
-  exit-2-with-stderr behavior, and 3-block per-file cap with cap-reached logging.
-- Idea 3: role + team .md files, sonnet model, `## disabled` marker in the team file,
-  single-member pipeline with no review loop.
+## Pre-commit Self-Check (placeholder-guard)
+Scanned both new skill files and all role edits for TODO/FIXME/HACK/XXX/PLACEHOLDER/
+example.com/changeme/your-api-key-here/lorem ipsum/password123 -- no matches.
+No `pass`, `NotImplementedError`, or `...` stubs introduced (all edits are doc/MD).
+No commented-out code blocks of 3+ lines introduced (only HTML doc-comments
+explaining the rationale, which are intentional and load-bearing).
 
+## Follow-ups / Known Gaps
+1. The hook event summary step in orchestrator.md depends on the JSONL writer
+   (post_tool_use_logger.sh) being registered for every role's container. That
+   registration lives in `.claude/settings.json` which the orchestrator does NOT
+   touch directly -- it is installed by `server/run_agent.py`. No code change is
+   needed here (the hook is already registered), but if a future agent role is
+   spawned without that hook, the summary will silently be a no-op.
+2. The Tool Search beta header opt-in is documented but NOT yet wired into any
+   container env. Wiring it requires editing `server/run_agent.py`, which is
+   outside this task's allowed edit set. Tracked in the skill file's "Enabling"
+   section.
+3. The debugger.md and general.md roles intentionally received no frontmatter.
+   Revisit if a security review flags this as a gap.
 
-## Pre-commit Self-Check
-
-Scanned all created/modified files (excluding the canary skill/hook which legitimately
-contain canary phrases as data) for: TODO, FIXME, HACK, XXX, PLACEHOLDER markers;
-NotImplementedError; bare-pass stubs; placeholder URLs / credentials; commented-out
-code blocks.
-
-Result: clean. The matches that DO appear in CLAUDE/skills/canary-phrase-guard.md and
-server/utils/hooks/canary_phrase_guard.sh are intentional -- they are the regex deny-list
-and documentation examples for the canary guard itself.
-
-bash -n /workspace/server/utils/hooks/canary_phrase_guard.sh -> SYNTAX OK.
-
-Skill frontmatter YAML check: all three new skill files use double-quoted `summary:`
-strings because they contain `:` characters inside backticks (per the project instinct).
-
+---
 
 ## Review Request
 
 ### Change Summary
-Adds two new skills (`terminal-sequence-hook-output`, `canary-phrase-guard`), a new
-hook script (`canary_phrase_guard.sh`), a new team (`memory-curator`) and its single
-role (`memory_curator`), and appends one instinct about `ANTHROPIC_WORKSPACE_ID`. All
-changes are additive; no existing files are modified beyond the one-line instinct
-append.
+3 role files updated with `disallowedTools` frontmatter (planner, super_planner,
+documenter). 2 scout role files updated with an Optimization note. orchestrator.md
+received a single new subsection under Step 4 (no renumbering). 2 new skill files
+added under CLAUDE/skills/.
 
 ### Files Modified
-- CLAUDE/skills/terminal-sequence-hook-output.md -- new skill documenting v2.1.141 `terminalSequence` hook field and `ANTHROPIC_WORKSPACE_ID` env var.
-- CLAUDE/skills/canary-phrase-guard.md -- new skill describing the PostToolUse canary-phrase guard pattern.
-- server/utils/hooks/canary_phrase_guard.sh -- new executable hook script; jq + raw fallback; exit-2-with-stderr on match; 3-block per-file cap.
-- teams/roles/memory_curator.md -- new role (sonnet, Markdown-only) for post-pipeline memory curation.
-- teams/teams/memory-curator.md -- new single-member team, `## disabled` by default.
-- .klodTalk/instincts.md -- one appended line about `ANTHROPIC_WORKSPACE_ID` forwarding.
+- teams/roles/planner.md
+- teams/roles/super_planner.md
+- teams/roles/documenter.md
+- teams/roles/github_scout.md
+- teams/roles/website_scout.md
+- teams/orchestrator.md
+- CLAUDE/skills/multi-agent-hook-observability.md (new)
+- CLAUDE/skills/tool-search-mcp-token-reduction.md (new)
 
 ### Self-Assessed Risk Areas
-- Hook regex false positives (canary_phrase_guard.sh): the deny-list is intentionally narrow but could still trip on legitimate code that contains a literal `# TODO:` in a docstring or a code-quoting block. Mitigation in place: 3-block per-file cap with cap-reached logging so the session cannot deadlock. Worth verifying the regex list does not over-match common idioms.
-- Counter file lifecycle (`/tmp/canary_block_count_${SESSION_ID}_<hash>`): per-session, per-file; cleaned up implicitly when /tmp is rotated. No explicit deletion at session end. Acceptable for short-lived containers; flagged for the Reviewer.
-- YAML frontmatter parsing for the two new skills: both use double-quoted `summary:` strings because they contain colons. Spot-check the quoting renders correctly.
-- `## disabled` flag on memory-curator.md: matches the existing team-disable convention (heading-line marker). Should be detected by whatever team-listing logic reads team files; worth confirming the orchestrator's team-disable parser treats this exactly like other disabled teams.
-- The memory-curator role grants Markdown-only writes including to instincts.md. By design, the role can append instincts directly without a Reviewer step. Mitigation: team is `## disabled` by default and proposals are written to a separate report file first.
+- **planner.md frontmatter narrowing**: deviated from evaluated_ideas.md
+  (kept Write/Edit) to preserve the SIMPLE-task implementation path. If the
+  reviewer disagrees, the alternative is to split planner.md into planner.md
+  (text-only) and planner_simple.md (write-capable).
+- **documenter.md Bash retention**: similarly narrowed -- the role's own
+  "Git commit" step needs Bash. Reviewer should confirm this trade-off vs.
+  removing the commit step from the role definition.
+- **orchestrator.md hook summary step**: relies on
+  `.klodTalk/team/current/hook_events.jsonl` existing. The bullet says to
+  "skip silently if absent" -- but if the orchestrator can't read the file at
+  pipeline-end (e.g. it was rotated, or the path differs in some teams), the
+  step will silently no-op. Acceptable per design but worth a note.
+- **Tool Search skill claims 85% reduction**: this is the figure published by
+  Anthropic in the linked docs. Not independently benchmarked in KlodTalk.
 
 ### Questions for Reviewer
-- Does the orchestrator's team-disable parser detect `## disabled` as a heading line (not a comment) and skip the team accordingly? Per `team-disable-flag.md` this should work, but please confirm there are no parser quirks specific to the team-listing flow.
-- Is the per-file counter path (`/tmp/canary_block_count_${SESSION_ID}_<sha1>`) acceptable, or should it live under `.klodTalk/team/current/` for visibility?
+1. Should planner.md be split into a thin "planner" and a "simple_executor" role
+   so the frontmatter restriction matches the eval doc's intent, or is the
+   narrowed restriction (MultiEdit/NotebookEdit only, with comment block
+   explaining why) acceptable?
+2. Should the documenter's git-commit step be moved to the orchestrator so we
+   can actually block Bash on the documenter? Out of scope for this PR but
+   wanted to surface it.
+3. Is the orchestrator.md addition placed correctly under Step 4 "Final
+   Summary", or should it move to a new Step 4b? Kept inside Step 4 to avoid
+   renumbering, per the task guidelines.

@@ -1,3 +1,19 @@
+---
+disallowedTools:
+  - MultiEdit
+  - NotebookEdit
+---
+
+<!--
+  Tool-set restriction: Planner writes plan.md / plan_meta.txt and, for SIMPLE
+  tasks, may also implement code directly (see Responsibilities below) — so Write
+  and Edit must remain available. MultiEdit and NotebookEdit are blocked because
+  the plan output is single-file text and Jupyter notebooks are not part of any
+  planning artifact. Bash remains allowed so the planner can read repo context.
+  See CLAUDE/skills/disallowed-tools-frontmatter.md and CLAUDE/skills/auto-mode-hard-deny.md
+  for defense-in-depth at the settings layer.
+-->
+
 # Planner Role
 
 You are the **Planner** in a software development team. Your job is to analyze the user's request and create an implementation plan.

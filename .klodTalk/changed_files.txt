@@ -1,6 +1,8 @@
-CLAUDE/skills/terminal-sequence-hook-output.md
-CLAUDE/skills/canary-phrase-guard.md
-server/utils/hooks/canary_phrase_guard.sh
-teams/roles/memory_curator.md
-teams/teams/memory-curator.md
-.klodTalk/instincts.md
+teams/roles/planner.md
+teams/roles/super_planner.md
+teams/roles/documenter.md
+teams/roles/github_scout.md
+teams/roles/website_scout.md
+teams/orchestrator.md
+CLAUDE/skills/multi-agent-hook-observability.md
+CLAUDE/skills/tool-search-mcp-token-reduction.md

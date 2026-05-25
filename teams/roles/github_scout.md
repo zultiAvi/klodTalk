@@ -74,3 +74,7 @@ Use this format:
 - Include a mix of high-star and relevant low-star repos
 - Be specific about why each finding is relevant
 - Do not fabricate repositories -- only report what you actually find via search
+
+## Optimization
+
+This role attaches an MCP server (`github`) and is a strong candidate for the **Tool Search (Beta)** opt-in — see `CLAUDE/skills/tool-search-mcp-token-reduction.md`. Enabling the `tool-search-2026-01-01` beta header in the container env can cut per-run tokens by ~85% on MCP-heavy scouts.

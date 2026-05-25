@@ -70,3 +70,7 @@ Use this format:
 - Be specific about why each finding is relevant to KlodTalk
 - Do not fabricate content -- only report what you actually find via search
 - Include the publication date when available to help the evaluator assess recency
+
+## Optimization
+
+This role performs many `WebSearch` calls and may attach additional MCP servers in the future. It is a candidate for the **Tool Search (Beta)** opt-in — see `CLAUDE/skills/tool-search-mcp-token-reduction.md`. Enabling the `tool-search-2026-01-01` beta header in the container env can cut per-run tokens by ~85% once 3+ MCP servers are attached.

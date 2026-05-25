@@ -491,6 +491,10 @@ When the pipeline is complete, write `/workspace/.klodTalk/out_messages/out_mess
 
 For **idea-related roles** (idea_maker, idea_reviewer, super_planner), include the **full** idea list or review in the Sub-Agent Reports section — do NOT truncate these. For other roles, the first 20 lines or a key excerpt is sufficient.
 
+### Post-Pipeline Hook Event Summary
+
+If `/workspace/.klodTalk/team/current/hook_events.jsonl` exists at the end of the run, append a compact `## Tool Activity` section to `out_message.txt` containing one line per `(role, tool_name)` pair with its call count (sorted by count, descending). Skip silently if the file is absent (e.g., simple-task path) or empty. This gives the user a cross-agent timeline summary without requiring them to inspect the JSONL by hand. See `CLAUDE/skills/multi-agent-hook-observability.md` for the field layout and a sample `jq` command.
+
 ## Step 5: Output Files
 
 Ensure these files exist when you're done:
