@@ -11,4 +11,3 @@
 - Prefer `@github/mcp-server` over deprecated `@modelcontextprotocol/server-github`; env var is `GITHUB_TOKEN` (not `GITHUB_PERSONAL_ACCESS_TOKEN`).
 - Role-file edits that add a new required section MUST also update any embedded output-format code blocks earlier in the file — readers skim the template, not later sections.
 - `ANTHROPIC_WORKSPACE_ID` must be forwarded into Docker containers when the deployment uses workload identity federation (Claude Code v2.1.141+); omit it and federation requests are rejected silently. See CLAUDE/skills/terminal-sequence-hook-output.md.
-- Code Quality Rules (see CLAUDE.md "Code Quality Rules"): 1024-line cap per file, 1–2 classes per file, dataclasses over dicts, no `getattr(obj, "f", default)` for known fields. Skill: CLAUDE/skills/dataclass-over-dict-getattr.md.

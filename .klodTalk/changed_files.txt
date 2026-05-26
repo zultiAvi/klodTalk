@@ -1,4 +1,6 @@
-CLAUDE.md
+CLAUDE/skills/terminal-sequence-hook-output.md
+CLAUDE/skills/canary-phrase-guard.md
+server/utils/hooks/canary_phrase_guard.sh
+teams/roles/memory_curator.md
+teams/teams/memory-curator.md
 .klodTalk/instincts.md
-CLAUDE/skills/dataclass-over-dict-getattr.md
-server/server.py
