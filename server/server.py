@@ -1381,8 +1381,8 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         "user_name": session.user_name,
         "users": session.users,
         "working": session.session_id in running_sessions,
-        "system": getattr(session, 'system', False),
-        "comment": getattr(session, 'comment', ''),
+        "system": session.system,
+        "comment": session.comment,
     }
     if include_messages:
         # Prefer the durable per-session log when present — this is the

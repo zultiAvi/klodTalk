@@ -56,6 +56,20 @@ Server (Python asyncio)
 - **[docs/](docs/)** — Installation guide, architecture overview, development guide, team creation guide.
 - **[tests/](tests/)** — Unit tests for server components and utility abstractions.
 
+## Code Quality Rules
+
+All code added to this repo must follow these conventions:
+
+1. **Max 1024 lines per file.** Split modules that grow past this — by class, by concern, or by layer.
+2. **1–2 classes per file.** Helpers and inner types are fine; multiple top-level public classes are not.
+3. **Behaviors in classes.** When functions share state or operate on the same data, wrap them in a class. Use module-level functions only for pure stateless utilities.
+4. **Minimize environment variables.** Read env vars at most at startup, inside a single config loader. Application code receives parsed config objects — never reads `os.environ` directly.
+5. **Dataclasses over dicts.** Use `@dataclass` (or `pydantic.BaseModel` where present) for structured records with a known shape. Reserve plain dicts for genuinely-dynamic key/value maps.
+6. **No `getattr(obj, "field", default)` for known fields.** Declare the field on the dataclass with a default. `getattr` with a default masks missing-field bugs.
+7. **Few inline comments.** Names and structure carry intent. Comments explain *why*, never *what*.
+
+See `CLAUDE/skills/dataclass-over-dict-getattr.md` for rules #5 and #6 patterns.
+
 ## Message Protocol (JSON over WebSocket)
 
 | Direction | Type | Fields |
