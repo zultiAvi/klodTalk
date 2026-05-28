@@ -50,5 +50,8 @@ Publishes skill files from `CLAUDE/skills/` so others can install them.
 - Follow three-tier progressive disclosure: YAML frontmatter, Quick Reference, full instructions.
 - Keep skill files under 50 lines when possible.
 
+## Related
+- `claude-code-action-ci.md` -- complementary CI-side automation: runs `anthropics/claude-code-action@v1` on every PR for a lightweight review pass that does not require the Docker team pipeline.
+
 ## Source
 Based on the official Anthropic skills protocol (github.com/anthropics/skills).

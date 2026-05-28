@@ -23,6 +23,28 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/subagent_lifecycle_logger.sh SubagentStart"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/subagent_lifecycle_logger.sh SubagentStop"
+          }
+        ]
+      }
     ]
   }
 }

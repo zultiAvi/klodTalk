@@ -266,10 +266,21 @@ mv "${{SENTINEL}}.tmp" "$SENTINEL"
 
 
 def _claude_cmd(prompt: str) -> list[str]:
-    """Build the claude CLI command with auth-specific args."""
-    return ["claude"] + _claude_auth.get_cli_args() + [
-        "--dangerously-skip-permissions", "--output-format", "json", "-p", prompt
+    """Build the claude CLI command with auth-specific args.
+
+    If the operator has exported KLODTALK_PLUGIN_DIR (a directory or a .zip
+    bundle path), append `--plugin-dir <path>` so the Claude Code CLI loads
+    that plugin for the session. Empty / unset values are ignored. See
+    CLAUDE/skills/plugin-dir-dispatch.md for the dispatch contract.
+    """
+    cmd = ["claude"] + _claude_auth.get_cli_args() + [
+        "--dangerously-skip-permissions", "--output-format", "json"
     ]
+    plugin_dir = os.environ.get("KLODTALK_PLUGIN_DIR", "").strip()
+    if plugin_dir:
+        cmd += ["--plugin-dir", plugin_dir]
+    cmd += ["-p", prompt]
+    return cmd
 
 
 def _claude_env() -> dict:

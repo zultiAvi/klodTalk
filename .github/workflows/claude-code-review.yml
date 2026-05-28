@@ -1,0 +1,55 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+# Guard against feedback loops: if the bot itself raises a PR or pushes a
+# follow-up commit, do not re-trigger the review. This complements the
+# job-level `if:` guard below.
+concurrency:
+  group: claude-code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip when the action's own bot account opened/updated the PR, so the
+    # action does not review its own commits and create a loop.
+    if: github.actor != 'claude-code[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run Claude Code review
+        uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing a pull request against the KlodTalk repository.
+
+            Read the diff between the PR base and head. Focus on:
+              1. Correctness bugs and logic errors.
+              2. Security issues (secret leakage, command injection, unsafe
+                 file paths, missing input validation).
+              3. Adherence to KlodTalk conventions documented in /CLAUDE.md
+                 and the per-folder CLAUDE.md files (server/, teams/,
+                 clients/, config/, helpers/).
+              4. Hook discipline -- observational hooks must always exit 0;
+                 enforcement hooks need continueOnBlock: true.
+              5. Selective git staging -- flag any commit that uses
+                 `git add -A` or `git add .` in automated scripts.
+
+            Post your findings as a single PR comment. Group findings under
+            BLOCKER / WARNING / NOTE headings. If the diff looks good, post
+            a one-line "LGTM" comment instead of a long no-op review.

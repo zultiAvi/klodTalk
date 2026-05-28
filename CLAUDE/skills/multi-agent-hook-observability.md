@@ -39,6 +39,9 @@ At the end of Step 4 (Reporting), the orchestrator appends a compact tool-count 
 - The hook script already exits 0 on failure (see `hook-event-logging.md`) — observability is best-effort and never blocks the pipeline.
 - For >5 MB logs, sample the tail rather than parsing the whole file in the summary step.
 
+### Sub-agent Lifecycle Events
+The same JSONL also receives `SubagentStart` and `SubagentStop` events (event_type field) emitted by `server/utils/hooks/subagent_lifecycle_logger.sh` and registered in `.claude/settings.json` since the v2.1.145 lifecycle hook rollout. These let the orchestrator's Step 4 reporting distinguish per-role spawn timestamps and -- via the `background_tasks` field on Stop -- detect premature container teardown while async work is still pending. See `subagent-lifecycle-hooks.md` for the field reference and the drain-check `jq` snippet.
+
 ## Source
 - disler/claude-code-hooks-multi-agent-observability — https://github.com/disler/claude-code-hooks-multi-agent-observability
 - disler/claude-code-hooks-mastery — https://github.com/disler/claude-code-hooks-mastery (~3,000 stars)
