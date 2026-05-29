@@ -36,6 +36,7 @@ Rate limits (RPM/TPM) and credit pools are independent constraints — both appl
 ## Related
 - `CLAUDE/skills/rate-limit-awareness.md` — RPM/TPM headroom (distinct constraint)
 - `CLAUDE/skills/claude-agents-cli.md` — session launch flags
+- `CLAUDE/skills/compaction-api-opt-in.md` — compaction raises per-session token usage; if opted in, plan extra headroom against this credit pool
 
 ## Source
 Claude Code SDK documentation — https://platform.claude.com/docs/en/docs/claude-code/sdk (docs.anthropic.com)

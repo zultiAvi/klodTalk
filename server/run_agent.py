@@ -284,9 +284,20 @@ def _claude_cmd(prompt: str) -> list[str]:
 
 
 def _claude_env() -> dict:
-    """Return environment dict with auth-specific env vars merged in."""
+    """Return environment dict with auth-specific env vars merged in.
+
+    If the operator has exported KLODTALK_CONTEXT_COMPACTION (any non-empty
+    value), forward CLAUDE_CODE_CONTEXT_COMPACTION=1 to the claude CLI
+    subprocess so the server-side context-compaction beta is activated.
+    Requires Opus 4.6+; silently ignored on older models. See
+    CLAUDE/skills/compaction-api-opt-in.md for the dispatch contract.
+    Mirrors the KLODTALK_PLUGIN_DIR env-var-dispatch pattern (see
+    CLAUDE/skills/plugin-dir-dispatch.md).
+    """
     env = os.environ.copy()
     env.update(_claude_auth.get_env())
+    if os.environ.get("KLODTALK_CONTEXT_COMPACTION", "").strip():
+        env["CLAUDE_CODE_CONTEXT_COMPACTION"] = "1"
     return env
 
 

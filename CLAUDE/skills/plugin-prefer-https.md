@@ -60,6 +60,7 @@ Expected output: `1`. If `unset`, the variable did not propagate from `docker-co
 - The variable was added in Claude Code v2.1.141. Containers pinned to an earlier CLI version will silently ignore it; verify the CLI version pinned in `server/Dockerfile.agent` is v2.1.141 or newer before relying on it.
 
 ## Related
+- `security-guidance-plugin` -- the motivating use case: installing Anthropic's official security-guidance plugin in keyless agent containers depends on this env var.
 - `docker-claude-stability` -- companion skill on pinning the CLI version and suppressing auto-updates in `Dockerfile.agent`.
 - `session-id-in-bash-tools` -- another runtime env var (`CLAUDE_CODE_SESSION_ID`) that lives in container env, not in the Dockerfile.
 
