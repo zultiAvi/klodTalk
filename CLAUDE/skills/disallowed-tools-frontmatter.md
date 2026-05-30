@@ -56,3 +56,28 @@ disallowedTools:
 ### Notes
 - Requires Claude Code v2.1.119+ with `--print` mode (Dockerfile.agent is pinned to @2.90.0, which satisfies this)
 - Use `tools:` for allowlists, `disallowedTools:` for denylists
+
+### camelCase vs Hyphenated: Two Different Enforcement Paths
+
+Since Claude Code v2.1.152, two YAML frontmatter keys can restrict tools.
+They look similar but go through different enforcement code paths — mixing
+them up silently disables the restriction.
+
+| Key | File location | Enforcer | Notes |
+|-----|---------------|----------|-------|
+| `disallowedTools:` (camelCase) | `teams/roles/*.md` | KlodTalk `server/run_agent.py` | Parsed from role frontmatter and forwarded to `claude --print`. KlodTalk-managed. |
+| `disallowed-tools:` (hyphenated) | `.claude/commands/*.md`, `.claude/skills/*.md` | Claude Code CLI itself | CLI-native, recognized in skill/command files since v2.1.152. Enforced independently of `run_agent.py`. |
+
+**Rule of thumb:**
+- Role files in `teams/roles/` → use camelCase `disallowedTools:` (only key `run_agent.py` parses).
+- Skill files in `.claude/skills/` or command files in `.claude/commands/`
+  → may use hyphenated `disallowed-tools:` for native CLI enforcement.
+
+A role file using the hyphenated form is **silently ignored** because
+`run_agent.py` forwards only the camelCase keys (`mcpServers` and
+`disallowedTools`) per project instinct. A skill/command file using the
+camelCase form is **silently ignored** because the CLI's frontmatter parser
+expects the hyphenated form for skill/command files.
+
+If you need both enforcement layers (e.g. a role that is also surfaced as a
+skill), declare both keys with the same list.

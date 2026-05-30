@@ -138,6 +138,9 @@ token usage, so:
   both apply.
 
 ## Related
+- `precompact-context-guard.md` -- snapshot in_message.txt + progress.json
+  + last 5 hook events before each compaction pass so you can diagnose
+  context loss; pair with this skill on long Coder/Planner runs.
 - `agent-sdk-credit-billing.md` -- the credit pool you draw from after
   June 15 2026; required reading before enabling compaction at scale.
 - `plugin-dir-dispatch.md` -- the env-var-dispatch pattern this skill

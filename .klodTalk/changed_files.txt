@@ -1,8 +1,9 @@
-teams/roles/planner.md
-teams/roles/super_planner.md
-teams/roles/documenter.md
-teams/roles/github_scout.md
-teams/roles/website_scout.md
-teams/orchestrator.md
-CLAUDE/skills/multi-agent-hook-observability.md
-CLAUDE/skills/tool-search-mcp-token-reduction.md
+CLAUDE/skills/model-version-hygiene.md
+CLAUDE/skills/precompact-context-guard.md
+CLAUDE/skills/compaction-api-opt-in.md
+CLAUDE/skills/message-display-hook.md
+CLAUDE/skills/disallowed-tools-frontmatter.md
+teams/run_claude_team.sh
+config/server_config.yaml
+config/server_config_example.yaml
+config/CLAUDE.md

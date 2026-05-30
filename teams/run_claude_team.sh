@@ -13,7 +13,7 @@
 #   BASE_BRANCH      - Branch to merge from (default: main)
 #   CURRENT_BRANCH   - Current git branch
 #   MERGE_STATUS     - "ok" or "conflicts"
-#   CLAUDE_MODEL     - Override orchestrator model (default: claude-opus-4-7)
+#   CLAUDE_MODEL     - Override orchestrator model (default: claude-opus-4-8)
 
 set -euo pipefail
 
@@ -35,12 +35,13 @@ CURRENT_BRANCH="${CURRENT_BRANCH:-$(git -C "${WORKSPACE}" branch --show-current 
 MERGE_STATUS="${MERGE_STATUS:-ok}"
 REPOS_JSON="${REPOS_JSON:-}"
 RESULTS_FOLDER="${RESULTS_FOLDER:-$(jq -r '.results_folder // ""' "${2:-/workspace}/.klodTalk/team/team.json" 2>/dev/null || echo "")}"
-# Model alias resolution: opus->claude-opus-4-7, sonnet->claude-sonnet-4-6, haiku->claude-haiku-4-5-20251001
-# Deprecation warnings (as of April 2026):
+# Model alias resolution: opus->claude-opus-4-8, sonnet->claude-sonnet-4-6, haiku->claude-haiku-4-5-20251001
+# Deprecation warnings (as of May 2026):
 #   - claude-3-haiku-20240307: RETIRED — returns API errors since March 2026
 #   - claude-sonnet-4-20250514: retiring June 15 2026 — migrate to claude-sonnet-4-6
-#   - claude-opus-4-20250514: retiring June 15 2026 — migrate to claude-opus-4-7
-CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-7}"
+#   - claude-opus-4-20250514: retiring June 15 2026 — migrate to claude-opus-4-8
+#   - claude-opus-4-7: superseded May 28 2026 by claude-opus-4-8
+CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-8}"
 
 # ─────────────────────────────────────────────────────────────
 # Validate inputs

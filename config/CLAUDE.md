@@ -135,13 +135,20 @@ Role definitions live in `teams/roles/` as `.md` files. Each role file is the sy
 
 Supported models:
 
-- `opus` (claude-opus-4-7) — most capable, highest cost
+- `opus` (claude-opus-4-8) — most capable, highest cost (launched May 28 2026)
 - `sonnet` (claude-sonnet-4-6) — balanced capability and speed
 - `haiku` (claude-haiku-4-5-20251001) — fastest and cheapest
+
+**Superseded (still works, migrate soon):**
+- `claude-opus-4-7` — superseded May 28 2026; use `claude-opus-4-8` instead
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
 - `claude-sonnet-4-20250514` — retiring June 15, 2026; use `claude-sonnet-4-6` instead
-- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-7` instead
+- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-8` instead
+
+**Sampling param restriction:** `temperature`, `top_p`, and `top_k` non-default
+values return HTTP 400 on Opus 4.7 and 4.8. Use the `effort` parameter for
+controlled variation. See `CLAUDE/skills/model-version-hygiene.md`.
 
 Pick per role: e.g. Opus for the Coder when changes are heavy, Sonnet or Haiku for Planner/Reviewer when you want lower latency or cost.
