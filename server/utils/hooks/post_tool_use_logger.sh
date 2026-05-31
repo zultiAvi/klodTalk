@@ -33,10 +33,15 @@
 
         # Build a compact JSON line directly from the input payload
         # This avoids shell-variable round-tripping that loses null vs "null" distinction
+        # `agent_id` and `agent_type` are present in hook payloads from
+        # claude-agent-sdk-python (May 2026) -- they identify the role
+        # currently issuing the tool call when the Task tool spawns sub-agents.
+        # Older SDK versions omit the field; jq's `// null` falls back cleanly.
+        # See CLAUDE/skills/hook-agent-type-filter.md.
         LOG_ENTRY="$(echo "${INPUT}" | jq -c \
             --arg ts "${TIMESTAMP}" \
             --arg effort "${EFFORT}" \
-            '{timestamp: $ts, tool_name: (.tool_name // "unknown"), duration_ms: (.duration_ms // null), file_path: (.file_path // null), exit_code: (.exit_code // null), effort_level: ($effort | if . == "" then null else . end)}' 2>/dev/null)" || LOG_ENTRY=""
+            '{timestamp: $ts, tool_name: (.tool_name // "unknown"), duration_ms: (.duration_ms // null), file_path: (.file_path // null), exit_code: (.exit_code // null), effort_level: ($effort | if . == "" then null else . end), agent_id: (.agent_id // null), agent_type: (.agent_type // null)}' 2>/dev/null)" || LOG_ENTRY=""
 
         if [ -n "${LOG_ENTRY}" ]; then
             echo "${LOG_ENTRY}" >> "${LOG_FILE}" 2>/dev/null || true

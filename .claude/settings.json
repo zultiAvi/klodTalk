@@ -2,6 +2,17 @@
   "disableSkillShellExecution": true,
   "forceRemoteSettingsRefresh": true,
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/session_start_title.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "",

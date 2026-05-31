@@ -1,162 +1,163 @@
-Nightly Scout Coder Output -- 2026-05-30
-=========================================
+CODER OUTPUT -- Nightly Scout: implement top 3 (2026-05-31)
+=============================================================
 
-Implemented all 3 top candidates from evaluated_ideas.md.
+## Summary
+Implemented the three top-rated ideas from evaluated_ideas.md:
+  1. SessionStart hook that emits a per-session title for log correlation.
+  2. Fresh-context evaluator role file for unbiased code review.
+  3. agent_type / agent_id capture in the two main hook scripts for per-role
+     observability.
 
-----------------------------------------------------------------
-Idea 1: Opus 4.8 Model ID Update -- model-version-hygiene.md + configs
-----------------------------------------------------------------
+All three are additive: no existing team behaviour changes, no existing hook
+behaviour changes (the agent_type work is observability-only).
 
-Why: Anthropic launched Claude Opus 4.8 on May 28 2026 as the new flagship
-GA model. The existing model-version-hygiene skill still pointed the `opus`
-shorthand at `claude-opus-4-7`. The two `-20250514` IDs hard-retire on
-June 15 2026 (16 days from today) and need an URGENT callout. Opus 4.7+
-also returns HTTP 400 on non-default `temperature`/`top_p`/`top_k`, a
-silent-failure risk on upgrade.
+## What was changed and why
 
-Changes:
-- CLAUDE/skills/model-version-hygiene.md
-    * Active Models table: `opus` -> `claude-opus-4-8`
-    * New "Superseded Models" table row: claude-opus-4-7 -> claude-opus-4-8
-    * Retired Models table: promoted both -20250514 rows with **URGENT**
-      callout block citing June 15 2026 and a 16-day countdown
-    * New "Sampling param restriction" section (HTTP 400 on Opus 4.7+)
-    * Updated "Checking for Deprecations" with two new grep recipes
-      (claude-opus-4-7 search; temperature/top_p/top_k search)
-- teams/run_claude_team.sh
-    * CLAUDE_MODEL default: claude-opus-4-7 -> claude-opus-4-8
-    * Comment block updated to reflect May 2026 state + supersession note
-- config/server_config.yaml
-    * Comment updated: opus -> claude-opus-4-8, added 4.7 supersession
-      and sampling-param HTTP 400 warning
-- config/server_config_example.yaml
-    * Same comment update as server_config.yaml
-- config/CLAUDE.md
-    * Supported models list: opus -> claude-opus-4-8
-    * New "Superseded" section for claude-opus-4-7
-    * Deprecated table now points -opus-4-20250514 -> claude-opus-4-8
-    * Added "Sampling param restriction" note pointing at the skill
+### Idea 1 -- SessionStart sessionTitle hook
+Plan steps: create hook script, register in settings.json, document skill.
 
-----------------------------------------------------------------
-Idea 2: PreCompact/PostCompact Context-Guard Skill
-----------------------------------------------------------------
+- Created /workspace/server/utils/hooks/session_start_title.sh: reads
+  KLODTALK_PROJECT and KLODTALK_ROLE env vars (with graceful fallbacks to
+  "unknown" / "agent" per instinct that env vars may not be set), sanitizes
+  them (tr -d control chars, head -c length cap), and emits the v2.1.153+
+  hookSpecificOutput envelope with sessionTitle = "klodtalk/<project>
+  [<role>]" and reloadSkills: false. Exit-0 discipline applied via
+  { ... } 2>/dev/null + exit 0.
+- Registered a SessionStart hook group in /workspace/.claude/settings.json
+  with "matcher": "" (per instinct: matcher field required). Placed before
+  the existing PostToolUse group for readability; ordering does not affect
+  dispatch.
+- Created /workspace/CLAUDE/skills/session-start-title.md documenting the
+  pattern, env-var sources, the reloadSkills capability (currently false;
+  reserved for future hot-reload), the v2.1.153+ version requirement, and
+  the registration snippet.
 
-Why: KlodTalk's hook coverage already spans PreToolUse, PostToolUse,
-SubagentStart/Stop, and Stop. PreCompact/PostCompact were the missing
-pair. Long Coder/Planner runs using the Compaction API risk silent task-
-context loss when the summarizer de-prioritizes in_message.txt or pipeline
-stage state; a snapshot hook lets operators inspect what was preserved.
+Why: KlodTalk runs many concurrent Docker-per-role sessions; today they all
+appear identical in Claude Code logs. Per-session titles make operator log
+correlation trivial without touching server code.
 
-Changes:
-- CLAUDE/skills/precompact-context-guard.md (NEW)
-    * Documents PreCompact stdin payload + snapshot artifact contents
-      (original_task from in_message.txt, pipeline_stage from
-      progress.json, last 5 lines of hook_events.jsonl, ISO timestamp)
-    * Documents PostCompact JSONL confirmation record format
-    * Registration in /workspace/.claude/settings.json with matcher ""
-    * Exit-0 discipline emphasized (non-zero from PreCompact would block
-      the compaction the operator opted into)
-    * Cross-refs to compaction-api-opt-in, hook-settings-location,
-      hook-event-logging, multi-agent-hook-observability,
-      subagent-lifecycle-hooks
-- CLAUDE/skills/compaction-api-opt-in.md
-    * Added precompact-context-guard.md to the Related list with a
-      one-line description of the pairing rationale
+### Idea 2 -- Fresh-context evaluator role
+Plan steps: create role file with disallowedTools, document skill, do NOT
+modify any existing team file.
 
-----------------------------------------------------------------
-Idea 3: MessageDisplay Hook Skill + disallowed-tools Disambiguation
-----------------------------------------------------------------
+- Created /workspace/teams/roles/reviewer_fresh_context.md. Frontmatter
+  forwards mcpServers (filesystem) and disallowedTools (Bash, Write, Edit,
+  MultiEdit, NotebookEdit) -- only the two keys run_agent.py parses
+  (instinct: role frontmatter only forwards these two). Includes
+  <!-- inherits: base.md --> per role-inheritance-pattern.md. Prompt
+  establishes:
+    * No prior conversation history (fresh context).
+    * Default verdict per criterion = FAIL until evidence is read.
+    * Artefact-only inputs (in_message.txt, plan.md, changed_files.txt,
+      *_output.txt, and the actual changed files).
+    * Output written to reviewer_output.txt in the SAME schema as the
+      regular reviewer so downstream tooling (reviewer-exit-condition-
+      scoring.md consumers) keeps working.
+    * Required "## Fresh-Context Reading Log" section listing which
+      artefacts were opened -- makes drive-by APPROVAL verdicts visible.
+    * Exit Condition Check section matching reviewer-exit-condition-
+      scoring.md (n/10, < 7 -> BLOCKER).
+- Created /workspace/CLAUDE/skills/fresh-context-evaluator.md documenting
+  the design rationale, default-FAIL contract, opt-in pattern for teams,
+  and the safety note explaining why nightly_scout.md was NOT modified.
 
-Why: Claude Code v2.1.152 introduced two related changes -- a new
-`MessageDisplay` hook event that fires before an assistant message reaches
-the user (first hook on the outbound path; complements
-post-tool-output-sanitize which is inbound) and a CLI-native
-`disallowed-tools:` (hyphenated) frontmatter key for skill/command files
-that runs independently of KlodTalk's camelCase `disallowedTools:`
-forwarder in run_agent.py. Without disambiguation, operators will mix the
-two forms and get silent enforcement gaps.
+Why: KlodTalk's nightly pipelines run unattended; the regular reviewer
+shares context with the coder and can inherit framing bias. A fresh-
+context evaluator is a complement (not replacement) that any team can opt
+into by adding the role to its members table.
 
-Changes:
-- CLAUDE/skills/message-display-hook.md (NEW)
-    * Documents the MessageDisplay event (v2.1.152+) and its stdin payload
-    * Three concrete KlodTalk use cases: ANSI strip, [STAGE: <role>]
-      prefix injection, truncate-and-spill to
-      /workspace/.klodTalk/team/current/message_overflow_<ts>.txt
-    * Registration in /workspace/.claude/settings.json under
-      hooks.MessageDisplay with matcher ""
-    * Exit-0 discipline (non-zero blocks the response stream)
-    * CLI version requirement section warning that older CLIs silently
-      ignore the hook
-    * Verify recipe with an ANSI-coloured example input
-- CLAUDE/skills/disallowed-tools-frontmatter.md
-    * Added "camelCase vs Hyphenated: Two Different Enforcement Paths"
-      section with a comparison table:
-        - `disallowedTools:` (camelCase) -- role files, KlodTalk-forwarded
-          by run_agent.py
-        - `disallowed-tools:` (hyphenated) -- skill/command files,
-          CLI-native (v2.1.152+)
-    * Rule of thumb + warning that wrong key is silently ignored
-    * Note that both can be declared on a file that needs both paths
+### Idea 3 -- agent_type / agent_id in hook payloads
+Plan steps: modify post_tool_use_logger.sh, modify sanitize_bash_output.sh,
+document skill. Observability only -- no behavioural branching.
 
-----------------------------------------------------------------
-Pre-Commit Self-Check
-----------------------------------------------------------------
+- Modified /workspace/server/utils/hooks/post_tool_use_logger.sh: added
+  agent_id and agent_type fields to the jq JSONL builder (with `// null`
+  fallbacks for older SDKs). Inline comment cites the SDK source. Exit-0
+  discipline unchanged.
+- Modified /workspace/server/utils/hooks/sanitize_bash_output.sh: added
+  agent_id and agent_type to the telemetry JSONL entry. Inline comment
+  explicitly notes this is observability-only -- NO branching of the
+  redaction logic per role, per the safety guidance in the plan.
+- Created /workspace/CLAUDE/skills/hook-agent-type-filter.md documenting
+  the new payload fields, the jq snippet, a future per-role branching
+  sketch (clearly marked "NOT yet enabled"), the security note that
+  agent_type is not a trust boundary, and links to the actual security
+  primitives (disallowedTools, pre-tool-use-guard).
 
-- Grepped both new files for TODO/FIXME/XXX/PLACEHOLDER/lorem ipsum:
-  no matches.
-- Skill frontmatter `summary:` field on message-display-hook.md contains
-  inline backticks AND a colon, so it is quoted with double-quotes per
-  project instinct on YAML colon parsing.
-- git status --short verified before staging -- only expected files plus
-  the .klodTalk pipeline scratch files modified by the orchestrator/
-  earlier pipeline stages.
-- Did NOT touch Dockerfile.agent, server/server.py,
-  server/session_manager.py, or any client code.
+Why: KlodTalk's existing hooks are role-agnostic. Capturing agent_type in
+the JSONL telemetry enables operators to correlate hook events to roles
+without touching the per-role settings.json layout. Branching on the
+field is deferred behind a future security review per the prompt's
+instructions.
 
-----------------------------------------------------------------
-Deviations from Plan
-----------------------------------------------------------------
+## Files created or modified
 
-None. All three ideas implemented as specified in evaluated_ideas.md.
+Created:
+  server/utils/hooks/session_start_title.sh
+  teams/roles/reviewer_fresh_context.md
+  CLAUDE/skills/session-start-title.md
+  CLAUDE/skills/fresh-context-evaluator.md
+  CLAUDE/skills/hook-agent-type-filter.md
 
-----------------------------------------------------------------
-Files Created
-----------------------------------------------------------------
+Modified:
+  .claude/settings.json                              (added SessionStart hook group)
+  server/utils/hooks/post_tool_use_logger.sh         (+ agent_id, agent_type)
+  server/utils/hooks/sanitize_bash_output.sh         (+ agent_id, agent_type)
 
-- CLAUDE/skills/precompact-context-guard.md  (Idea 2)
-- CLAUDE/skills/message-display-hook.md      (Idea 3)
+Plus the standard nightly artefacts:
+  .klodTalk/team/current/coder_output.txt            (this file)
+  .klodTalk/changed_files.txt                        (file list for reviewer)
 
-----------------------------------------------------------------
-Files Modified
-----------------------------------------------------------------
+## Verification performed
+- Validated /workspace/.claude/settings.json parses as JSON via python3.
+- Smoke-tested session_start_title.sh with and without env vars set:
+  * No env: emits {"hookSpecificOutput":{"hookEventName":"SessionStart",
+    "sessionTitle":"klodtalk/unknown [agent]","reloadSkills":false}} exit 0.
+  * KLODTALK_PROJECT=demo KLODTALK_ROLE=coder: emits
+    "klodtalk/demo [coder]" exit 0.
+- Smoke-tested post_tool_use_logger.sh with a payload containing agent_id
+  and agent_type: JSONL line correctly includes both fields, exit 0.
 
-- CLAUDE/skills/model-version-hygiene.md         (Idea 1)
-- CLAUDE/skills/compaction-api-opt-in.md         (Idea 2 cross-ref)
-- CLAUDE/skills/disallowed-tools-frontmatter.md  (Idea 3 disambiguation)
-- teams/run_claude_team.sh                       (Idea 1 default model)
-- config/server_config.yaml                      (Idea 1 comments)
-- config/server_config_example.yaml              (Idea 1 comments)
-- config/CLAUDE.md                               (Idea 1 model docs)
+## Decisions that deviated from the plan
+- Did NOT modify nightly_scout.md (or any existing team file). The
+  evaluated_ideas.md plan for Idea 2 originally allowed updating a team
+  file; the task prompt explicitly told me to document the opt-in path in
+  the skill instead. The fresh-context-evaluator.md skill file does this
+  and explains the safety reasoning.
+- Added env-var sanitization (tr -d control chars + head -c length cap) to
+  session_start_title.sh before interpolation into the JSON envelope. Not
+  in the original plan but required: the values end up in Claude Code's
+  UI / log strings, and an attacker-controlled KLODTALK_PROJECT could
+  otherwise inject newlines into the JSON.
 
-----------------------------------------------------------------
-Source Attribution
-----------------------------------------------------------------
+## Source Attribution
+- Idea 1 -- SessionStart sessionTitle:
+    Claude Code changelog v2.1.153 --
+    https://releasebot.io/updates/anthropic/claude-code
+    (github.com/anthropics/claude-code via releasebot)
+- Idea 2 -- Fresh-context evaluator subagent:
+    anthropics/cwc-long-running-agents --
+    https://github.com/anthropics/cwc-long-running-agents
+    (102 stars, official Anthropic repo, May 2026)
+- Idea 3 -- agent_id / agent_type in hook payloads:
+    anthropics/claude-agent-sdk-python --
+    https://github.com/anthropics/claude-agent-sdk-python
+    (official Anthropic, May 2026)
 
-Idea 1 -- Opus 4.8 Model ID Update:
-  - Anthropic model deprecations page:
-    https://platform.claude.com/docs/en/docs/about-claude/model-deprecations
-    (platform.claude.com/docs)
-  - Claude Opus 4.8 launch announcement:
-    https://www.anthropic.com/news/claude-opus-4-8
-    (anthropic.com/news, May 28 2026)
-
-Idea 2 -- PreCompact/PostCompact Context-Guard Skill:
-  - vinicius91carvalho/.claude (community hook collection, GitHub):
-    https://github.com/vinicius91carvalho/.claude
-    (niche repo; 23 enforcement hooks across 8 lifecycle events,
-    including PreCompact and PostCompact)
-
-Idea 3 -- MessageDisplay Hook Skill + disallowed-tools Disambiguation:
-  - Claude Code v2.1.152 release notes (anthropics/claude-code):
-    https://github.com/anthropics/claude-code/releases
-    (Official Anthropic repo, May 27 2026)
+## Known limitations / follow-up
+- session_start_title.sh requires Claude Code v2.1.153+. Older CLIs ignore
+  the sessionTitle field silently; not a regression. Dockerfile.agent is
+  pinned to @2.90.0 (>= 2.1.119) -- verify it also satisfies 2.1.153
+  before relying on the title in operator workflows.
+- reloadSkills is hard-coded to false; the deferred-ideas section calls
+  out the missing live-session signal path needed before this can flip.
+- The fresh-context evaluator is not yet wired into any team. Operators
+  who want a second-opinion review must opt in by editing their own team
+  .md (see the skill file for the members-table snippet).
+- agent_type branching in hooks is deliberately NOT enabled -- JSONL
+  telemetry only. Future change should go through a fresh-context review
+  before flipping any policy branches.
+- KLODTALK_PROJECT / KLODTALK_ROLE env-var injection by run_agent.py was
+  not directly inspected in this session; the hook degrades to
+  "unknown"/"agent" if either is missing, so worst case is a less
+  informative title rather than a failure.

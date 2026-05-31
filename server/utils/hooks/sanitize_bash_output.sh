@@ -53,13 +53,20 @@ mkdir -p "${LOG_DIR}" 2>/dev/null || true
     if command -v jq >/dev/null 2>&1 && [ -n "${INPUT}" ]; then
         TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" 2>/dev/null)" \
             || TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+        # `agent_id` and `agent_type` come from the claude-agent-sdk-python
+        # hook payload (May 2026) and identify which role spawned the tool
+        # call. Captured here for observability only -- no behavioural
+        # branching, per the safety note in
+        # CLAUDE/skills/hook-agent-type-filter.md.
         LOG_ENTRY="$(echo "${INPUT}" | jq -c \
             --arg ts "${TIMESTAMP}" \
             '{timestamp: $ts,
               hook: "sanitize_bash_output",
               tool_name: (.tool_name // "unknown"),
               duration_ms: (.duration_ms // null),
-              exit_code: (.exit_code // null)}' 2>/dev/null)" || LOG_ENTRY=""
+              exit_code: (.exit_code // null),
+              agent_id: (.agent_id // null),
+              agent_type: (.agent_type // null)}' 2>/dev/null)" || LOG_ENTRY=""
         if [ -n "${LOG_ENTRY}" ]; then
             echo "${LOG_ENTRY}" >> "${LOG_FILE}" 2>/dev/null || true
         fi
