@@ -33,6 +33,7 @@ The PowerShell tool now invokes scripts with `-ExecutionPolicy Bypass` by defaul
 ## Related
 - `CLAUDE/skills/docker-claude-stability.md` — Dockerfile.agent CLI pinning
 - `CLAUDE/skills/plugin-prefer-https.md` — plugin install transport
+- `CLAUDE/skills/dynamic-workflows-background-sessions.md` — `! <command>` background-session dispatch syntax (v2.1.154+).
 
 ## Source
 Claude Code CLI v2.1.143 CHANGELOG — https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md

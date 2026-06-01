@@ -56,6 +56,17 @@
           }
         ]
       }
+    ],
+    "MessageDisplay": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/message_display_transform.sh"
+          }
+        ]
+      }
     ]
   }
 }

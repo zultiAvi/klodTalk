@@ -6,6 +6,15 @@ mcpServers:
       - "-y"
       - "@modelcontextprotocol/server-filesystem"
       - "/workspace"
+  # Optional -- gated by operator setting KLODTALK_SECURITY_MCP=1 in container env;
+  # see CLAUDE/skills/security-intel-mcp.md. Frontmatter forwarding is
+  # unconditional, so the operator controls activation via NVD_API_KEY presence
+  # (missing key -> tools return errors and reviewer degrades gracefully).
+  cve_intel:
+    command: npx
+    args:
+      - "-y"
+      - "@mukul975/cve-mcp-server"
 disallowedTools:
   - Bash
   - Write

@@ -12,6 +12,8 @@ Security-focused team. Uses Opus throughout for deeper threat analysis and secur
 | coder | coder | opus |
 | reviewer | reviewer | sonnet |
 
+> Reviewer in this pipeline gets the CVE intel MCP when `KLODTALK_SECURITY_MCP=1` (with `NVD_API_KEY`) is set on the agent container. See `CLAUDE/skills/security-intel-mcp.md`.
+
 ## Pipeline
 
 1. **planner** — Analyze the request with security threat modeling. Include OWASP concerns in the plan.
