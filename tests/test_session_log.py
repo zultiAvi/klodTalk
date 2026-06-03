@@ -138,3 +138,112 @@ def test_log_event_empty_session_id_is_noop(fresh_session_log):
     # should be created.
     if os.path.isdir(sl.LOG_BASE):
         assert ".klodTalk" not in os.listdir(sl.LOG_BASE)
+
+
+# ── Integration tests covering server.py interaction with session_log ─────────
+# These tests guard the two-bug fix for closed-session-reopen duplication and
+# hook-event leakage into the client view. Import server lazily because it has
+# module-level side effects; isolate writes via tmp env vars.
+
+@pytest.fixture
+def server_module(tmp_path, monkeypatch):
+    """Import server.server with isolated workspace/log directories."""
+    monkeypatch.setenv("KLODTALK_TEMP_BASE", str(tmp_path / "ws"))
+    monkeypatch.setenv("KLODTALK_LOG_BASE", str(tmp_path / "logs"))
+    # Force a fresh import so the env vars take effect even if a previous test
+    # already imported server.
+    import session_log
+    importlib.reload(session_log)
+    import server
+    importlib.reload(server)
+    return server
+
+
+def test_session_to_dict_filters_hook_events(server_module, tmp_path):
+    """role='hook' entries in events.jsonl must NOT appear in the messages
+    list returned to clients on history fetch."""
+    server = server_module
+    sid = "ses_hook01"
+    # Arrange: persistent log with a mix of roles.
+    server.session_log.log_event(sid, "user", "hello")
+    server.session_log.log_event(sid, "hook", '{"tool":"Read","path":"/x"}')
+    server.session_log.log_event(sid, "agent", "world")
+    server.session_log.log_event(sid, "hook", '{"tool":"Edit"}')
+
+    # Build a minimal Session-like stand-in. _session_to_dict only reads
+    # attributes; it does not call into session_manager.
+    class _S:
+        session_id = sid
+        project_name = "p"
+        git_branch = "b"
+        status = "open"
+        created_at = ""
+        closed_at = ""
+        user_name = "u"
+        users = ["u"]
+        workspace_path = str(tmp_path / "ws")
+        system = False
+        comment = ""
+
+    d = server._session_to_dict(_S(), include_messages=True)
+    msgs = d["messages"]
+    roles = [m["role"] for m in msgs]
+    assert "hook" not in roles, f"hook role leaked into messages: {roles}"
+    assert roles == ["user", "agent"]
+
+
+def test_broadcast_does_not_double_write_when_log_to_session_false(server_module):
+    """Explicit log_event + default-arg _broadcast_to_session_users must
+    produce exactly ONE line in events.jsonl, not two."""
+    import asyncio
+    server = server_module
+    sid = "ses_dup01"
+
+    # Register a fake session so _broadcast_to_session_users does not early-out.
+    class _S:
+        session_id = sid
+        users = []  # no connected clients, send loop is a no-op
+        project_name = "p"
+
+    server.session_manager._sessions[sid] = _S()
+
+    # Explicit log_event (mirrors what every role handler in server.py does
+    # immediately before broadcasting).
+    server.session_log.log_event(sid, "user", "hello")
+    # Broadcast with default log_to_session=False — must NOT mirror.
+    asyncio.run(server._broadcast_to_session_users(sid, {
+        "type": "new_message",
+        "session_id": sid,
+        "role": "user",
+        "content": "hello",
+    }))
+
+    events = server.session_log.read_events(sid)
+    assert len(events) == 1, f"expected 1 event, got {len(events)}: {events}"
+    assert events[0]["role"] == "user"
+    assert events[0]["content"] == "hello"
+
+
+def test_broadcast_mirrors_when_log_to_session_true(server_module):
+    """Opt-in path: log_to_session=True must still mirror lifecycle/error
+    payloads that have no peer explicit log_event."""
+    import asyncio
+    server = server_module
+    sid = "ses_mirror01"
+
+    class _S:
+        session_id = sid
+        users = []
+        project_name = "p"
+
+    server.session_manager._sessions[sid] = _S()
+
+    asyncio.run(server._broadcast_to_session_users(sid, {
+        "type": "session_working",
+        "session_id": sid,
+        "working": True,
+    }, log_to_session=True))
+
+    events = server.session_log.read_events(sid)
+    assert len(events) == 1
+    assert events[0].get("type") == "session_working" or events[0].get("role") == "system"
