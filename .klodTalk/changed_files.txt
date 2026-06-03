@@ -1,5 +1,6 @@
-server/server.py
-server/tools/__init__.py
-server/tools/dedupe_events_jsonl.py
-tests/test_session_log.py
-clients/web/index.html
+CLAUDE/skills/terminal-sequence-hook-output.md
+CLAUDE/skills/canary-phrase-guard.md
+server/utils/hooks/canary_phrase_guard.sh
+teams/roles/memory_curator.md
+teams/teams/memory-curator.md
+.klodTalk/instincts.md
