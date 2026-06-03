@@ -11,3 +11,6 @@
 - Prefer `@github/mcp-server` over deprecated `@modelcontextprotocol/server-github`; env var is `GITHUB_TOKEN` (not `GITHUB_PERSONAL_ACCESS_TOKEN`).
 - Role-file edits that add a new required section MUST also update any embedded output-format code blocks earlier in the file — readers skim the template, not later sections.
 - `ANTHROPIC_WORKSPACE_ID` must be forwarded into Docker containers when the deployment uses workload identity federation (Claude Code v2.1.141+); omit it and federation requests are rejected silently. See CLAUDE/skills/terminal-sequence-hook-output.md.
+- `_broadcast_to_session_users(...)` defaults to `log_to_session=False`; pass `True` only at call sites with NO peer `session_log.log_event(...)` for the same content — otherwise events.jsonl double-writes and reopen shows duplicates. See `CLAUDE/skills/broadcast-log-event-single-write.md`.
+- `_session_to_dict` and `handle_reopen_session` filter `role=="hook"` events from client payloads (durable log keeps them); the archive branch in `_session_to_dict` (`status=="closed"` fallback) now also filters hooks (fixed in b701a77).
+- Forward-only fixes to write-path bugs do NOT heal historical rows already on disk in `events.jsonl`; pair every such fix with a one-shot dedupe migration. See `CLAUDE/skills/events-jsonl-dedupe-migration.md` and `server/tools/dedupe_events_jsonl.py`.
