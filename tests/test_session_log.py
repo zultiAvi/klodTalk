@@ -224,6 +224,90 @@ def test_broadcast_does_not_double_write_when_log_to_session_false(server_module
     assert events[0]["content"] == "hello"
 
 
+def test_nightly_start_broadcast_single_write(server_module):
+    """The nightly-routine start path logs the message via session_log.log_event
+    AND then broadcasts it. The broadcast must NOT mirror — otherwise every
+    nightly run writes the same content twice into events.jsonl, which then
+    surfaces as duplicate "Nightly routine starting" lines on reconnect.
+
+    This mirrors the production sequence at server/server.py:~3510 (log_event)
+    + ~3516 (broadcast). After the fix, the broadcast no longer passes
+    log_to_session=True, so exactly one row lands in events.jsonl.
+    """
+    import asyncio
+    server = server_module
+    sid = "ses_nightly01"
+
+    class _S:
+        session_id = sid
+        users = []
+        project_name = "system"
+
+    server.session_manager._sessions[sid] = _S()
+
+    body = "Nightly routine starting: scanning Claude/Anthropic channels and GitHub for improvements..."
+    # Step 1 — explicit log_event (matches server.py:~3510).
+    server.session_log.log_event(sid, "system", body)
+    # Step 2 — broadcast with default log_to_session=False (matches the fixed
+    # server.py:~3516 call site).
+    asyncio.run(server._broadcast_to_session_users(sid, {
+        "type": "new_message",
+        "session_id": sid,
+        "project": "system",
+        "role": "system",
+        "content": body,
+    }))
+
+    events = server.session_log.read_events(sid)
+    assert len(events) == 1, f"nightly broadcast double-wrote: {events}"
+    assert events[0]["role"] == "system"
+    assert events[0]["content"].startswith("Nightly routine starting")
+
+
+def test_session_to_dict_archive_branch_filters_hook_events(server_module, tmp_path):
+    """Closed-session reopen reads from the archive ``session.jsonl`` when the
+    persistent ``events.jsonl`` is empty. The archive branch must apply the
+    same ``role == "hook"`` filter as the persistent branch — otherwise hook
+    rows leak into the client view on reopen of legacy sessions."""
+    import json as _json
+    server = server_module
+    sid = "ses_archive_hook01"
+
+    # Stage an archive directory with one normal + one hook row.
+    archive_dir = tmp_path / "archive" / sid
+    archive_dir.mkdir(parents=True)
+    archive_file = archive_dir / "session.jsonl"
+    with open(archive_file, "w", encoding="utf-8") as f:
+        f.write(_json.dumps({"timestamp": "t0", "role": "user", "content": "hello"}) + "\n")
+        f.write(_json.dumps({"timestamp": "t1", "role": "hook", "content": '{"tool":"Read"}'}) + "\n")
+        f.write(_json.dumps({"timestamp": "t2", "role": "agent", "content": "world"}) + "\n")
+
+    # Stub session_manager.get_archive_path to point at the staged dir.
+    server.session_manager.get_archive_path = lambda s: str(archive_dir)  # type: ignore
+
+    class _S:
+        session_id = sid
+        project_name = "p"
+        git_branch = "b"
+        status = "closed"
+        created_at = ""
+        closed_at = ""
+        user_name = "u"
+        users = ["u"]
+        workspace_path = str(tmp_path / "ws_missing")  # intentionally missing
+        system = False
+        comment = ""
+
+    # Ensure the persistent log is empty so the archive branch is exercised.
+    assert server.session_log.read_events(sid) == []
+
+    d = server._session_to_dict(_S(), include_messages=True)
+    msgs = d["messages"]
+    roles = [m["role"] for m in msgs]
+    assert "hook" not in roles, f"archive hook row leaked into messages: {roles}"
+    assert roles == ["user", "agent"], roles
+
+
 def test_broadcast_mirrors_when_log_to_session_true(server_module):
     """Opt-in path: log_to_session=True must still mirror lifecycle/error
     payloads that have no peer explicit log_event."""

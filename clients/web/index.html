@@ -1436,7 +1436,24 @@ function handleMessage(msg) {
           system: s.system || false,
         };
         if (s.working) workingSessions.add(s.session_id);
-        sessionMessages[s.session_id] = s.messages || [];
+        // Belt-and-braces dedupe of the server-supplied history. The server is
+        // the source of truth post-948633d, but legacy events.jsonl files may
+        // still carry pre-fix duplicates until the dedupe migration is run.
+        // Key on timestamp|role|content; first occurrence wins. O(n) per session.
+        // Live messages (case 'new_message') deliberately skip this dedupe — a
+        // user genuinely sending the same text twice in the same second must
+        // still appear twice.
+        const _rawMsgs = s.messages || [];
+        const _seen = new Set();
+        const _deduped = [];
+        for (let i = 0; i < _rawMsgs.length; i++) {
+          const m = _rawMsgs[i];
+          const k = (m && m.timestamp || '') + '|' + (m && m.role || '') + '|' + (m && m.content || '');
+          if (_seen.has(k)) continue;
+          _seen.add(k);
+          _deduped.push(m);
+        }
+        sessionMessages[s.session_id] = _deduped;
         rebuildSessionTokens(s.session_id, false); // rebuild without touching weekly usage
       });
       saveTokenState();

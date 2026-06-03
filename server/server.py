@@ -1428,9 +1428,15 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
                             if not line:
                                 continue
                             try:
-                                messages.append(json.loads(line))
+                                row = json.loads(line)
                             except json.JSONDecodeError:
                                 continue
+                            # Hook events stay in the archive for debugging but
+                            # are not forwarded to clients (mirrors the
+                            # persistent-branch filter above at ~line 1406).
+                            if row.get("role") == "hook":
+                                continue
+                            messages.append(row)
                 except Exception as e:
                     log.error("Failed to read archive history for session %s: %s", session.session_id, e)
                 d["messages"] = messages
@@ -3512,7 +3518,9 @@ async def run_nightly_routine(routine_cfg: dict):
     except Exception:
         pass
 
-    # 5. Notify all connected clients
+    # 5. Notify all connected clients.
+    # Peer session_log.log_event for this nightly-start lives at line ~3510 above;
+    # do NOT pass log_to_session=True here or events.jsonl will double-write.
     await _broadcast_to_session_users(SYSTEM_SESSION_ID, {
         "type": "new_message",
         "session_id": SYSTEM_SESSION_ID,
@@ -3520,7 +3528,7 @@ async def run_nightly_routine(routine_cfg: dict):
         "role": "system",
         "content": "Nightly routine starting: scanning Claude/Anthropic channels and GitHub for improvements...",
         "timestamp": datetime.utcnow().isoformat() + "Z",
-    }, log_to_session=True)
+    })
 
     # 6. Trigger the agent in execute mode
     await trigger_session(SYSTEM_SESSION_ID, "execute", "_system")
