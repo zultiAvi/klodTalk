@@ -604,7 +604,7 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
         "type": "session_working",
         "session_id": session_id,
         "working": True,
-    })
+    }, log_to_session=True)
 
     try:
         merge_status = "ok"
@@ -720,7 +720,7 @@ async def trigger_session(session_id: str, mode: str, triggering_user: str):
             "type": "session_working",
             "session_id": session_id,
             "working": False,
-        })
+        }, log_to_session=True)
 
 
 async def _notify_session_error(session_id: str, message: str):
@@ -746,44 +746,47 @@ async def _notify_session_error(session_id: str, message: str):
                 pass
 
 
-async def _broadcast_to_session_users(session_id: str, payload: dict):
+async def _broadcast_to_session_users(session_id: str, payload: dict,
+                                      *, log_to_session: bool = False):
     """Send a message to all users registered on the session.
 
-    Every payload is mirrored to ``session_log.log_event`` so that no
-    user-visible event is ever lost — even if no client is currently
-    connected, the event still lands on disk.
+    When ``log_to_session=True``, the payload is also mirrored into the
+    persistent session log. Callers that already invoke
+    ``session_log.log_event`` for the same content MUST leave this False to
+    avoid duplicate events.jsonl entries (which surface as duplicated
+    messages on reopen).
     """
     session = session_manager.get_session(session_id)
     if not session:
         return
     msg = json.dumps(payload)
-    # Mirror EVERY payload into the persistent session log exactly once.
-    try:
-        ptype = payload.get("type", "system")
-        # Choose role: prefer explicit "role" (new_message); else use type.
-        if ptype == "new_message":
-            role_for_log = payload.get("role") or "system"
-        elif ptype == "error":
-            role_for_log = "error"
-        else:
-            # Lifecycle events: session_working, session_reopening,
-            # session_reopened, session_deleted, etc.
-            role_for_log = "system"
-        # Body: prefer "content"/"message"; fall back to the payload itself
-        # so nothing is silently dropped.
-        body = payload.get("content")
-        if body is None:
-            body = payload.get("message")
-        if body is None:
-            body = json.dumps({k: v for k, v in payload.items() if k != "session_id"},
-                              ensure_ascii=False)
-        session_log.log_event(
-            session_id, role_for_log, body,
-            model=payload.get("model"),
-            extra={"type": ptype},
-        )
-    except Exception:
-        pass
+    if log_to_session:
+        try:
+            ptype = payload.get("type", "system")
+            # Choose role: prefer explicit "role" (new_message); else use type.
+            if ptype == "new_message":
+                role_for_log = payload.get("role") or "system"
+            elif ptype == "error":
+                role_for_log = "error"
+            else:
+                # Lifecycle events: session_working, session_reopening,
+                # session_reopened, session_deleted, etc.
+                role_for_log = "system"
+            # Body: prefer "content"/"message"; fall back to the payload itself
+            # so nothing is silently dropped.
+            body = payload.get("content")
+            if body is None:
+                body = payload.get("message")
+            if body is None:
+                body = json.dumps({k: v for k, v in payload.items() if k != "session_id"},
+                                  ensure_ascii=False)
+            session_log.log_event(
+                session_id, role_for_log, body,
+                model=payload.get("model"),
+                extra={"type": ptype},
+            )
+        except Exception:
+            pass
     sent_to: set[str] = set()
     for user in session.users:
         if user in sent_to:
@@ -1396,8 +1399,12 @@ def _session_to_dict(session, include_messages: bool = False, workspace_override
         if persistent:
             # Map session_log events into the existing message shape so
             # clients don't need any change to render them.
+            # Hook events stay in events.jsonl for debugging but are not
+            # forwarded to clients (raw JSONL is noise in the UI).
             messages = []
             for ev in persistent:
+                if ev.get("role") == "hook":
+                    continue
                 msg = {
                     "timestamp": ev.get("timestamp", ""),
                     "role": ev.get("role", "system"),
@@ -1818,12 +1825,16 @@ async def handle_reopen_session(ws, user_name: str, data: dict):
                     fallback = history_store.read_session(session_id, session.workspace_path)
                 events = fallback
             if events:
-                events_capped = events[-500:]
-                await ws.send(json.dumps({
-                    "type": "session_replay",
-                    "session_id": session_id,
-                    "events": events_capped,
-                }))
+                # Hook events are kept in events.jsonl for debugging but
+                # excluded from the client-facing replay.
+                visible = [e for e in events if e.get("role") != "hook"]
+                events_capped = visible[-500:]
+                if events_capped:
+                    await ws.send(json.dumps({
+                        "type": "session_replay",
+                        "session_id": session_id,
+                        "events": events_capped,
+                    }))
         except Exception as e:
             log.error("Reopen replay failed for %s: %s", session_id, e)
     else:
@@ -2594,7 +2605,7 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
             "session_id": session_id,
             "analysis": analysis,
             "status": "complete",
-        })
+        }, log_to_session=True)
     except Exception as e:
         log.error("Session analysis failed for '%s': %s", session_id, e)
         await _broadcast_to_session_users(session_id, {
@@ -2602,7 +2613,7 @@ async def _run_session_analysis(session_id: str, session, messages: list, user_n
             "session_id": session_id,
             "status": "error",
             "message": str(e),
-        })
+        }, log_to_session=True)
     finally:
         _session_analysis_running.discard(session_id)
 
@@ -3471,7 +3482,7 @@ async def run_nightly_routine(routine_cfg: dict):
                 "role": "system",
                 "content": f"Model references updated: {', '.join(msg_parts)}",
                 "timestamp": datetime.utcnow().isoformat() + "Z",
-            })
+            }, log_to_session=True)
     except Exception as e:
         log.warning("[routine] Model check failed (non-fatal): %s", e)
 
@@ -3509,7 +3520,7 @@ async def run_nightly_routine(routine_cfg: dict):
         "role": "system",
         "content": "Nightly routine starting: scanning Claude/Anthropic channels and GitHub for improvements...",
         "timestamp": datetime.utcnow().isoformat() + "Z",
-    })
+    }, log_to_session=True)
 
     # 6. Trigger the agent in execute mode
     await trigger_session(SYSTEM_SESSION_ID, "execute", "_system")
