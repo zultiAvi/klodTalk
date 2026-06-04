@@ -4,7 +4,7 @@ triggers:
   - Authoring a multi-agent pipeline role that needs to check whether a sub-agent is still running
   - Diagnosing a Claude Code session that appears stuck or hung
   - Building a status reporter / watchdog utility for KlodTalk pipeline runs
-summary: "Use `claude agents --json` (Claude Code v2.1.145+) to query live session state machine-readably instead of inferring it from in_message.txt/out_message.txt file writes."
+summary: "Use `claude agents --json` (Claude Code v2.1.145+) to query live session state machine-readably instead of inferring it from in_message.txt/out_message.txt file writes; v2.1.162 adds the `waitingFor` field that distinguishes a blocked agent from a stuck one."
 ---
 
 # Skill: `claude agents --json` Session-State Polling
@@ -12,9 +12,9 @@ summary: "Use `claude agents --json` (Claude Code v2.1.145+) to query live sessi
 ## Quick Reference
 - Command: `claude agents --json` -- emits JSON array of live sessions.
 - Scope to a project: `claude agents --json --cwd /workspace`.
-- Fields per session: `sessionId`, `status`, `model`, `cwd`, `parentSessionId`, `elapsed`.
+- Fields per session: `sessionId`, `status`, `model`, `cwd`, `parentSessionId`, `elapsed`, `waitingFor` (v2.1.162+).
 - OTEL spans expose the same identity via `agent_id` / `parent_agent_id` (v2.1.145).
-- Requires Claude Code >= v2.1.145; the `--cwd` flag landed in v2.1.141.
+- Requires Claude Code >= v2.1.145; the `--cwd` flag landed in v2.1.141; `waitingFor` requires v2.1.162.
 
 ## When to Use
 Use this skill when an Orchestrator or watchdog role needs a deterministic, lower-latency answer to "is sub-agent X still running?" than the current file-write inference (waiting for `out_message.txt` to update). Also use it when assembling a status reporter, when diagnosing a stuck session, or when correlating OTEL traces to KlodTalk sessions.
@@ -28,13 +28,16 @@ claude agents --json --cwd /workspace      # scope to one project tree
 ```
 Parse the JSON with `jq` -- example: `claude agents --json | jq '.[] | select(.status=="running") | .sessionId'`.
 
-### Output schema (v2.1.145)
+Filter for blocked agents (v2.1.162+): `claude agents --json | jq '.[] | select(.waitingFor != null) | {sessionId, waitingFor}'` -- distinguishes agents awaiting input/tool response from genuinely stuck ones.
+
+### Output schema (v2.1.145, with v2.1.162 additions)
 - `sessionId` -- string, matches the `session_id` used in WebSocket messages.
 - `status` -- `running` | `idle` | `exited` | `error`.
-- `model` -- e.g. `claude-opus-4-7`.
+- `model` -- e.g. `claude-opus-4-8`.
 - `cwd` -- absolute path the session was launched with.
 - `parentSessionId` -- nullable; set for sub-agents dispatched via `claude agents`.
 - `elapsed` -- seconds since session start.
+- `waitingFor` -- `string | null` (v2.1.162+). Set when the agent is blocked: common values include `"human_input"` and `"tool_response"`. `null` when running normally. Absent on Claude Code < v2.1.162 -- treat missing key as `null`.
 
 ### Dispatch-time overrides (v2.1.142)
 Complementary flags for `claude agents <subcommand>`: `--add-dir`, `--settings`, `--mcp-config`, `--model`, `--effort`. Useful when launching a sub-agent with a different model or MCP config than the parent.
@@ -47,6 +50,8 @@ remaining=$(claude agents --json --cwd "$CLAUDE_PROJECT_DIR" \
 if [ "$remaining" = "0" ]; then printf '\a'; fi
 ```
 Emit the bell via the `terminalSequence` hook output -- see `terminal-sequence-hook-output.md`.
+
+If a sub-agent's `waitingFor` is non-null (v2.1.162+), the watchdog should notify (bell/log) rather than terminate -- a blocked agent waiting for input or a tool response is not the same as a hung one and should not be force-killed on a timeout alone.
 
 ### OTEL correlation
 The `agent_id` and `parent_agent_id` span fields (v2.1.145) match the JSON `sessionId` / `parentSessionId` -- use them to join Claude Code traces with KlodTalk's per-session logs.

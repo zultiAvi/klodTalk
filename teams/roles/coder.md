@@ -35,6 +35,10 @@ A plain-text summary including:
 
 One file path per line (relative to `/workspace`), listing every file you created or modified.
 
+## Before Completing
+
+Before writing your final `out_message.txt` or signaling completion to the orchestrator, perform the self-check described in `CLAUDE/skills/coder-done-when-self-check.md`: score your implementation 0-10 against `plan.md`'s `DONE WHEN:` line and log `CODER_SELF_CHECK_SCORE:` in `handoff.md`. If the score is below 7, do one more implementation pass instead of relying on the Reviewer to catch the gap -- this avoids burning a full review loop.
+
 <!-- inherits: base.md -->
 
 ## Guidelines

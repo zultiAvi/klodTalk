@@ -3204,7 +3204,7 @@ def _query_latest_model(family: str) -> str:
     """
     result = subprocess.run(
         [_CLAUDE_CMD, "--print", "--model", family, "--max-turns", "1",
-         "Reply ONLY with your exact model ID string (e.g. claude-opus-4-7). Nothing else."],
+         "Reply ONLY with your exact model ID string (e.g. claude-opus-4-8). Nothing else."],
         capture_output=True, text=True, timeout=60,
     )
     if result.returncode != 0:
