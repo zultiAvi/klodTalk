@@ -4,7 +4,7 @@ triggers:
   - Coder role about to write final `out_message.txt` or signal completion to the orchestrator
   - Coder role finishing an implementation that has a Planner `plan.md` with a `DONE WHEN:` line
   - Tuning a pipeline to reduce premature APPROVED / forced review-fix iterations
-summary: Before declaring done, the Coder scores its own implementation against the Planner's `DONE WHEN:` line on a 0-10 scale; if the score is below 7, do another pass before handing off, and always log the score in `handoff.md`.
+summary: "Before declaring done, the Coder scores its own implementation against the Planner's `DONE WHEN:` line on a 0-10 scale; if the score is below 7, do another pass before handing off, and always log the score in `handoff.md`."
 ---
 
 # Skill: Coder `DONE WHEN:` Self-Check
