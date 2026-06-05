@@ -30,6 +30,18 @@ HISTORY_FILE = "/workspace/.klodTalk/history/session.jsonl"
 MAX_HISTORY_CHARS = 20000
 MAX_HISTORY_MESSAGES = 50
 
+# Refusal classification (Claude Platform API, 2026-06-02).
+# A run that returns stop_reason == "refusal" with no output is not billed and
+# carries a stop_details object {category, explanation}. category is one of
+# "cyber", "bio", or null. A null category on an ordinary authorized workspace
+# task is the signature of a hallucinated / workspace-auth false-positive
+# refusal — KlodTalk's most recurring failure mode.
+# See CLAUDE/skills/refusal-stop-details-classification.md.
+STOP_REASON_REFUSAL = "refusal"
+REFUSAL_CATEGORY_CYBER = "cyber"
+REFUSAL_CATEGORY_BIO = "bio"
+REFUSAL_LOG_FILE = os.path.join(TEAM_CURRENT_DIR, "refusal_events.log")
+
 _claude_auth = get_claude_auth()
 
 BASE_BRANCH = os.environ.get("BASE_BRANCH", "main")
@@ -368,6 +380,73 @@ def parse_claude_json_output(raw_stdout: str) -> tuple[str, str]:
         return raw_stdout, ""
 
 
+def classify_refusal(data: dict) -> tuple[bool, str | None, str]:
+    """Classify a parsed --output-format json payload for refusal stop reasons.
+
+    Reads ``data["stop_reason"]`` and ``data["stop_details"]`` (shape
+    ``{category, explanation}`` per the Claude Platform API as of 2026-06-02).
+    ``stop_details`` may be missing or None on older CLIs / non-refusal runs.
+
+    Returns ``(is_refusal, category, explanation)`` where:
+      - ``is_refusal`` is True only when ``stop_reason == "refusal"``.
+      - ``category`` is ``"cyber"``, ``"bio"``, or ``None`` (None == a likely
+        hallucinated / workspace-auth false-positive refusal).
+      - ``explanation`` is the human-readable string (empty if absent).
+    """
+    if not isinstance(data, dict):
+        return False, None, ""
+    if data.get("stop_reason") != STOP_REASON_REFUSAL:
+        return False, None, ""
+
+    details = data.get("stop_details")
+    if not isinstance(details, dict):
+        return True, None, ""
+
+    category = details.get("category")
+    if not isinstance(category, str):
+        category = None
+    explanation = details.get("explanation")
+    if not isinstance(explanation, str):
+        explanation = ""
+    return True, category, explanation
+
+
+def log_refusal(data: dict, source: str) -> None:
+    """Inspect a parsed JSON payload and log any refusal to stderr + a log file.
+
+    Observational only — does NOT retry. A null-category refusal on an
+    authorized workspace task is logged as a WARNING recommending the
+    authorization preamble be re-asserted; a cyber/bio refusal is surfaced
+    verbatim. ``source`` identifies the call site (e.g. "single-agent").
+    """
+    is_refusal, category, explanation = classify_refusal(data)
+    if not is_refusal:
+        return
+
+    if category is None:
+        line = (
+            f"WARNING [refusal:{source}]: stop_reason=refusal with null category "
+            "on an authorized workspace task — this is likely a hallucinated / "
+            "workspace-auth false-positive refusal. The authorization preamble "
+            "should be re-asserted (see CLAUDE/skills/workspace-authorization-preamble.md)."
+        )
+    else:
+        detail = f": {explanation}" if explanation else ""
+        line = (
+            f"WARNING [refusal:{source}]: genuine policy refusal, "
+            f"category={category}{detail}"
+        )
+
+    print(line, file=sys.stderr)
+    try:
+        os.makedirs(TEAM_CURRENT_DIR, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with open(REFUSAL_LOG_FILE, "a") as f:
+            f.write(f"{timestamp} {line}\n")
+    except OSError:
+        pass
+
+
 def git_available() -> bool:
     try:
         r = subprocess.run(
@@ -672,6 +751,11 @@ def run_execute_mode(input_text: str):
                 if usage_summary and os.path.isfile(OUT_FILE):
                     with open(OUT_FILE, 'a') as f:
                         f.write(f"\n\n{usage_summary}")
+                # Observational refusal classification (no auto-retry).
+                try:
+                    log_refusal(json.loads(raw_output), "team-orchestrator")
+                except (json.JSONDecodeError, TypeError):
+                    pass
             except Exception as e:
                 print(f"WARNING: Could not parse orchestrator token usage: {e}")
 
@@ -833,11 +917,19 @@ Timestamp: {timestamp}"""
         with open(OUT_FILE, 'w') as f:
             f.write(f"Claude finished the task but did not write a summary to {OUT_FILE}.")
 
-    # Append usage summary before branch info.
-    _, usage_summary = parse_claude_json_output(result.stdout.strip())
+    # Parse the JSON payload once and reuse it for both the usage summary and
+    # refusal classification (avoids a second json.loads).
+    raw_stdout = result.stdout.strip()
+    _, usage_summary = parse_claude_json_output(raw_stdout)
     if usage_summary and os.path.isfile(OUT_FILE):
         with open(OUT_FILE, 'a') as f:
             f.write(f"\n\n{usage_summary}")
+
+    # Observational refusal classification (no auto-retry).
+    try:
+        log_refusal(json.loads(raw_stdout), "single-agent")
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     # Append branch/repo info so the user knows which branch was used.
     branch_info = get_repo_branch_info()
