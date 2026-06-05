@@ -34,7 +34,9 @@
 # Source: Claude Code CHANGELOG v2.1.163 --
 #   https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md
 
-CODER_REMINDER='Before declaring done, run your DONE-WHEN self-check: score 0-10 against plan.md'\''s "DONE WHEN:" line, and if it is below 7 do another pass. Record the score in your handoff before finishing.'
+# NOTE: keep this text free of literal double-quote characters so the no-jq
+# fallback below (which builds the JSON by hand) stays valid JSON.
+CODER_REMINDER='Before declaring done, run your DONE-WHEN self-check: score 0-10 against the plan.md DONE-WHEN line, and if it is below 7 do another pass. Record the score in your handoff before finishing.'
 
 {
     INPUT="$(cat 2>/dev/null)" || INPUT=""
