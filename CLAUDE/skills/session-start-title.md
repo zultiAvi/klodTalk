@@ -4,7 +4,7 @@ triggers:
   - Adding per-session labels in Claude Code UI/logs
   - Correlating logs across many concurrent agent sessions
   - Reasoning about the SessionStart hook reloadSkills capability
-summary: "SessionStart hook returns hookSpecificOutput.sessionTitle to label each Claude Code session (e.g. klodtalk/<project> [<role>]); reloadSkills field reserved for future hot-reload."
+summary: "SessionStart hook returns hookSpecificOutput.sessionTitle to label each Claude Code session (e.g. klodtalk/<project> [<role>]); reloadSkills is now emitted true to trigger a one-time skill-directory rescan during session startup."
 ---
 
 # Skill: SessionStart Title Hook
@@ -30,7 +30,7 @@ Claude Code v2.1.153 added `hookSpecificOutput.sessionTitle` to the SessionStart
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
     "sessionTitle": "klodtalk/my-project [coder]",
-    "reloadSkills": false
+    "reloadSkills": true
   }
 }
 ```
@@ -56,7 +56,11 @@ Both env vars are sanitized (control chars stripped, length capped) before being
 ```
 
 ### reloadSkills Field
-The same hook payload supports `reloadSkills: true` to force the CLI to rescan the configured skill directories within a live session. This script currently emits `reloadSkills: false` because KlodTalk has no live-session signal path to trigger a reload mid-run; see the deferred ideas entry on `reloadSkills`. When KlodTalk gains a way to signal a running container (sentinel file, SIGUSR1), this hook can branch on the signal and emit `reloadSkills: true` on the next SessionStart event without any other changes.
+This script emits `reloadSkills: true` **unconditionally** at session start. SessionStart fires once per container launch (not repeatedly mid-run), so emitting `true` triggers a one-time rescan of the configured skill directories during the CLI's initialization pass. This is always safe and imposes zero extra overhead — it just ensures any skills written to `.claude/skills/` before the container launched are picked up by that session.
+
+Keep the distinction clear:
+- **Startup rescan (now active)**: `reloadSkills: true` from SessionStart fires once during initialization. Always safe.
+- **Mid-session reload (still un-wired)**: forcing a rescan inside a *running* session would require a live-session signal path (sentinel file, SIGUSR1) that KlodTalk does not yet have. That is a separate future capability, not what this hook does.
 
 ### Exit Discipline
 Same as all observational hooks: wrap logic in `{ ... } 2>/dev/null` and end with `exit 0`. SessionStart is a startup gate — a non-zero exit would prevent the session from starting at all.

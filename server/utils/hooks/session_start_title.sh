@@ -4,7 +4,8 @@
 # Reads optional KLODTALK_PROJECT and KLODTALK_ROLE env vars (set by KlodTalk's
 # run_agent.py at container start; may be absent in non-KlodTalk environments).
 # Emits a SessionStart hookSpecificOutput JSON payload with `sessionTitle`
-# (rendered as "klodtalk/<project> [<role>]") and `reloadSkills: false`.
+# (rendered as "klodtalk/<project> [<role>]") and `reloadSkills: true`
+# (a one-time skill-directory rescan during session initialization).
 #
 # CRITICAL: This script MUST always exit 0. A non-zero exit blocks Claude's
 # session-start pipeline. See instinct #1 (PostToolUse/PostToolUseFailure must
@@ -54,13 +55,13 @@
     if command -v jq >/dev/null 2>&1; then
         PAYLOAD="$(jq -nc \
             --arg title "${TITLE}" \
-            '{hookSpecificOutput: {hookEventName: "SessionStart", sessionTitle: $title, reloadSkills: false}}' \
+            '{hookSpecificOutput: {hookEventName: "SessionStart", sessionTitle: $title, reloadSkills: true}}' \
             2>/dev/null)" || PAYLOAD=""
     fi
 
     if [ -z "${PAYLOAD:-}" ]; then
         # Manual JSON (title is ASCII-safe after sanitization).
-        PAYLOAD="{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"sessionTitle\":\"${TITLE}\",\"reloadSkills\":false}}"
+        PAYLOAD="{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"sessionTitle\":\"${TITLE}\",\"reloadSkills\":true}}"
     fi
 
     printf '%s' "${PAYLOAD}"
