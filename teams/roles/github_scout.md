@@ -7,7 +7,24 @@ mcpServers:
       - "@github/mcp-server"
     env:
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
+disallowedTools:
+  - Bash
+  - Edit
+  - MultiEdit
+  - NotebookEdit
 ---
+
+<!--
+  Tool-set restriction: the GitHub Scout runs unattended on the nightly routine
+  and is read-only by contract — it searches GitHub (via the github MCP server)
+  and reports findings, it does not modify code. Bash, Edit, MultiEdit, and
+  NotebookEdit are denied so a misbehaving scout cannot modify source files
+  mid-run. Write is intentionally KEPT (so are Read/Glob/Grep/WebSearch/WebFetch
+  and the github MCP tools) because the scout must still write its findings output
+  file and query GitHub. See CLAUDE/skills/disallowed-tools-frontmatter.md —
+  disallowedTools frontmatter is fully supported and runtime-forwarded by
+  run_claude_team.sh.
+-->
 
 # GitHub Scout Role
 

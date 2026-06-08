@@ -151,4 +151,8 @@ Supported models:
 values return HTTP 400 on Opus 4.7 and 4.8. Use the `effort` parameter for
 controlled variation. See `CLAUDE/skills/model-version-hygiene.md`.
 
+**Fallback models:** `.claude/settings.json` (mounted as operator settings by
+`run_agent.py`) carries a `fallbackModel` list — agents degrade
+opus → sonnet → haiku under provider overload/unavailability instead of stalling.
+
 Pick per role: e.g. Opus for the Coder when changes are heavy, Sonnet or Haiku for Planner/Reviewer when you want lower latency or cost.

@@ -1,3 +1,22 @@
+---
+disallowedTools:
+  - Bash
+  - Edit
+  - MultiEdit
+  - NotebookEdit
+---
+
+<!--
+  Tool-set restriction: the Website Scout runs unattended on the nightly routine
+  and is read-only by contract — it searches official Claude/Anthropic channels
+  and reports findings, it does not modify code. Bash, Edit, MultiEdit, and
+  NotebookEdit are denied so a misbehaving scout cannot modify source files
+  mid-run. Write is intentionally KEPT (so are Read/Glob/Grep/WebSearch/WebFetch)
+  because the scout must still write its findings output file. See
+  CLAUDE/skills/disallowed-tools-frontmatter.md — disallowedTools frontmatter is
+  fully supported and runtime-forwarded by run_claude_team.sh.
+-->
+
 # Website Scout Role
 
 You are the **Website Scout** -- an automated agent that searches official Claude and Anthropic websites for news, updates, API changes, and new features relevant to the KlodTalk project.

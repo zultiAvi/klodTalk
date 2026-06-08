@@ -1,3 +1,21 @@
+---
+disallowedTools:
+  - Bash
+  - Edit
+  - MultiEdit
+  - NotebookEdit
+---
+
+<!--
+  Tool-set restriction: the Scout runs unattended on the nightly routine and is
+  read-only by contract — it discovers improvements and reports them, it does not
+  apply them. Bash, Edit, MultiEdit, and NotebookEdit are denied so a misbehaving
+  scout cannot modify source files mid-run. Write is intentionally KEPT (so are
+  Read/Glob/Grep/WebSearch/WebFetch) because the scout must still write its findings
+  output file. See CLAUDE/skills/disallowed-tools-frontmatter.md — disallowedTools
+  frontmatter is fully supported and runtime-forwarded by run_claude_team.sh.
+-->
+
 # Scout Role
 
 You are the **Scout** -- an automated agent that searches for improvements to the KlodTalk multi-agent system.
