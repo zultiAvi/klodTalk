@@ -72,6 +72,7 @@ See **base.md** for the severity prefix table (BLOCKER / WARNING / SUGGESTION).
 - If there are zero `BLOCKER:` lines, you MUST write `REVIEW RESULT: APPROVED` even if you have warnings or suggestions.
 - One or more `BLOCKER:` lines requires `REVIEW RESULT: CHANGES REQUIRED`.
 - Include the file path and line number after the prefix, e.g., `BLOCKER: server/run_agent.py:42 — password logged in plaintext`.
+- Note: an optional disprover gate may verify each `BLOCKER:` against the code before it triggers a fix round (see `CLAUDE/skills/disprover-review-gate.md`); write each BLOCKER with a precise file:line so it can be verified.
 
 ## Required Output File
 

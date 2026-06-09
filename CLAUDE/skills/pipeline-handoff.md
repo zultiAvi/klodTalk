@@ -27,17 +27,23 @@ STAGE: <role name>
 DONE: <one sentence of what was accomplished>
 KEY_DECISIONS:
   - <bullet, max 5 items>
+FAILED_APPROACHES:
+  - <approach> — <why it failed>   (chronological one-liners, or "none")
 NEXT_AGENT_NEEDS: <what the next role must know to skip re-reading the full context>
 OPEN_ITEMS: <unresolved questions or risks, or "none">
 ```
+
+`FAILED_APPROACHES` records every dead end already tried (the most expensive thing for the next role to rediscover), so the next stage/iteration does not re-derive it.
 
 ### Producer Discipline
 - Write `handoff.md` after the stage's primary output (`plan.md`, `coder_output.txt`, ...), not instead of it.
 - Keep it under ~30 lines. If it is longer, the stage is doing too much.
 - Do not include code blocks — point to the file paths instead.
+- **`FAILED_APPROACHES` is append-only**: across review-fix iterations, add new dead ends below the existing ones — never overwrite or trim the list. It accumulates within a task so the log survives every fix round. One line per entry; point to file paths, not code.
 
 ### Consumer Discipline
 - Read `handoff.md` first, then read only the artifacts it references.
+- **Read `FAILED_APPROACHES` before attempting a fix** so you do not retry an approach the reviewer (or a prior iteration) already rejected.
 - If `handoff.md` is absent, follow the role's normal context-loading instructions.
 - If `handoff.md` contradicts the primary artifact (e.g., `plan.md`), trust the primary artifact and flag the contradiction.
 
@@ -46,4 +52,5 @@ OPEN_ITEMS: <unresolved questions or risks, or "none">
 - `selective-git-staging-nightly.md` — companion convention for nightly pipelines.
 
 ## Source
-mattpocock/skills handoff pattern — https://github.com/mattpocock/skills (star count flagged as implausible by the idea evaluator; treated as a standalone pattern rather than a vetted repo).
+- mattpocock/skills handoff pattern — https://github.com/mattpocock/skills (star count flagged as implausible by the idea evaluator; treated as a standalone pattern rather than a vetted repo).
+- `FAILED_APPROACHES` field: REMvisual/claude-handoff — https://github.com/REMvisual/claude-handoff (~19 stars, v2.0.0 2026-04-21), which records every failed approach chronologically as "the most expensive thing to rediscover".

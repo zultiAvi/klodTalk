@@ -95,6 +95,10 @@ When a pipeline step has a review loop:
 5. If the reviewer wrote `NO_ISSUES_FOUND` → the loop is done (same as zero blockers).
 6. If max iterations reached → proceed to next pipeline step regardless.
 
+#### Disprover Gate (optional)
+
+Before step 4 spawns a fix round, you MAY run an optional disprover gate to filter false-positive BLOCKERs. For each `BLOCKER:` line, spawn a read-only verifier (`teams/roles/disprover.md`, Read/Grep/Glob only) that tries to refute the finding against the code and emits `CONFIDENCE: <0-100>`. BLOCKERs scoring below threshold (recommend 80) are demoted to `WARNING:` and do NOT trigger a fix round; if no `BLOCKER:` lines survive, treat the review as approved (step 3). This is opt-in — skip it for trivial tasks. See `CLAUDE/skills/disprover-review-gate.md` for the full pattern and logging discipline.
+
 ### Validator Review Loops
 
 When a validator step has a review loop with both `fix_role` and `redesign_role`:

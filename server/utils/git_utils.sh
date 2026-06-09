@@ -50,6 +50,48 @@ git_configure_identity() {
     git config user.email "${email}"
 }
 
+# Create a per-session git worktree on its own branch.
+# Usage: git_create_session_worktree <session_id> <base_branch>
+# Path convention: /workspace/.worktrees/<session_id>; branch: session/<session_id>.
+# Guards against an existing path or branch (idempotent — reuses if present).
+git_create_session_worktree() {
+    local session_id="$1"
+    local base_branch="$2"
+    if [[ -z "${session_id}" ]] || [[ -z "${base_branch}" ]]; then
+        echo "[git_utils] git_create_session_worktree: session_id and base_branch required" >&2
+        return 1
+    fi
+    local wt_path="/workspace/.worktrees/${session_id}"
+    local branch="session/${session_id}"
+    if [[ -e "${wt_path}" ]]; then
+        echo "${wt_path}"
+        return 0
+    fi
+    mkdir -p /workspace/.worktrees
+    if git -C /workspace show-ref --verify --quiet "refs/heads/${branch}"; then
+        git -C /workspace worktree add "${wt_path}" "${branch}" 2>&1 || return 1
+    else
+        git -C /workspace worktree add "${wt_path}" -b "${branch}" "origin/${base_branch}" 2>&1 || return 1
+    fi
+    echo "${wt_path}"
+}
+
+# Remove a per-session git worktree and prune stale metadata.
+# Usage: git_remove_session_worktree <session_id>
+# Uses --force so dirty worktrees are still removed on session cleanup.
+git_remove_session_worktree() {
+    local session_id="$1"
+    if [[ -z "${session_id}" ]]; then
+        echo "[git_utils] git_remove_session_worktree: session_id required" >&2
+        return 1
+    fi
+    local wt_path="/workspace/.worktrees/${session_id}"
+    if [[ -e "${wt_path}" ]]; then
+        git -C /workspace worktree remove --force "${wt_path}" 2>&1 || rm -rf "${wt_path}"
+    fi
+    git -C /workspace worktree prune 2>&1 || true
+}
+
 # Collect branch information for all repos (or single repo).
 # Output: human-readable string; empty if no git repo present.
 #   Single-repo:  "branch_name"
