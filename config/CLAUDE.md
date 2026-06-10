@@ -135,13 +135,16 @@ Role definitions live in `teams/roles/` as `.md` files. Each role file is the sy
 
 Supported models:
 
-- `opus` (claude-opus-4-7) — most capable, highest cost
+- `opus` (claude-opus-4-8) — most capable Opus-tier, highest cost
 - `sonnet` (claude-sonnet-4-6) — balanced capability and speed
 - `haiku` (claude-haiku-4-5-20251001) — fastest and cheapest
+
+A newer top tier (not wired as a shorthand) is available: `claude-fable-5` (Claude Fable 5, GA June 9 2026 — most capable widely-released model) and `claude-mythos-5` (limited availability). Use the full ID to select them; the `opus` shorthand still resolves to Opus 4.8.
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
 - `claude-sonnet-4-20250514` — retiring June 15, 2026; use `claude-sonnet-4-6` instead
-- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-7` instead
+- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-8` instead
+- `claude-opus-4-7` — superseded; use `claude-opus-4-8` instead
 
 Pick per role: e.g. Opus for the Coder when changes are heavy, Sonnet or Haiku for Planner/Reviewer when you want lower latency or cost.
