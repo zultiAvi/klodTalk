@@ -1,5 +1,7 @@
 {
   "disableSkillShellExecution": true,
+  "disableBundledSkills": true,
+  "requiredMinimumVersion": "2.1.170",
   "forceRemoteSettingsRefresh": true,
   "fallbackModel": [
     "claude-sonnet-4-6",
@@ -68,6 +70,17 @@
           {
             "type": "command",
             "command": "bash /workspace/server/utils/hooks/message_display_transform.sh"
+          }
+        ]
+      }
+    ],
+    "PostSession": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/post_session_snapshot.sh"
           }
         ]
       }

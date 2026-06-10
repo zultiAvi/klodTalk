@@ -33,13 +33,24 @@ MAX_HISTORY_MESSAGES = 50
 # Refusal classification (Claude Platform API, 2026-06-02).
 # A run that returns stop_reason == "refusal" with no output is not billed and
 # carries a stop_details object {category, explanation}. category is one of
-# "cyber", "bio", or null. A null category on an ordinary authorized workspace
-# task is the signature of a hallucinated / workspace-auth false-positive
-# refusal — KlodTalk's most recurring failure mode.
+# "cyber", "bio", "reasoning_extraction", or null. A null category on an
+# ordinary authorized workspace task is the signature of a hallucinated /
+# workspace-auth false-positive refusal — KlodTalk's most recurring failure
+# mode. Any non-null category is a genuine policy refusal surfaced verbatim.
 # See CLAUDE/skills/refusal-stop-details-classification.md.
 STOP_REASON_REFUSAL = "refusal"
 REFUSAL_CATEGORY_CYBER = "cyber"
 REFUSAL_CATEGORY_BIO = "bio"
+# reasoning_extraction: added in the 2026-06-09 Platform API release alongside
+# Fable 5; blocks reverse-engineering / duplication of model outputs. Treated
+# as a genuine policy refusal identical to cyber/bio (surface explanation).
+REFUSAL_CATEGORY_REASONING_EXTRACTION = "reasoning_extraction"
+# Genuine (non-hallucinated) policy-refusal categories. A refusal whose category
+# is in this set is surfaced verbatim; a null category is the workspace-auth
+# false-positive signature (re-assert the authorization preamble).
+GENUINE_REFUSAL_CATEGORIES = frozenset(
+    {REFUSAL_CATEGORY_CYBER, REFUSAL_CATEGORY_BIO, REFUSAL_CATEGORY_REASONING_EXTRACTION}
+)
 REFUSAL_LOG_FILE = os.path.join(TEAM_CURRENT_DIR, "refusal_events.log")
 
 _claude_auth = get_claude_auth()
@@ -389,8 +400,10 @@ def classify_refusal(data: dict) -> tuple[bool, str | None, str]:
 
     Returns ``(is_refusal, category, explanation)`` where:
       - ``is_refusal`` is True only when ``stop_reason == "refusal"``.
-      - ``category`` is ``"cyber"``, ``"bio"``, or ``None`` (None == a likely
-        hallucinated / workspace-auth false-positive refusal).
+      - ``category`` is ``"cyber"``, ``"bio"``, ``"reasoning_extraction"``, or
+        ``None`` (None == a likely hallucinated / workspace-auth false-positive
+        refusal). Any category in ``GENUINE_REFUSAL_CATEGORIES`` is a genuine
+        policy refusal whose explanation is surfaced verbatim.
       - ``explanation`` is the human-readable string (empty if absent).
     """
     if not isinstance(data, dict):
@@ -416,25 +429,30 @@ def log_refusal(data: dict, source: str) -> None:
 
     Observational only — does NOT retry. A null-category refusal on an
     authorized workspace task is logged as a WARNING recommending the
-    authorization preamble be re-asserted; a cyber/bio refusal is surfaced
-    verbatim. ``source`` identifies the call site (e.g. "single-agent").
+    authorization preamble be re-asserted; a genuine policy refusal
+    (cyber/bio/reasoning_extraction) is surfaced verbatim. ``source`` identifies
+    the call site (e.g. "single-agent").
     """
     is_refusal, category, explanation = classify_refusal(data)
     if not is_refusal:
         return
 
-    if category is None:
-        line = (
-            f"WARNING [refusal:{source}]: stop_reason=refusal with null category "
-            "on an authorized workspace task — this is likely a hallucinated / "
-            "workspace-auth false-positive refusal. The authorization preamble "
-            "should be re-asserted (see CLAUDE/skills/workspace-authorization-preamble.md)."
-        )
-    else:
+    if category in GENUINE_REFUSAL_CATEGORIES:
         detail = f": {explanation}" if explanation else ""
         line = (
             f"WARNING [refusal:{source}]: genuine policy refusal, "
             f"category={category}{detail}"
+        )
+    else:
+        # Null category — or any unrecognized category — on an authorized
+        # workspace task is the hallucinated / workspace-auth false-positive
+        # signature. Recommend re-asserting the authorization preamble.
+        line = (
+            f"WARNING [refusal:{source}]: stop_reason=refusal with "
+            f"category={category!r} on an authorized workspace task — this is "
+            "likely a hallucinated / workspace-auth false-positive refusal. The "
+            "authorization preamble should be re-asserted "
+            "(see CLAUDE/skills/workspace-authorization-preamble.md)."
         )
 
     print(line, file=sys.stderr)
