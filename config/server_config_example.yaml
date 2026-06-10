@@ -18,9 +18,12 @@ auto_update:
   branch: "main"
 
 # Model shorthand resolution (used in team member tables):
-#   opus   -> claude-opus-4-7
+#   opus   -> claude-opus-4-8
 #   sonnet -> claude-sonnet-4-6
 #   haiku  -> claude-haiku-4-5-20251001
+# Newer top tier (not wired as shorthands; reference by full ID):
+#   claude-fable-5  (Claude Fable 5, GA 2026-06-09 — most capable widely-released)
+#   claude-mythos-5 (limited availability, Project Glasswing)
 # Retired models (do not use): claude-3-haiku-20240307, claude-sonnet-4-20250514,
 # claude-opus-4-20250514. See CLAUDE/skills/model-version-hygiene.md for details.
 

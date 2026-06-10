@@ -208,9 +208,11 @@ Assign it to a project with `"team": "my-team"` in `config/projects.json`. See `
 
 ### Available Models
 
-- **`opus`** (claude-opus-4-7) — most capable
+- **`opus`** (claude-opus-4-8) — most capable Opus-tier
 - **`sonnet`** (claude-sonnet-4-6) — balanced
 - **`haiku`** (claude-haiku-4-5-20251001) — fastest and cheapest
+
+A newer top tier exists but is not wired as a shorthand: **Claude Fable 5** (`claude-fable-5`, GA June 9 2026) is Anthropic's most capable widely-released model, and **Claude Mythos 5** (`claude-mythos-5`) is limited-availability. Reference these by full ID; `opus` still resolves to Opus 4.8.
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026

@@ -108,9 +108,11 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 
 ## Available Models
 
-- `opus` — most capable (claude-opus-4-7)
+- `opus` — most capable Opus-tier (claude-opus-4-8)
 - `sonnet` — balanced (claude-sonnet-4-6)
 - `haiku` — fastest/cheapest (claude-haiku-4-5-20251001)
+
+Newer top-tier models exist but are not wired as shorthands: `claude-fable-5` (Claude Fable 5, GA June 9 2026 — most capable widely-released model) and `claude-mythos-5` (limited availability). Reference them by full ID in a member table; `opus` still resolves to Opus 4.8.
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
