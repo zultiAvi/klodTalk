@@ -114,8 +114,8 @@ When the flag is present, the orchestrator uses it as the primary signal. When a
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
-- `claude-sonnet-4-20250514` — retiring June 15, 2026; use `sonnet` alias instead
-- `claude-opus-4-20250514` — retiring June 15, 2026; use `opus` alias instead
+- `claude-sonnet-4-20250514` — **retiring in 4 days — June 15, 2026**; use `sonnet` alias instead
+- `claude-opus-4-20250514` — **retiring in 4 days — June 15, 2026**; use `opus` alias instead
 
 ## Enabling / disabling a team
 

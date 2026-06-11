@@ -40,10 +40,32 @@ Step 4 (run record / audit) can read `post_session_log.jsonl` for a per-role
 token tally and open `session_transcript_<role>_*.jsonl` to inspect exactly what
 a role did — without re-launching its (now-destroyed) container.
 
+## Known Reliability Risks
+
+PostSession/SessionEnd hooks are not guaranteed to complete on abrupt teardown
+(anthropics/claude-code issue tracker):
+
+- **Issue #41577** — SessionEnd/PostSession hooks may be **killed before async
+  I/O completes** when the session ends abruptly (Ctrl+C, container teardown,
+  Docker stop signal). **Issue #32712** — hooks are cancelled on Ctrl+C.
+- **Defensive rule:** `post_session_snapshot.sh` must write all output files
+  **synchronously** — no backgrounded subprocesses (`&`), no network / `curl`
+  calls before the writes; complete every file write before the process exits.
+  The script already exits 0, but write *ordering* is what lets the snapshot
+  survive an abrupt kill: do the writes first, defer anything optional.
+- **Fallback:** if the PostSession hook silently fails on abrupt teardown, the
+  **PreCompact** hook (`precompact-context-guard.md`) fires more reliably for
+  long-running sessions — consider writing a minimal fallback snapshot there too.
+- **`/wrap-up` pattern** (inspired by issue #59273's `/exit`-writes-memory idea):
+  a slash command agents invoke before an intentional exit to trigger the
+  snapshot manually, bypassing the unreliable auto-hook timing window.
+
 ## Cross-References
 - `subagent-lifecycle-hooks.md` — Task-tool sub-agent (SubagentStart/Stop) level.
 - `multi-agent-hook-observability.md` — the shared JSONL observability pattern.
 - `required-minimum-version-pin.md` — the 2.1.169/2.1.170 version floor.
+- `precompact-context-guard.md` — reliability fallback: fires on PreCompact for
+  long-running sessions when PostSession may be killed on abrupt teardown.
 
 ## Source
 - anthropics/claude-code CHANGELOG v2.1.169 —
