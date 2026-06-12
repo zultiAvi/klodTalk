@@ -21,9 +21,24 @@ summary: "Opus 4.8 supports `role: \"system\"` messages injected mid-`messages`-
 3. `_run_btw_agent` (`server/server.py:1626`) runs a lightweight `MODE=btw` `claude -p` call (`server.py:~1644`) and the output is logged/broadcast with a `[BTW]` prefix.
 - Net effect: BTW is *user/context text* fed through a one-shot `-p` invocation — it is not injected into a running agent's `messages` array, and a long-running agent's prompt cache gets no benefit.
 
+## Cross-Session Relay Loses User Authority (v2.1.166)
+As of Claude Code v2.1.166, messages relayed between sessions (e.g. via
+`SendMessage`) **lose user-level authority** — they are treated as
+non-user-authored — and are **blocked in auto / unattended mode**.
+- KlodTalk's BTW is exactly such a cross-session side-channel relay: the payload
+  originates in one session and is delivered into another via the file +
+  `MODE=btw` `-p` shim, so it arrives as **system / non-user context, not a user
+  turn**.
+- Implication: any BTW-triggered action that requires *user authority* (e.g.
+  approving a gated tool, authorizing a destructive op) will **not be honored in
+  unattended nightly runs** — the relayed content is non-user-authored and such
+  messages are blocked in auto mode. BTW remains usable as added *context*, but
+  do not rely on it to grant permissions in an unattended pipeline.
+
 ## When to Use
 - Anyone redesigning BTW to inject guidance into an already-running pipeline agent.
 - Anyone diagnosing "why does BTW get treated as chit-chat / why did the cache miss".
+- Anyone wondering why a BTW that asks for a privileged/gated action is ignored in an unattended run.
 
 ## Recommendation (future direction)
 - IF/WHEN BTW is migrated off the file + `-p` shim to a structured `messages` array (e.g. an Agent SDK path), route the BTW payload as a mid-conversation `role: "system"` message so it is treated as instruction WITHOUT invalidating the running agent's prompt cache.
@@ -35,4 +50,5 @@ summary: "Opus 4.8 supports `role: \"system\"` messages injected mid-`messages`-
 - `model-version-hygiene.md` — the Opus 4.8 requirement.
 
 ## Source
-Mid-conversation system messages (no beta header, Opus 4.8) — https://docs.anthropic.com/en/build-with-claude/mid-conversation-system-messages (platform.claude.com / API release notes, 2026-05-28).
+- Mid-conversation system messages (no beta header, Opus 4.8) — https://docs.anthropic.com/en/build-with-claude/mid-conversation-system-messages (platform.claude.com / API release notes, 2026-05-28).
+- Cross-session relayed messages lose user authority and are blocked in auto mode — Claude Code CHANGELOG v2.1.166 (https://code.claude.com/docs/en/changelog).

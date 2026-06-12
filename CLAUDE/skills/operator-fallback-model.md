@@ -4,7 +4,7 @@ triggers:
   - Agents/orchestrator stalling or erroring when the primary model (Opus) is overloaded
   - Adding graceful-degradation to unattended pipelines (nightly_scout, optimizer, tdd)
   - Editing .claude/settings.json operator settings for the agent containers
-summary: Add a `fallbackModel` list to .claude/settings.json so agents fall back (opus to sonnet to haiku) on overload instead of stalling (Claude Code v2.1.166+).
+summary: Add a `fallbackModel` list to .claude/settings.json so agents fall back (sonnet to haiku) on overload instead of stalling (Claude Code v2.1.166+); the list holds models tried AFTER the primary, so do not include the opus primary in it.
 ---
 
 # Skill: fallbackModel Operator Setting for Graceful Degradation
@@ -24,11 +24,19 @@ KlodTalk has no graceful-degradation path by default; an overloaded primary mode
 1. Edit `/workspace/.claude/settings.json` (the operator-level file `run_agent.py` mounts into containers — NOT `~/.claude/settings.json`, which `_setup_agent_hooks()` overwrites).
 2. Add a top-level key alongside existing keys; preserve the full `hooks` block and all other keys verbatim:
    ```json
-   "fallbackModel": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
+   "fallbackModel": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
    ```
    Slot order matters: the primary model is tried first, then each entry in the
    array is tried in order on overload/unavailability. Up to 3 entries are
    supported (Claude Code v2.1.166+).
+   - **Why no `claude-opus-4-8` in the list:** the array holds models tried
+     *after* the primary on overload. KlodTalk's safety-net roles are
+     opus-primary (orchestrator, coder), so listing opus as the first fallback
+     would just retry the already-overloaded primary. The 2-entry sonnet→haiku
+     chain is the better *universal* fallback — it degrades to genuinely lighter
+     models and works unchanged for opus- and sonnet-primary roles alike. Keep
+     this list and the live `/workspace/.claude/settings.json` value identical so
+     they don't drift.
 3. Validate JSON: `python3 -m json.tool /workspace/.claude/settings.json`.
 4. No Python changes are needed — the setting is consumed by the CLI runtime, not by KlodTalk code.
 5. Document the key in `config/CLAUDE.md` for discoverability.

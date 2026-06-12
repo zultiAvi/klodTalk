@@ -1,7 +1,7 @@
 {
   "disableSkillShellExecution": true,
   "disableBundledSkills": true,
-  "requiredMinimumVersion": "2.1.170",
+  "requiredMinimumVersion": "2.1.172",
   "forceRemoteSettingsRefresh": true,
   "fallbackModel": [
     "claude-sonnet-4-6",
