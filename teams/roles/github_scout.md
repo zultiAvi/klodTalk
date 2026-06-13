@@ -57,6 +57,7 @@ Search GitHub for public repositories, tools, and discussions matching the tags 
 - Claude Code CLI tips, custom slash commands, automation patterns
 - Multi-agent orchestration patterns
 - Anything that could improve team definitions, role prompts, server utilities, or developer workflows
+- Whenever the CLI floor is bumped, check the native sub-agent prompt tracker for Plan/Explore/Task prompt changes — see `CLAUDE/skills/native-subagent-prompt-drift.md`
 
 ## Required Output File
 
