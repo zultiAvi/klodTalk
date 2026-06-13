@@ -33,6 +33,9 @@ Add a credit-headroom probe to the nightly pipeline preamble analogous to the RP
 ### Interaction with Rate Limits
 Rate limits (RPM/TPM) and credit pools are independent constraints — both apply simultaneously. A pipeline can pass the rate-limit probe and still fail on credit exhaustion, and vice versa. Keep both checks.
 
+## Tooling
+- `CLAUDE/skills/ant-cli-helpers.md` — the official `ant` CLI wraps `GET /v1/usage` (`ant usage`) for terminal credit checks. Note: OAuth-only installs have no API key, so credit queries remain console-only.
+
 ## Related
 - `CLAUDE/skills/rate-limit-awareness.md` — RPM/TPM headroom (distinct constraint)
 - `CLAUDE/skills/claude-agents-cli.md` — session launch flags

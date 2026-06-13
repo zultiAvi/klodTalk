@@ -50,6 +50,7 @@ When `NVD_API_KEY` is set, the Reviewer uses the `cve_intel` tools to:
 When the MCP is unavailable (missing key or network error), the Reviewer logs a `WARNING:` noting that live CVE data was unreachable and proceeds with model-knowledge-only review.
 
 ## Related
+- `security-auditor-role.md` -- the dedicated read-only Security Auditor role that reuses this same `cve_intel` MCP, gated identically.
 - `mcp-frontmatter.md` -- the unconditional frontmatter forwarding contract.
 - `codebase-search-mcp.md` -- another MCP server added to Reviewer (sibling pattern).
 - `plugin-dir-dispatch.md` -- the env-var dispatch precedent (`KLODTALK_PLUGIN_DIR`); same operator-side conditionality model.
