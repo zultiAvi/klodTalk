@@ -36,7 +36,7 @@ summary: "Optional gate: each `BLOCKER:` is checked by a read-only disprover sub
 
 ## Related
 - `teams/roles/disprover.md` — the read-only verifier role.
-- `teams/roles/reviewer.md` / `reviewer-exit-condition-scoring.md` — produce the BLOCKERs this gate filters.
+- `teams/roles/reviewer.md` / `reviewer-exit-condition-scoring.md` — produce the BLOCKERs this gate filters. The reviewer's "Evidence Requirement" (every BLOCKER cites a `file:line` actually read) makes each finding cheaper for this gate to confirm or refute.
 - `fresh-context-evaluator.md` — clean-context re-read (complementary, not refutation).
 
 ## Source

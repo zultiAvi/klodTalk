@@ -57,15 +57,17 @@ existing call sites can break silently on migration:
 | Model ID | Status | Replacement |
 |----------|--------|-------------|
 | `claude-3-haiku-20240307` | RETIRED (March 2026) | `claude-haiku-4-5-20251001` |
-| `claude-sonnet-4-20250514` | **URGENT** — (**4 DAYS** — retires 2026-06-15) | `claude-sonnet-4-6` |
-| `claude-opus-4-20250514` | **URGENT** — (**4 DAYS** — retires 2026-06-15) | `claude-opus-4-8` |
+| `claude-sonnet-4-20250514` | **URGENT** — (**1 DAY** — retires TOMORROW 2026-06-15; RETIRED after) | `claude-sonnet-4-6` |
+| `claude-opus-4-20250514` | **URGENT** — (**1 DAY** — retires TOMORROW 2026-06-15; RETIRED after) | `claude-opus-4-8` |
 | `claude-3-7-sonnet` | RETIRED | `claude-sonnet-4-6` |
 | `claude-3-5-haiku` | RETIRED | `claude-haiku-4-5-20251001` |
 
-> **URGENT — June 15, 2026 retirement (4 DAYS from 2026-06-11):**
+> **URGENT — June 15, 2026 retirement (1 DAY from 2026-06-14 — retires TOMORROW):**
 > Both `claude-sonnet-4-20250514` and `claude-opus-4-20250514` hard-retire on
 > June 15, 2026. Any role, team definition, or server call still pinned to
 > these IDs will start returning API errors that day. Audit and migrate now.
+> **After 2026-06-15 these two rows become simply "RETIRED"** — move them into
+> the "Retired Models (Do Not Use)" framing once the date passes.
 
 ## Sampling Param Restriction (Opus 4.7+)
 
@@ -97,6 +99,7 @@ If you find `budget_tokens` in any `.py` file, replace it with the appropriate `
 - `teams/teams/*.md` — member tables use shorthands (`opus`, `sonnet`, `haiku`)
 - `teams/run_claude_team.sh` — model mapping in the orchestrator launcher
 - `server/*.py` — any direct API calls with model parameters
+- `enforce-available-models.md` — the **enforcement layer**: the `enforceAvailableModels` + `availableModels` allowlist in `.claude/settings.json` hard-blocks any alias from resolving to a model not in the Active table above (the harness-level counterpart to this doc's "Do Not Use" list).
 
 ## Checking for Deprecations
 

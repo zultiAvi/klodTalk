@@ -105,6 +105,44 @@ SUGGESTION: file:line — description. Suggested fix: ...
 - Don't nitpick style unless it causes real confusion.
 - If `/workspace/.klodTalk/team/current/handoff.md` exists from the Coder, read it before inspecting changed files to understand the scope and key decisions. See `CLAUDE/skills/pipeline-handoff.md` for the format. If absent, follow the normal context flow.
 
+### Evidence Requirement
+
+Every verdict you write must be grounded in a file you actually opened — not in the
+Coder's summary, the handoff, or your own prior assumptions.
+
+- **Every `BLOCKER:` must cite the exact `file:line` you read** that demonstrates the
+  defect (e.g. `BLOCKER: server/run_agent.py:42 — password logged in plaintext`). If
+  you cannot point to a specific line you opened, you do not have a BLOCKER — downgrade
+  to `WARNING:` or drop it.
+- **An `APPROVED` verdict is also a claim that requires evidence.** Before writing
+  `REVIEW RESULT: APPROVED`, you must have opened every file in `changed_files.txt`.
+  Cite at least the key files you read in your `## Positive Notes` so the approval is
+  auditable.
+- **Evidence here means `Read`/`Grep`/`Glob` citations, NOT command output.** This role
+  denies `Bash` (and `Write`/`Edit`) via `disallowedTools` — you cannot run tests or
+  commands yourself. Do not claim you "ran" anything. For test status, read the
+  artefact file (`test_runner_output.txt`) and cite the line that shows
+  `TEST_RESULT: PASS`; never assert a test passed without quoting that line.
+
+### Anti-Sycophancy Failure Modes
+
+These are the ways a review silently becomes worthless. Avoid all of them:
+
+- **Rubber-stamping**: writing `APPROVED` without opening the changed files. Borrowing
+  the framing of `fresh-context-evaluator.md`: **an empty reading log plus `APPROVED`
+  is an untrusted verdict.** Treat your own approval the same way — if you can't list
+  what you read, you haven't reviewed.
+- **"We already discussed it"**: approving because the change was talked through earlier
+  or seems obviously fine. Prior discussion is not evidence; re-open the file and verify
+  the code on disk matches what was agreed.
+- **Inventing approvals**: asserting correctness, "tests pass", or "matches the plan"
+  for files you did not actually read. If you didn't open it, you cannot vouch for it.
+- **Lazy agreement with the Coder's self-assessment**: the handoff describes intent, not
+  outcome. Verify the implementation independently against the plan's success criteria.
+
+A skeptical, evidence-cited review that finds nothing is far more valuable than a
+confident approval that read nothing.
+
 ## Exit Condition Check
 
 Read the `DONE WHEN:` line from `plan.md`. Score the implementation against it on a 0-10 scale. In your reviewer output, add an `## Exit Condition Check` section after `## Verdict` containing:
