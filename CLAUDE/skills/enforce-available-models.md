@@ -18,8 +18,7 @@ summary: "Claude Code (>= 2.1.174) managed settings `enforceAvailableModels: tru
   "availableModels": [
     "claude-opus-4-8",
     "claude-sonnet-4-6",
-    "claude-haiku-4-5-20251001",
-    "claude-fable-5"
+    "claude-haiku-4-5-20251001"
   ]
   ```
 - Location: workspace-level `/workspace/.claude/settings.json` (see `hook-settings-location.md`). Settings only — do NOT touch server logic, auth, or `Dockerfile.agent`.
@@ -28,7 +27,8 @@ summary: "Claude Code (>= 2.1.174) managed settings `enforceAvailableModels: tru
 - KlodTalk selects models via shorthand aliases (`opus`/`sonnet`/`haiku`, resolved in
   `teams/run_claude_team.sh`). If an alias or a stale config string ever resolves
   to a retired ID (e.g. `claude-opus-4-20250514` / `claude-sonnet-4-20250514`,
-  which hard-retire 2026-06-15), the failure surfaces as an API error mid-pipeline.
+  which hard-retired 2026-06-15) or a suspended ID (`claude-fable-5` /
+  `claude-mythos-5`), the failure surfaces as an API error mid-pipeline.
 - `enforceAvailableModels` turns that class of failure into an **early, harness-level
   hard block**: a model outside the allowlist cannot be selected at all. This is the
   enforcement layer that complements the *documentation* layer (`model-version-hygiene.md`'s
@@ -57,8 +57,7 @@ Add to `/workspace/.claude/settings.json` alongside the version pin:
   "availableModels": [
     "claude-opus-4-8",
     "claude-sonnet-4-6",
-    "claude-haiku-4-5-20251001",
-    "claude-fable-5"
+    "claude-haiku-4-5-20251001"
   ]
 }
 ```

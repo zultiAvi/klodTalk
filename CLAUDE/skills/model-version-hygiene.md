@@ -4,7 +4,7 @@ triggers:
   - Updating model references in team definitions or config files
   - Diagnosing API errors from retired model identifiers
   - Migrating from budget_tokens to the effort parameter
-summary: "Current (incl. Fable 5) and retired model IDs, shorthand resolution, and effort parameter reference."
+summary: "Current and retired model IDs, shorthand resolution, and effort parameter reference (Fable 5/Mythos 5 are suspended)."
 ---
 
 # Skill: Model Version Hygiene
@@ -22,19 +22,20 @@ When updating model references in team definitions, config files, or server code
 
 | Shorthand | Full Model ID | Notes |
 |-----------|---------------|-------|
-| (none) | `claude-fable-5` | Most capable widely-released model (launched 2026-06-09). 1M context default, 128k max output, always-on adaptive thinking, $10/$50 per MTok in/out. See "Fable 5 Breaking Constraints" below. |
 | `opus` | `claude-opus-4-8` | Most capable Opus, highest cost (launched May 28 2026) |
 | `sonnet` | `claude-sonnet-4-6` | Balanced capability and speed |
 | `haiku` | `claude-haiku-4-5-20251001` | Fastest and cheapest |
 
-`claude-mythos-5` is a Fable 5 sibling but is limited to **Project Glasswing**
-participants — it is NOT a generally-available option; do not select it for
-KlodTalk roles.
+> **`claude-fable-5` and `claude-mythos-5` are SUSPENDED** (launched ~2026-06-09,
+> suspended ~2026-06-12 by a US government export-control directive). Do NOT add
+> them to `.claude/settings.json` `availableModels` or use them as a role/alias
+> target — see `model-suspension-fable-mythos-5.md`. The "Fable 5 Breaking
+> Constraints" notes below are retained for historical reference only.
 
-## Fable 5 Breaking Constraints
+## Fable 5 Breaking Constraints (suspended model — historical reference)
 
-`claude-fable-5` (launched 2026-06-09) changes several long-standing defaults —
-existing call sites can break silently on migration:
+`claude-fable-5` (launched 2026-06-09, suspended 2026-06-12) changed several
+long-standing defaults — existing call sites could break silently on migration:
 
 - `thinking: {"type":"disabled"}` returns **HTTP 400** — thinking cannot be disabled.
 - Manual `budget_tokens` returns **HTTP 400** — adaptive thinking is always on.
@@ -57,17 +58,15 @@ existing call sites can break silently on migration:
 | Model ID | Status | Replacement |
 |----------|--------|-------------|
 | `claude-3-haiku-20240307` | RETIRED (March 2026) | `claude-haiku-4-5-20251001` |
-| `claude-sonnet-4-20250514` | **URGENT** — (**1 DAY** — retires TOMORROW 2026-06-15; RETIRED after) | `claude-sonnet-4-6` |
-| `claude-opus-4-20250514` | **URGENT** — (**1 DAY** — retires TOMORROW 2026-06-15; RETIRED after) | `claude-opus-4-8` |
+| `claude-sonnet-4-20250514` | RETIRED 2026-06-15 | `claude-sonnet-4-6` |
+| `claude-opus-4-20250514` | RETIRED 2026-06-15 | `claude-opus-4-8` |
 | `claude-3-7-sonnet` | RETIRED | `claude-sonnet-4-6` |
 | `claude-3-5-haiku` | RETIRED | `claude-haiku-4-5-20251001` |
 
-> **URGENT — June 15, 2026 retirement (1 DAY from 2026-06-14 — retires TOMORROW):**
-> Both `claude-sonnet-4-20250514` and `claude-opus-4-20250514` hard-retire on
-> June 15, 2026. Any role, team definition, or server call still pinned to
-> these IDs will start returning API errors that day. Audit and migrate now.
-> **After 2026-06-15 these two rows become simply "RETIRED"** — move them into
-> the "Retired Models (Do Not Use)" framing once the date passes.
+> **RETIRED 2026-06-15:** Both `claude-sonnet-4-20250514` and
+> `claude-opus-4-20250514` hard-retired on 2026-06-15. Any role, team
+> definition, or server call still pinned to these IDs now returns API errors.
+> Migrate to `claude-sonnet-4-6` / `claude-opus-4-8` respectively.
 
 ## Sampling Param Restriction (Opus 4.7+)
 

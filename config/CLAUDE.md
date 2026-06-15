@@ -144,8 +144,8 @@ Supported models:
 
 **Deprecated models (do not use):**
 - `claude-3-haiku-20240307` — RETIRED, returns API errors since March 2026
-- `claude-sonnet-4-20250514` — retiring June 15, 2026; use `claude-sonnet-4-6` instead
-- `claude-opus-4-20250514` — retiring June 15, 2026; use `claude-opus-4-8` instead
+- `claude-sonnet-4-20250514` — retired 2026-06-15; use `claude-sonnet-4-6` instead
+- `claude-opus-4-20250514` — retired 2026-06-15; use `claude-opus-4-8` instead
 
 **Sampling param restriction:** `temperature`, `top_p`, and `top_k` non-default
 values return HTTP 400 on Opus 4.7 and 4.8. Use the `effort` parameter for

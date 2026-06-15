@@ -38,8 +38,8 @@ RESULTS_FOLDER="${RESULTS_FOLDER:-$(jq -r '.results_folder // ""' "${2:-/workspa
 # Model alias resolution: opus->claude-opus-4-8, sonnet->claude-sonnet-4-6, haiku->claude-haiku-4-5-20251001
 # Deprecation warnings (as of May 2026):
 #   - claude-3-haiku-20240307: RETIRED — returns API errors since March 2026
-#   - claude-sonnet-4-20250514: retiring June 15 2026 — migrate to claude-sonnet-4-6
-#   - claude-opus-4-20250514: retiring June 15 2026 — migrate to claude-opus-4-8
+#   - claude-sonnet-4-20250514: retired 2026-06-15 — migrate to claude-sonnet-4-6
+#   - claude-opus-4-20250514: retired 2026-06-15 — migrate to claude-opus-4-8
 #   - claude-opus-4-7: superseded May 28 2026 by claude-opus-4-8
 CLAUDE_MODEL="${CLAUDE_MODEL:-claude-opus-4-8}"
 

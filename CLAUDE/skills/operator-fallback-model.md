@@ -12,7 +12,7 @@ summary: Add a `fallbackModel` list to .claude/settings.json so agents fall back
 ## Quick Reference
 - Add a top-level `fallbackModel` array to `/workspace/.claude/settings.json`.
 - Up to 3 models, tried in order when the primary is overloaded/unavailable. Requires Claude Code v2.1.166+.
-- Use CURRENT non-retiring model IDs only (e.g. `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`). Never list `*-20250514` (retires 2026-06-15).
+- Use CURRENT non-retiring model IDs only (e.g. `claude-sonnet-4-6`, `claude-haiku-4-5-20251001`). Never list `*-20250514` (retired 2026-06-15).
 
 ## When to Use
 When the orchestrator or per-role agents (especially the Opus-backed Coder/orchestrator in unattended nightly pipelines) can silently stall on Opus overload, and you want them to degrade and finish rather than error mid-run.

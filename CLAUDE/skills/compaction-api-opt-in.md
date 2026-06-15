@@ -117,7 +117,7 @@ Compaction is available on Opus 4.6 and later. Audit your team's model
 config (`teams/*.md`, `config/`) and confirm none of the long-running
 roles are pinned to a retired model (see `model-version-hygiene.md` --
 e.g. `claude-3-haiku-20240307` is retired April 2026; Sonnet 4 / Opus 4
-`*-20250514` retire June 15 2026).
+`*-20250514` retired 2026-06-15).
 
 If the model is older than 4.6, the env var is silently ignored by the
 CLI; the session will not benefit from compaction but will not fail.
