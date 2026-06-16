@@ -50,6 +50,7 @@ OPEN_ITEMS: <unresolved questions or risks, or "none">
 ## Related
 - `requesting-code-review.md` and `receiving-code-review.md` — review-loop handoff specifics.
 - `selective-git-staging-nightly.md` — companion convention for nightly pipelines.
+- `subagent-sidechain-summary.md` — the sub-agent-written, mid-pipeline variant (sub-agent summarizes its own large output for the parent, vs. this skill's orchestrator-written stage handoff).
 
 ## Source
 - mattpocock/skills handoff pattern — https://github.com/mattpocock/skills (star count flagged as implausible by the idea evaluator; treated as a standalone pattern rather than a vetted repo).

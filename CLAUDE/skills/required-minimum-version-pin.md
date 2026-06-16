@@ -4,7 +4,7 @@ triggers:
   - A version-gated hook or skill silently no-ops because the container CLI drifted
   - Hardening the agent container against Claude Code CLI version drift
   - Deciding the minimum Claude Code version KlodTalk's pipeline depends on
-summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requiredMinimumVersion, requiredMaximumVersion] managed settings; pin a floor (currently 2.1.176, the highest version any active KlodTalk hook/skill needs) to turn silent feature no-ops into a loud startup failure. Doc/config only — do NOT edit Dockerfile.agent."
+summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requiredMinimumVersion, requiredMaximumVersion] managed settings; pin a floor (currently 2.1.178, the highest version any active KlodTalk hook/skill needs) to turn silent feature no-ops into a loud startup failure. Doc/config only — do NOT edit Dockerfile.agent."
 ---
 
 # Skill: requiredMinimumVersion Managed-Settings Pin
@@ -12,7 +12,7 @@ summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requi
 ## Quick Reference
 - Keys: `requiredMinimumVersion` / `requiredMaximumVersion` (managed settings, Claude Code **>= 2.1.163**).
 - Effect: the CLI **refuses to start** if its version is outside the configured range.
-- Recommended floor: **2.1.176** (matches the highest version any active KlodTalk skill/hook depends on — the 2.1.176 hook `if`-condition matching fix and `enforceAvailableModels` allowlist enforcement matter for KlodTalk's model hardening; the 2.1.172 `CLAUDE_MEMORY_STORES` fix matters for KlodTalk's team memory recall in containerized/remote sessions; the `PostSession` lifecycle hook and `disableBundledSkills` need 2.1.169; the 2.1.170 transcript-save fix matters for KlodTalk's containerized launch path; `additionalContext` Stop hooks need 2.1.163; `waitingFor` needs 2.1.162).
+- Recommended floor: **2.1.178** (matches the highest version any active KlodTalk skill/hook depends on — the 2.1.178 MCP `disallowedTools` sub-agent enforcement fix matters for KlodTalk's reviewer/executor/validator role restrictions; the 2.1.176 hook `if`-condition matching fix and `enforceAvailableModels` allowlist enforcement matter for KlodTalk's model hardening; the 2.1.172 `CLAUDE_MEMORY_STORES` fix matters for KlodTalk's team memory recall in containerized/remote sessions; the `PostSession` lifecycle hook and `disableBundledSkills` need 2.1.169; the 2.1.170 transcript-save fix matters for KlodTalk's containerized launch path; `additionalContext` Stop hooks need 2.1.163; `waitingFor` needs 2.1.162).
 - Location: workspace-level `/workspace/.claude/settings.json` (see `hook-settings-location.md`). DO NOT touch `Dockerfile.agent` (pinned per project realities).
 
 ## When to Use
@@ -29,14 +29,14 @@ CLI image, this pin is **complementary insurance**, not a replacement — keep t
 floor in sync with the CLI version pinned in `Dockerfile.agent`.
 
 Version-floor history (why the floor is where it is):
+- **2.1.178 (2026-06-15): MCP `disallowedTools` sub-agent fix + `Tool(param:value)` permission syntax** — `disallowedTools` specs in sub-agent role files were silently ignored before this version; KlodTalk's `reviewer.md` / `executor.md` / `validator.md` / scout role restrictions rely on it being enforced. Also adds `Tool(param:value)` permission syntax (e.g. `Agent(model:claude-sonnet-4-6)`) for constraining sub-agent model at the permission-rule level (see `tool-param-permission-syntax.md`). Current recommended floor.
 - **2.1.176 (2026-06-13): hook `if`-condition matching fix + `enforceAvailableModels`**
   — hook `if` conditions that match documented tool patterns (e.g. `Edit(src/**)`)
   were not evaluated correctly before this version; KlodTalk's `PostToolUse` /
   `PreToolUse` matchers rely on correct `if`-condition matching. 2.1.176 also lands
   `footerLinksRegexes` and Fable 5 auto-fallback, and subsumes the 2.1.174
   `enforceAvailableModels` / `availableModels` allowlist enforcement that KlodTalk's
-  model-allowlist hardening depends on (see `enforce-available-models.md`). Current
-  recommended floor.
+  model-allowlist hardening depends on (see `enforce-available-models.md`).
 - **2.1.172 (2026-06-10): CLAUDE_MEMORY_STORES fix** — team memory stores
   weren't found in remote/container sessions before this version; KlodTalk's
   team memory recall depends on it. (2.1.172 also raised the sub-agent nesting
@@ -54,7 +54,7 @@ Add to `/workspace/.claude/settings.json`:
 
 ```json
 {
-  "requiredMinimumVersion": "2.1.176"
+  "requiredMinimumVersion": "2.1.178"
 }
 ```
 
@@ -62,7 +62,7 @@ Optionally cap with a maximum to detect an unintended upgrade:
 
 ```json
 {
-  "requiredMinimumVersion": "2.1.176",
+  "requiredMinimumVersion": "2.1.178",
   "requiredMaximumVersion": "2.99.99"
 }
 ```
@@ -76,7 +76,9 @@ requires, whichever is higher). The two must not drift apart.
 - `hook-settings-location.md` — why this goes in the workspace-level settings file.
 - `stop-hook-additional-context.md` — a 2.1.163-gated feature this floor protects.
 - `enforce-available-models.md` — the 2.1.174+ `enforceAvailableModels` allowlist this floor guarantees is honored.
+- `tool-param-permission-syntax.md` — the 2.1.178 `Tool(param:value)` permission syntax this floor unlocks.
+- `disallowed-tools-frontmatter.md` — the role `disallowedTools:` restrictions the 2.1.178 sub-agent fix makes effective.
 
 ## Source
-- Claude Code CHANGELOG v2.1.163 / v2.1.169 / v2.1.170 / v2.1.172 / v2.1.174 / v2.1.176 —
+- Claude Code CHANGELOG v2.1.163 / v2.1.169 / v2.1.170 / v2.1.172 / v2.1.174 / v2.1.176 / v2.1.178 —
   https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md

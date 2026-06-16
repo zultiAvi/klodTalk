@@ -45,6 +45,9 @@ stay out as well.
   resolution. Its "Fable 5 Breaking Constraints" section is now historical only.
 - `enforce-available-models.md` — the allowlist enforcement layer that turns a
   suspended/retired ID into an early hard block.
+- `fable-5-tokenizer-and-thinking.md` — the Opus 4.7 tokenizer (+30% tokens) and
+  always-on thinking (HTTP 400) gotchas plus a reinstatement checklist for when the
+  suspension lifts.
 
 ## Source
 
