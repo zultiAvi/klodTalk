@@ -50,12 +50,33 @@ permissions:
 ---
 ```
 
+## KlodTalk Runtime Caveat — `permissions:` is NOT wirable per-role today
+**Do not add a `permissions:` block to `teams/roles/*.md` frontmatter — it is a dead no-op.**
+Verified 2026-06-17 (file:line evidence):
+- KlodTalk code parses/forwards only `mcpServers` and `disallowedTools` from role
+  frontmatter (project instinct #7). A grep for `disallowedTools` across `server/` +
+  `teams/` matches **only** role `.md` files and one hook comment — it appears in **no**
+  executable path. `permissions:` has no parser/sink at all and would be silently dropped
+  (same no-op class as the `settings:` key documented in `auto-mode-hard-deny.md`).
+- The team orchestrator spawns sub-agents via the **native Agent tool**, which accepts a
+  `disallowedTools` parameter but does **NOT** accept a `permissions` parameter — there is
+  no place to forward a param-scoped deny even if it were parsed.
+- Both launch paths run with `--dangerously-skip-permissions`
+  (`teams/run_claude_team.sh:240`, `server/run_agent.py:300`), which bypasses the
+  `permissions` allow/ask/deny engine entirely.
+- **Net:** `Tool(param:value)` deny rules cannot currently be enforced per-role in KlodTalk
+  without a runtime change (a parser to forward `permissions:` into the Agent tool call AND
+  dropping `--dangerously-skip-permissions` for that spawn). Until then, restrict roles via
+  the `disallowedTools` whole-tool denylist and constrain models globally via
+  `enforceAvailableModels` (`enforce-available-models.md`).
+
 ## Notes
 - This is parameter-level, role-scoped. The model allowlist (`enforceAvailableModels`) is
   global; `Tool(param:value)` deny rules are how you tighten a *single* role below the
   global allowlist.
 - Applying concrete `Agent(model:...)` rules to specific KlodTalk role files (reviewer.md,
-  executor.md) is a follow-on per-role analysis, not part of adopting this skill.
+  executor.md) is a follow-on per-role analysis — and per the runtime caveat above it is
+  blocked on a runtime change, not a frontmatter edit.
 
 ## Cross-References
 - `required-minimum-version-pin.md` — the 2.1.178 floor that enables this syntax.
