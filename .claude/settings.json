@@ -1,7 +1,7 @@
 {
   "disableSkillShellExecution": true,
   "disableBundledSkills": true,
-  "requiredMinimumVersion": "2.1.178",
+  "requiredMinimumVersion": "2.1.181",
   "forceRemoteSettingsRefresh": true,
   "enforceAvailableModels": true,
   "availableModels": [

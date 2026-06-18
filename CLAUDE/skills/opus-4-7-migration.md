@@ -40,6 +40,7 @@ Review role prompts for loose phrasing such as "roughly", "if possible", "try to
 
 ## Related
 - `CLAUDE/skills/model-version-hygiene.md` — model ID swap and effort parameter
+- `CLAUDE/skills/opus-sampling-params-deprecated.md` — `temperature`/`top_p`/`top_k` return a hard 400 on Opus 4.7+; remove them before migrating
 - `CLAUDE/skills/orchestrator-step-edits.md` — editing role prompts safely
 
 ## Source
