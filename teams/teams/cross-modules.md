@@ -19,9 +19,10 @@ The default balanced team. A planner designs the approach, a coder implements it
 ## Pipeline
 
 1. **planner** — Analyze the request, classify as simple/complex, write implementation plan.
-2. **coder** — Implement the plan, commit changes.
+2. **coder** — Implement the plan, commit changes. The coder ends `coder_output.txt` with a `CODER_CONFIDENCE`/`KNOWN_GAPS`/`RISK_FLAGS` block (see `coder-confidence-gate.md`).
 3. **qa_analyst** — Read the coder's changed files and the existing test suite. Identify uncovered code paths, missing edge case tests, and regression scenarios. Write findings to `qa_analyst_output.txt`.
 4. **reviewer** — Review the implementation against the plan.
+   - Pre-Reviewer gate: if the coder's `CODER_CONFIDENCE < 6`, request one coder fix pass (targeting its `KNOWN_GAPS`) **before** invoking the reviewer — see `coder-confidence-gate.md`.
    - Review loop: if changes required, send back to **coder** for fixes.
    - Max iterations: **3**
 5. **executor** (optional) — Run the code: tests, builds, scripts. Capture all output. The orchestrator runs this when the planner sets NEEDS_EXECUTION=true in plan_meta.txt, or when the task clearly involves runnable code.

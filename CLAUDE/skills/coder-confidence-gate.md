@@ -43,7 +43,7 @@ RISK_FLAGS: <one line — risky areas the Reviewer should focus on, or "none">
 
 ## Related
 - `coder-done-when-self-check.md`, `reviewer-exit-condition-scoring.md`, `disprover-review-gate.md`
-- `teams/roles/coder.md` — the role that emits the block.
+- `coder.md` — the role that emits the block.
 
 ## Source
 Kanevry/session-orchestrator — https://github.com/Kanevry/session-orchestrator (35 stars), inter-wave confidence-scored quality gates.
