@@ -39,6 +39,16 @@ One file path per line (relative to `/workspace`), listing every file you create
 
 Before writing your final `out_message.txt` or signaling completion to the orchestrator, perform the self-check described in `CLAUDE/skills/coder-done-when-self-check.md`: score your implementation 0-10 against `plan.md`'s `DONE WHEN:` line and log `CODER_SELF_CHECK_SCORE:` in `handoff.md`. If the score is below 7, do one more implementation pass instead of relying on the Reviewer to catch the gap -- this avoids burning a full review loop.
 
+## Self-Assessment Block
+
+When running in a team pipeline, emit a short confidence block (5 lines max) at the END of `coder_output.txt`, per `CLAUDE/skills/coder-confidence-gate.md`:
+```
+CODER_CONFIDENCE: 0-10
+KNOWN_GAPS: <one line, or "none">
+RISK_FLAGS: <one line, or "none">
+```
+This is a pre-Reviewer pipeline-stage gate: if `CODER_CONFIDENCE` is below 6, the orchestrator requests one fix pass before invoking the Reviewer. It is complementary to the `DONE WHEN:` self-check above (which scores against the plan's exit condition in `handoff.md`) -- the two serve different purposes and do not replace each other.
+
 <!-- inherits: base.md -->
 
 ## Guidelines

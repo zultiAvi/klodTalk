@@ -117,6 +117,8 @@ When `results` is `true`, the path is designated as the project's **results fold
 
 If both top-level `extra_files` and `repos` are provided, the top-level value is ignored with a warning.
 
+`network_allowlist` (optional, **documentation-only / not yet wired**) — a proposed list of domains and/or CIDRs the project's agent container is permitted to reach. The intended semantics are a drop-all default with one explicit `ACCEPT` per entry, applied by `run_agent.py` as a mounted iptables init script (requires the container to run with `--cap-add NET_ADMIN`). Absent or `[]` means unrestricted (current behavior). Example: `"network_allowlist": ["github.com", "api.anthropic.com", "10.0.0.0/8"]`. A coarser alternative is `docker network create --internal` to block all external egress. Server wiring is a manual follow-up — see `CLAUDE/skills/container-network-allowlist.md`.
+
 `team` (optional) — references a file in `teams/teams/` by **basename without `.md`** (e.g. `"cross-modules"` loads `teams/teams/cross-modules.md`). When set, the multi-agent team pipeline is used instead of a single Claude invocation. Omit or set to `null` for direct mode. When `team` is set, `code_review` is redundant (the Reviewer is already part of the pipeline) and can be left `false`. Per-role model assignments live in the team definition, not in `projects.json`.
 
 Each workspace gets a `.klodTalk/` directory (gitignored automatically) containing `in_messages/`, `out_messages/`, `pr_messages/`, `history/`, and `team/` (team pipeline session files).
