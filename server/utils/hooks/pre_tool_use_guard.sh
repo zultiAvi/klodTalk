@@ -44,6 +44,12 @@ DENY_PATTERNS=(
     'rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f'
     'rm[[:space:]]+-[a-zA-Z]*f[a-zA-Z]*r'
     'git[[:space:]]+reset[[:space:]]+--hard'
+    # Block ALL git push (not just --force): KlodTalk agents never push; the
+    # server pushes after the agent finishes. Web/Android task-agent sub-agents
+    # may attempt an auto-push to claude/<task-id> despite CLAUDE.md (issue
+    # #56865), so this plain-push pattern is the only defence. The --force/-f
+    # patterns below are now subsumed but kept for explicit, readable intent.
+    'git[[:space:]]+push([[:space:]]|$)'
     'git[[:space:]]+push[[:space:]]+(.*[[:space:]]+)?--force($|[[:space:]])'
     'git[[:space:]]+push[[:space:]]+(.*[[:space:]]+)?-f($|[[:space:]])'
     'chmod[[:space:]]+777'

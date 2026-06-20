@@ -138,6 +138,7 @@ if [ -n "$COMMAND" ]; then
     case "$COMMAND" in
         *"git push"*"--force"*)   BLOCKED="git push --force is blocked" ;;
         *"git push"*"-f"*)        BLOCKED="git push -f is blocked" ;;
+        *"git push"*)             BLOCKED="git push is blocked (issue #56865 task-agent auto-push; server handles pushing)" ;;
         *"git reset"*"--hard"*)   BLOCKED="git reset --hard is blocked" ;;
         *"git clean"*"-f"*)       BLOCKED="git clean -f is blocked" ;;
         *"git checkout ."*)       BLOCKED="git checkout . is blocked" ;;

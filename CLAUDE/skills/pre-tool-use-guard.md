@@ -18,7 +18,7 @@ KlodTalk agents run inside Docker containers with `/workspace` bind-mounted from
 **Deny-list (narrow -- extend deliberately):**
 - `rm -rf` / `rm -fr` (any flag order containing both r and f)
 - `git reset --hard`
-- `git push --force` (anchored, so `--force-with-lease` is allowed) / `git push -f`
+- `git push` — ALL plain pushes are now blocked, not just `--force`/`-f`. KlodTalk agents never push (the server pushes after the agent finishes); Web/Android task-agent sub-agents may auto-push despite CLAUDE.md (issue #56865), so the hook is the only defence. See `task-agent-auto-push-guard.md`. The `--force`/`-f` patterns remain (subsumed but explicit).
 - `chmod 777`, `dd ... of=/dev/...`, `mkfs`
 - `shutdown` / `reboot` (anchored to command position)
 

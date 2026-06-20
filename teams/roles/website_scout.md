@@ -93,3 +93,5 @@ Use this format:
 ## Optimization
 
 This role performs many `WebSearch` calls and may attach additional MCP servers in the future. It is a candidate for the **Tool Search (Beta)** opt-in — see `CLAUDE/skills/tool-search-mcp-token-reduction.md`. Enabling the `tool-search-2026-01-01` beta header in the container env can cut per-run tokens by ~85% once 3+ MCP servers are attached.
+
+If KlodTalk migrates scouts onto the API/SDK path, the `web_search`/`web_fetch` `response_inclusion` parameter can drop consumed result blocks to cut multi-turn tokens — see `CLAUDE/skills/web-search-response-inclusion.md` (future direction; the CLI WebSearch tool does not expose it).

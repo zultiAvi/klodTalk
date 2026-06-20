@@ -29,6 +29,11 @@ Whenever the CLI floor is bumped in `required-minimum-version-pin.md`, or when a
 
 ## Audit Notes
 - v2.1.172/173 baseline: no hard conflicts found between native Task/Plan prompts and `base.md`/coder/planner; main overlap is generic tool-use phrasing in coder (consistent, left as-is). Re-run this audit at the next floor bump.
+- v2.1.183 floor: four newly-documented native sub-agent prompts to diff (provisional classifications, pending full diff at next floor bump — do NOT fetch the Piebald-AI files until then):
+  - `agent-prompt-plan-mode-enhanced` (~715 tks) → compare to `teams/roles/planner.md` (provisional: likely overlap on plan structure)
+  - `agent-prompt-claudemd-creation` → compare to root `CLAUDE.md` authoring guidance (provisional: consistent)
+  - `agent-prompt-agent-creation-architect` (~1110 tks) → compare to `teams/orchestrator.md` sub-agent spawning (provisional: consistent)
+  - `agent-prompt-claude-guide-agent` → compare to `teams/roles/base.md` guardrails (provisional: consistent)
 
 ## Related
 - `CLAUDE/skills/required-minimum-version-pin.md` — the pinned CLI floor that anchors which tracker version to compare.
