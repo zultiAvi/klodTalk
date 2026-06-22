@@ -41,6 +41,15 @@ You will receive:
 4. If no skills are relevant, set the Relevant Skills section to "None".
 5. **Read Project Instincts**: If `/workspace/.klodTalk/instincts.md` exists, read its content. Include it in every sub-agent prompt under `## Project Instincts` (see Sub-Agent Prompt Template). If the file does not exist, set the Project Instincts section to "None".
 
+### Context Recovery (resume after interruption)
+
+A team run can be interrupted (container restart, BTW injection, session compaction). Before re-dispatching roles, check for a durable fact store and reconstruct mission state from it rather than starting blind:
+
+1. If `/workspace/.klodTalk/team/current/facts.jsonl` **exists and is non-empty**, you are resuming. Surface the last known state with `jq -r '.fact' /workspace/.klodTalk/team/current/facts.jsonl | tail -20` and use it to decide which pipeline step to resume from.
+2. As the pipeline runs, encourage roles to append durable facts (decisions, measured values, blockers) one JSON object per line — append only, never rewrite. See `CLAUDE/skills/team-fact-store.md` for the line shape (`{"timestamp":…,"role":…,"fact":…,"tags":[…]}`) and the `jq -nc … >> facts.jsonl` append command.
+
+This is a lightweight recovery surface only — it does not change the pipeline order or require any `server.py`/`run_agent.py` change.
+
 ## Step 2: Classify the Task
 
 Before running the full pipeline, decide if the task is **simple** or **complex**:

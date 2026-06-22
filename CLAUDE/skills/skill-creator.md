@@ -43,6 +43,7 @@ Apply this whenever the orchestrator's Step 6 reflection decides a reusable patt
 Before creating a new file, scan the existing `CLAUDE/skills/` set (the Available Skills section). If a skill already covers the topic, **extend or amend that file** instead. Only create a new file when the topic is genuinely distinct from every existing skill. This keeps the skill set deduplicated and lets each nightly run build on the last.
 
 ## Cross-References
+- `skills-spec-conformance.md` — field-by-field map of the official Agent Skills spec onto KlodTalk's `skill_name`/`triggers`/`summary` frontmatter (which official keys KlodTalk uses, renames, and omits).
 - `session-start-title.md` — example of a clean frontmatter + body following these conventions.
 - `stop-hook-additional-context.md` — example of a config-snippet-bearing skill.
 - Orchestrator Step 6 (`teams/orchestrator.md`) — where skill creation is triggered.
