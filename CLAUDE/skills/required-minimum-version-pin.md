@@ -4,7 +4,7 @@ triggers:
   - A version-gated hook or skill silently no-ops because the container CLI drifted
   - Hardening the agent container against Claude Code CLI version drift
   - Deciding the minimum Claude Code version KlodTalk's pipeline depends on
-summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requiredMinimumVersion, requiredMaximumVersion] managed settings; pin a floor (currently 2.1.186, the highest version any active KlodTalk hook/skill needs) to turn silent feature no-ops into a loud startup failure. Doc/config only — do NOT edit Dockerfile.agent."
+summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requiredMinimumVersion, requiredMaximumVersion] managed settings; pin a floor (currently 2.1.187, the highest version any active KlodTalk hook/skill needs) to turn silent feature no-ops into a loud startup failure. Doc/config only — do NOT edit Dockerfile.agent."
 ---
 
 # Skill: requiredMinimumVersion Managed-Settings Pin
@@ -12,7 +12,7 @@ summary: "Claude Code (>= 2.1.163) refuses to start if the CLI is outside [requi
 ## Quick Reference
 - Keys: `requiredMinimumVersion` / `requiredMaximumVersion` (managed settings, Claude Code **>= 2.1.163**).
 - Effect: the CLI **refuses to start** if its version is outside the configured range.
-- Recommended floor: **2.1.186** (matches the highest version any active KlodTalk skill/hook depends on — the 2.1.186 `respondToBashCommands` default flip is pinned `false` in KlodTalk's settings, see `respond-to-bash-commands.md`; the 2.1.185 stream-stall hint improvements make long-running container sessions more interpretable when the API stalls; the 2.1.183 auto-mode destructive-git/infra-destroy safety guards protect KlodTalk's autonomous nightly-scout commits, and `attribution.sessionUrl` lets the nightly bot suppress claude.ai session links in its commit/PR messages, see `attribution-session-url.md`; the 2.1.181 `/config key=value` inline syntax and `CLAUDE_CLIENT_PRESENCE_FILE` matter for per-stage session overrides; the 2.1.179 mid-stream connection-drop partial-response preservation matters for KlodTalk's long-running container sessions over WebSocket; the 2.1.178 MCP `disallowedTools` sub-agent enforcement fix matters for KlodTalk's reviewer/executor/validator role restrictions; the 2.1.176 hook `if`-condition matching fix and `enforceAvailableModels` allowlist enforcement matter for KlodTalk's model hardening; the 2.1.172 `CLAUDE_MEMORY_STORES` fix matters for KlodTalk's team memory recall in containerized/remote sessions; the `PostSession` lifecycle hook and `disableBundledSkills` need 2.1.169; the 2.1.170 transcript-save fix matters for KlodTalk's containerized launch path; `additionalContext` Stop hooks need 2.1.163; `waitingFor` needs 2.1.162).
+- Recommended floor: **2.1.187** (matches the highest version any active KlodTalk skill/hook depends on — the 2.1.187 `sandbox.credentials` host-credential read block hardens KlodTalk's Docker agents against reading host secrets, see `sandbox-credentials-block.md`, the 5-minute MCP remote tool-call abort timeout prevents hung container agents on stalled MCP calls, and the structured-output infinite-re-call fix protects subagent schema flows; the 2.1.186 `respondToBashCommands` default flip is pinned `false` in KlodTalk's settings, see `respond-to-bash-commands.md`; the 2.1.185 stream-stall hint improvements make long-running container sessions more interpretable when the API stalls; the 2.1.183 auto-mode destructive-git/infra-destroy safety guards protect KlodTalk's autonomous nightly-scout commits, and `attribution.sessionUrl` lets the nightly bot suppress claude.ai session links in its commit/PR messages, see `attribution-session-url.md`; the 2.1.181 `/config key=value` inline syntax and `CLAUDE_CLIENT_PRESENCE_FILE` matter for per-stage session overrides; the 2.1.179 mid-stream connection-drop partial-response preservation matters for KlodTalk's long-running container sessions over WebSocket; the 2.1.178 MCP `disallowedTools` sub-agent enforcement fix matters for KlodTalk's reviewer/executor/validator role restrictions; the 2.1.176 hook `if`-condition matching fix and `enforceAvailableModels` allowlist enforcement matter for KlodTalk's model hardening; the 2.1.172 `CLAUDE_MEMORY_STORES` fix matters for KlodTalk's team memory recall in containerized/remote sessions; the `PostSession` lifecycle hook and `disableBundledSkills` need 2.1.169; the 2.1.170 transcript-save fix matters for KlodTalk's containerized launch path; `additionalContext` Stop hooks need 2.1.163; `waitingFor` needs 2.1.162).
 - Location: workspace-level `/workspace/.claude/settings.json` (see `hook-settings-location.md`). DO NOT touch `Dockerfile.agent` (pinned per project realities).
 
 ## When to Use
@@ -29,7 +29,8 @@ CLI image, this pin is **complementary insurance**, not a replacement — keep t
 floor in sync with the CLI version pinned in `Dockerfile.agent`.
 
 Version-floor history (why the floor is where it is):
-- **2.1.186 (2026-06-22): `respondToBashCommands` default flip + skill-frontmatter case-insensitivity + MCP `login`/`logout` + subagent schema-failure abort** — the default for `respondToBashCommands` flipped so a `!` bash command's output now auto-triggers a Claude response; KlodTalk pins it `false` to keep deterministic context-only behavior (see `respond-to-bash-commands.md`). Skill frontmatter keys now accept kebab/snake/camelCase and malformed `SKILL.md` YAML loads the body with empty metadata instead of failing silently. Adds `claude mcp login/logout` (non-interactive MCP auth) and a 5-attempt abort for `agent({schema})` subagents. NOTE: 2.1.186 also begins **enforcing** `Agent(type)`/`Agent(x,y)` named-subagent restrictions — but this remains a **no-op in KlodTalk** because `run_agent.py`/`run_claude_team.sh` launch with `--dangerously-skip-permissions`, which bypasses the permission engine regardless (see `tool-param-permission-syntax.md` + instinct #39). Current recommended floor.
+- **2.1.187 (2026-06-23): `sandbox.credentials` host-credential read block + 5-minute MCP remote tool-call abort timeout + org-level model-restriction enforcement in the picker + structured-output infinite-re-call fix + `--resume` no-model-turns fix** — the 5-min MCP abort (override via `CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT`) prevents hung container agents when a remote MCP tool call stalls indefinitely. `sandbox.credentials` blocks sandboxed commands from reading host credential files and secret env vars, hardening KlodTalk's Docker agents that mount the host workspace against reading host secrets (see new `sandbox-credentials-block.md`). The structured-output fix stops the model re-calling `StructuredOutput` after a successful call and makes follow-up turns reliably return structured output, protecting KlodTalk subagent `agent({schema})` flows. Current recommended floor.
+- **2.1.186 (2026-06-22): `respondToBashCommands` default flip + skill-frontmatter case-insensitivity + MCP `login`/`logout` + subagent schema-failure abort** — the default for `respondToBashCommands` flipped so a `!` bash command's output now auto-triggers a Claude response; KlodTalk pins it `false` to keep deterministic context-only behavior (see `respond-to-bash-commands.md`). Skill frontmatter keys now accept kebab/snake/camelCase and malformed `SKILL.md` YAML loads the body with empty metadata instead of failing silently. Adds `claude mcp login/logout` (non-interactive MCP auth) and a 5-attempt abort for `agent({schema})` subagents. NOTE: 2.1.186 also begins **enforcing** `Agent(type)`/`Agent(x,y)` named-subagent restrictions — but this remains a **no-op in KlodTalk** because `run_agent.py`/`run_claude_team.sh` launch with `--dangerously-skip-permissions`, which bypasses the permission engine regardless (see `tool-param-permission-syntax.md` + instinct #39).
 - **2.1.185 (2026-06-20): stream-stall hint improvements** — the stall message wording changed to "Waiting for API response · will retry in …" and the silence threshold was raised from 10s to 20s before the hint appears; directly benefits KlodTalk's long-running Docker agent sessions where API stalls are common during heavy multi-turn runs, making a stalled stream interpretable instead of looking like a hang.
 - **2.1.183 (2026-06-19): auto-mode destructive-git/infra-destroy safety guards + `attribution.sessionUrl` setting + thinking-block/WebSearch-in-subagents fixes** — adds confirmation guards that block destructive git operations (`reset --hard`, force-push) and infrastructure-destroy commands when running in autonomous/auto mode, which directly protects KlodTalk's nightly-scout agent that commits unattended. Introduces the `attribution.sessionUrl` setting (suppresses claude.ai session links in agent commit/PR messages, see `attribution-session-url.md`) — KlodTalk sets it `false` so bot commits stay link-free. Also fixes thinking-block rendering and `WebSearch` availability inside sub-agents.
 - **2.1.181 (2026-06-18): `/config key=value` inline setting syntax + `CLAUDE_CLIENT_PRESENCE_FILE` + Bun 1.4** — subsumes the 2.1.179 connection-drop fix below. 2.1.181 adds `/config key=value` inline in-session setting syntax (ephemeral per-session override, see `inline-config-syntax.md`), the `CLAUDE_CLIENT_PRESENCE_FILE` env var (suppresses mobile push notifications while a client is attached), upgrades the bundled runtime to Bun 1.4, and improves line-by-line streaming of long paragraphs.
@@ -59,7 +60,7 @@ Add to `/workspace/.claude/settings.json`:
 
 ```json
 {
-  "requiredMinimumVersion": "2.1.186"
+  "requiredMinimumVersion": "2.1.187"
 }
 ```
 
@@ -67,7 +68,7 @@ Optionally cap with a maximum to detect an unintended upgrade:
 
 ```json
 {
-  "requiredMinimumVersion": "2.1.186",
+  "requiredMinimumVersion": "2.1.187",
   "requiredMaximumVersion": "2.99.99"
 }
 ```
@@ -88,5 +89,5 @@ requires, whichever is higher). The two must not drift apart.
 - `respond-to-bash-commands.md` — the 2.1.186 `respondToBashCommands` default flip this floor pins to `false`.
 
 ## Source
-- Claude Code CHANGELOG v2.1.163 / v2.1.169 / v2.1.170 / v2.1.172 / v2.1.174 / v2.1.176 / v2.1.178 / v2.1.179 / v2.1.181 / v2.1.183 / v2.1.185 / v2.1.186 —
+- Claude Code CHANGELOG v2.1.163 / v2.1.169 / v2.1.170 / v2.1.172 / v2.1.174 / v2.1.176 / v2.1.178 / v2.1.179 / v2.1.181 / v2.1.183 / v2.1.185 / v2.1.186 / v2.1.187 —
   https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md

@@ -1,7 +1,7 @@
 {
   "disableSkillShellExecution": true,
   "disableBundledSkills": true,
-  "requiredMinimumVersion": "2.1.186",
+  "requiredMinimumVersion": "2.1.187",
   "respondToBashCommands": false,
   "attribution": {
     "sessionUrl": false
@@ -91,6 +91,28 @@
           {
             "type": "command",
             "command": "bash /workspace/server/utils/hooks/post_session_snapshot.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/precompact_snapshot.sh"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /workspace/server/utils/hooks/postcompact_confirm.sh"
           }
         ]
       }
