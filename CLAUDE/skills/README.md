@@ -16,6 +16,8 @@ At the top of each file, a YAML block between `---` markers provides:
 - `triggers` — list of when-to-use conditions (keywords/task types)
 - `summary` — one-sentence description of what the skill covers
 
+New skills may also include an optional `description:` field — 2-3 keyword-rich prose sentences that tool-search uses for semantic skill auto-selection, complementing the compact one-line `summary:`. It mirrors the canonical upstream `anthropics/skills` SKILL.md schema; add it to new skills, keep `summary:` for display, and leave existing skills untouched (the field is additive/optional). See `skill-frontmatter-spec.md`.
+
 ### Tier 2: Quick Reference (2-4 lines)
 Immediately after the frontmatter heading, a `## Quick Reference` section provides key file paths, function signatures, or one-liner usage patterns. Agents can act on this for simple cases without reading the full instructions.
 
