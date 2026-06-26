@@ -57,5 +57,8 @@ disallowedTools:
 - `autoMode.hard_deny` (settings) — locks the container against auto-mode writes regardless of allow rules.
 - Use both: one bypassed alone is still caught by the other.
 
+### Cross-References
+- `classify-all-shell.md` — the write-capable-role counterpart (`autoMode.classifyAllShell`, CLI 2.1.193): when a hard deny would break the role, classify every shell command instead.
+
 ### Source
 Claude Code v2.1.136: https://github.com/anthropics/claude-code/releases/tag/v2.1.136 (github.com/anthropics/claude-code, 82,000+ stars). Pattern reinforced by `rohitg00/awesome-claude-code-toolkit` guard/lifecycle hooks (~1,500 stars).
