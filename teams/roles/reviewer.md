@@ -74,12 +74,34 @@ See **base.md** for the severity prefix table (BLOCKER / WARNING / SUGGESTION).
 - Include the file path and line number after the prefix, e.g., `BLOCKER: server/run_agent.py:42 — password logged in plaintext`.
 - Note: an optional disprover gate may verify each `BLOCKER:` against the code before it triggers a fix round (see `CLAUDE/skills/disprover-review-gate.md`); write each BLOCKER with a precise file:line so it can be verified.
 
+### Authoritative Verdict: `REVIEW VERDICT: CRITICAL | SHIP`
+
+In addition to `REVIEW RESULT:` and the `BLOCKER:` lines above, you MUST emit exactly one
+`REVIEW VERDICT:` line. This is the **single authoritative signal** the orchestrator scans
+to decide whether to run a fix round — it subsumes BOTH the `BLOCKER:`-prefix rule AND the
+`EXIT_CONDITION_SCORE < 7` rule, closing the gap where a `CHANGES REQUIRED` driven only by a
+low score (with no `BLOCKER:` line) silently failed to trigger a fix round.
+
+Mapping (compute mechanically, do not editorialize):
+- `REVIEW VERDICT: CRITICAL` if **any** `BLOCKER:` line is present **OR** `EXIT_CONDITION_SCORE`
+  is a number **below 7**.
+- `REVIEW VERDICT: SHIP` otherwise. **SHIP is the ONLY non-blocking verdict** — anything that
+  is not SHIP must be CRITICAL.
+- `EXIT_CONDITION_SCORE: N/A` does **NOT** force CRITICAL (Nightly Scout has no `DONE WHEN:`
+  line). N/A with zero `BLOCKER:` lines → `SHIP`.
+
+`REVIEW VERDICT:` is additive: keep emitting `REVIEW RESULT:` and `BLOCKER:` lines for human
+readability and back-compat. They must stay consistent — a CRITICAL verdict pairs with
+`REVIEW RESULT: CHANGES REQUIRED`; a SHIP verdict pairs with `REVIEW RESULT: APPROVED`.
+See `CLAUDE/skills/reviewer-critical-ship-labels.md`.
+
 ## Required Output File
 
 ### Always write `/workspace/.klodTalk/team/current/reviewer_output.txt`
 
 ```
 REVIEW RESULT: [APPROVED / CHANGES REQUIRED]
+REVIEW VERDICT: [CRITICAL / SHIP]
 
 ## Issues Found
 BLOCKER: file:line — description. Suggested fix: ...
@@ -152,6 +174,7 @@ EXIT_CONDITION_SCORE: <n>/10 — <one-sentence justification>
 ```
 
 Rules:
-- If the score is **below 7**, treat it as a `BLOCKER` regardless of other findings, and write `REVIEW RESULT: CHANGES REQUIRED`.
-- If `plan.md` has no `DONE WHEN:` line, write `EXIT_CONDITION_SCORE: N/A` with a one-sentence reason.
+- If the score is **below 7**, treat it as a `BLOCKER` regardless of other findings, write `REVIEW RESULT: CHANGES REQUIRED`, and set `REVIEW VERDICT: CRITICAL`.
+- If `plan.md` has no `DONE WHEN:` line, write `EXIT_CONDITION_SCORE: N/A` with a one-sentence reason. `N/A` does **not** force CRITICAL — with zero `BLOCKER:` lines the verdict is `SHIP`.
+- The `REVIEW VERDICT:` line (see "Authoritative Verdict" under Issue Severity Prefixes) is the single signal the orchestrator scans; it folds this score<7 rule together with the `BLOCKER:`-line rule so a low score can never silently skip a fix round.
 - See `CLAUDE/skills/reviewer-exit-condition-scoring.md` for the full rubric.
