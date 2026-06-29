@@ -11,7 +11,7 @@ summary: "Use the Piebald-AI tracker to fetch the native Plan/Explore/Task sub-a
 
 ## Quick Reference
 - Tracker: Piebald-AI/claude-code-system-prompts — https://github.com/Piebald-AI/claude-code-system-prompts (~11k stars)
-- Tracks every native sub-agent prompt (Plan / Explore / Task) + all built-in tool descriptions, per CLI release (latest tracked v2.1.173).
+- Tracks every native sub-agent prompt (Plan / Explore / Task) + all built-in tool descriptions, per CLI release (tracker current with v2.1.195 floor as of 2026-06-29).
 - KlodTalk roles run AS Claude Code sub-agents, so the native prompt is the baseline our role text layers on top of.
 
 ## When to Use
@@ -29,11 +29,12 @@ Whenever the CLI floor is bumped in `required-minimum-version-pin.md`, or when a
 
 ## Audit Notes
 - v2.1.172/173 baseline: no hard conflicts found between native Task/Plan prompts and `base.md`/coder/planner; main overlap is generic tool-use phrasing in coder (consistent, left as-is). Re-run this audit at the next floor bump.
-- v2.1.183 floor: four newly-documented native sub-agent prompts to diff (provisional classifications, pending full diff at next floor bump — do NOT fetch the Piebald-AI files until then):
-  - `agent-prompt-plan-mode-enhanced` (~715 tks) → compare to `teams/roles/planner.md` (provisional: likely overlap on plan structure)
-  - `agent-prompt-claudemd-creation` → compare to root `CLAUDE.md` authoring guidance (provisional: consistent)
-  - `agent-prompt-agent-creation-architect` (~1110 tks) → compare to `teams/orchestrator.md` sub-agent spawning (provisional: consistent)
-  - `agent-prompt-claude-guide-agent` → compare to `teams/roles/base.md` guardrails (provisional: consistent)
+- v2.1.195 floor (CONFIRMED 2026-06-29): the four provisional prompt types were fetched and diffed. Tracker tag used: **v2.1.195** (commit `7b9ccd1`) — the tracker is current with the KlodTalk floor (no lag this run). Files under `system-prompts/` on the tracker. Per-prompt classifications:
+  - `agent-prompt-plan-mode-enhanced` (tracker header `ccVersion: 2.1.118`) ↔ `teams/roles/planner.md` → **conflicting (intentional override, left as-is)**. The native prompt is STRICT READ-ONLY ("STRICTLY PROHIBITED from creating/modifying/deleting files … you do NOT have access to file editing tools"). KlodTalk's planner is deliberately NOT read-only: it writes `plan.md`/`plan_meta.txt` and, for SIMPLE tasks, implements code directly (Write/Edit kept available — see planner.md frontmatter comment). This is a documented KlodTalk design choice, not accidental drift; the existing frontmatter comment already records why Write/Edit stay. No edit needed. Plan-structure framing (explore → design → step-by-step → critical files) overlaps and is consistent.
+  - `agent-prompt-claudemd-creation` (tracker header `ccVersion: 2.1.185`) ↔ root `CLAUDE.md` authoring guidance → **consistent (no overlapping instructions; nothing to drift)**. KlodTalk's root `CLAUDE.md` is the artifact itself, not a prompt that tells an agent HOW to author a CLAUDE.md, so there is no competing instruction set. The native "do not include obvious/generic instructions; focus on big-picture architecture" guidance is in fact echoed by KlodTalk's actual CLAUDE.md style (architecture-first, no boilerplate). Left as-is.
+  - `agent-prompt-agent-creation-architect` (tracker header `ccVersion: 2.0.77`) ↔ `teams/orchestrator.md` sub-agent spawning section → **consistent (non-overlapping scope)**. Native authors NEW agent specs as a JSON object (`identifier`/`whenToUse`/`systemPrompt`). KlodTalk's orchestrator spawns sub-agents from fixed role `.md` files via the Agent tool and never authors new agent JSON specs, so there is no contradictory instruction. Left as-is.
+  - `agent-prompt-claude-guide-agent` (tracker header `ccVersion: 2.1.154`) ↔ `teams/roles/base.md` guardrails → **consistent (non-overlapping scope)**. Native is a docs-lookup helper (Claude Code / Agent SDK / Claude API guidance via WebFetch). base.md guardrails cover code quality, commit rules, and the workspace-auth refusal override — no shared subject matter, no conflict. Left as-is.
+  - Net: zero edits to any role file required this run. The one "conflict" (planner read-only) is a pre-existing intentional override already documented in `planner.md`. Re-run this audit at the next floor bump.
 
 ## Related
 - `CLAUDE/skills/required-minimum-version-pin.md` — the pinned CLI floor that anchors which tracker version to compare.

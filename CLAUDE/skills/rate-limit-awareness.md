@@ -63,7 +63,26 @@ Sleeps until the rate limit resets (up to `max_wait_s` seconds). Uses the `reset
 
 The recommended integration point is `server/session_manager.py` in the `_launch_agent()` method (or equivalent), immediately before the `docker exec` call that spawns a new agent. This is a restricted file -- do not modify it without explicit instruction.
 
+## Rate Limit Tier Parity (June 2026)
+
+As of **2026-06-26**, Sonnet and Haiku rate limits **match Opus at every API tier**
+(Start / Build / Scale). Source: Anthropic API Rate Limits documentation —
+https://platform.claude.com/docs/en/api/rate-limits (platform.claude.com, 2026-06-26).
+
+- **Scale tier**: 10,000 RPM / 10M ITPM / 2M OTPM apply **uniformly** across Opus 4.x,
+  Sonnet 4.x, and Haiku 4.5. There is no longer a per-model limit asymmetry.
+- **Implication for KlodTalk**: teams that spawn Sonnet or Haiku sub-agents for cost
+  efficiency no longer need to reserve extra headroom for assumed per-model limit
+  differences — the same throttle thresholds apply regardless of which model a sub-agent
+  uses. The thresholds below are therefore **per-workspace, model-agnostic**; do NOT
+  inflate them for Sonnet/Haiku batches.
+- `server/utils/rate_limit_utils.py` is already model-agnostic and correct as-is; this is
+  a documentation-only update.
+
 ## Recommended Throttle Thresholds
+
+These thresholds are **model-agnostic** — apply the same values whether a sub-agent uses
+Opus, Sonnet, or Haiku (limits are now uniform across models per the parity note above).
 
 | Environment | min_requests | min_tokens |
 |-------------|-------------|-----------|
