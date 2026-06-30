@@ -1,7 +1,7 @@
 {
   "disableSkillShellExecution": true,
   "disableBundledSkills": true,
-  "requiredMinimumVersion": "2.1.195",
+  "requiredMinimumVersion": "2.1.196",
   "respondToBashCommands": false,
   "attribution": {
     "sessionUrl": false

@@ -11,7 +11,7 @@ summary: "Use the Piebald-AI tracker to fetch the native Plan/Explore/Task sub-a
 
 ## Quick Reference
 - Tracker: Piebald-AI/claude-code-system-prompts — https://github.com/Piebald-AI/claude-code-system-prompts (~11k stars)
-- Tracks every native sub-agent prompt (Plan / Explore / Task) + all built-in tool descriptions, per CLI release (tracker current with v2.1.195 floor as of 2026-06-29).
+- Tracks every native sub-agent prompt (Plan / Explore / Task) + all built-in tool descriptions, per CLI release (tracker current with v2.1.196 floor as of 2026-06-30).
 - KlodTalk roles run AS Claude Code sub-agents, so the native prompt is the baseline our role text layers on top of.
 
 ## When to Use
@@ -35,6 +35,12 @@ Whenever the CLI floor is bumped in `required-minimum-version-pin.md`, or when a
   - `agent-prompt-agent-creation-architect` (tracker header `ccVersion: 2.0.77`) ↔ `teams/orchestrator.md` sub-agent spawning section → **consistent (non-overlapping scope)**. Native authors NEW agent specs as a JSON object (`identifier`/`whenToUse`/`systemPrompt`). KlodTalk's orchestrator spawns sub-agents from fixed role `.md` files via the Agent tool and never authors new agent JSON specs, so there is no contradictory instruction. Left as-is.
   - `agent-prompt-claude-guide-agent` (tracker header `ccVersion: 2.1.154`) ↔ `teams/roles/base.md` guardrails → **consistent (non-overlapping scope)**. Native is a docs-lookup helper (Claude Code / Agent SDK / Claude API guidance via WebFetch). base.md guardrails cover code quality, commit rules, and the workspace-auth refusal override — no shared subject matter, no conflict. Left as-is.
   - Net: zero edits to any role file required this run. The one "conflict" (planner read-only) is a pre-existing intentional override already documented in `planner.md`. Re-run this audit at the next floor bump.
+- v2.1.196 floor (CONFIRMED 2026-06-30): re-ran the deferred audit at the new floor bump. Tracker tag used: **v2.1.196** (the tracker is current with the KlodTalk floor — no lag this run; v2.1.196 was the most recent tag, released 2026-06-29, "+1,869 tokens" vs v2.1.195). Fetched the same four prompt files under `system-prompts/` and diffed against the same KlodTalk counterparts. The four prompt files are UNCHANGED at v2.1.196 — every tracker header is identical to the v2.1.195 run, confirming v2.1.196 introduced no edits to these sub-agent prompts:
+  - `agent-prompt-plan-mode-enhanced` (tracker header `ccVersion: 2.1.118`, unchanged) ↔ `teams/roles/planner.md` → **conflicting (intentional override, left as-is)** — same as v2.1.195: native prompt is STRICT READ-ONLY; KlodTalk's planner deliberately writes plan files and implements SIMPLE tasks directly (documented in planner.md frontmatter). No edit.
+  - `agent-prompt-claudemd-creation` (tracker header `ccVersion: 2.1.185`, unchanged) ↔ root `CLAUDE.md` authoring guidance → **consistent** — no competing instruction set; KlodTalk's CLAUDE.md is architecture-first with no boilerplate, echoing the native "no obvious/generic instructions" guidance. No edit.
+  - `agent-prompt-agent-creation-architect` (tracker header `ccVersion: 2.0.77`, unchanged) ↔ `teams/orchestrator.md` sub-agent spawning section → **consistent (non-overlapping scope)** — native authors NEW agent JSON specs; KlodTalk's orchestrator spawns from fixed role `.md` files and never authors agent JSON. No edit.
+  - `agent-prompt-claude-guide-agent` (tracker header `ccVersion: 2.1.154`, unchanged) ↔ `teams/roles/base.md` guardrails → **consistent (non-overlapping scope)** — native is a docs-lookup helper; base.md covers code quality/commit rules/workspace-auth override. No shared subject matter. No edit.
+  - Net: zero edits to any role file required this run (identical outcome to v2.1.195 — the four prompts did not change between floors). The one "conflict" (planner read-only) remains a pre-existing intentional override already documented in `planner.md`; `teams/roles/base.md` was NOT touched (instinct #29 — it carries pre-existing unstaged drift and no real conflict was found). Re-run this audit at the next floor bump.
 
 ## Related
 - `CLAUDE/skills/required-minimum-version-pin.md` — the pinned CLI floor that anchors which tracker version to compare.
