@@ -38,9 +38,11 @@ introduced purely by the CLI floor bump, not by any KlodTalk code change.
    Forward it the same way other `CLAUDE_*` knobs reach the container env in
    `server/run_agent.py` (the container env dict). Do NOT hardcode it globally without
    cause — keep it conditional on observed premature termination, since the watchdog is a
-   legitimate hang-recovery feature for genuinely stuck sessions. The idle threshold
-   itself is configurable via `CLAUDE_STREAM_IDLE_TIMEOUT_MS` (default 5 minutes /
-   300000 ms) if you prefer to lengthen the window rather than disable the watchdog.
+   legitimate hang-recovery feature for genuinely stuck sessions. The v2.1.196
+   default-on watchdog aborts after ~5 minutes of no streamed events; the idle window
+   itself is configurable via `CLAUDE_STREAM_IDLE_TIMEOUT_MS` (value in ms — the exact
+   default is not restated in the v2.1.196 changelog entry, so set it explicitly rather
+   than assuming) if you prefer to lengthen the window rather than disable the watchdog.
 3. **Prefer a narrow fix**: if only one role (e.g. an opus coder with long quiet
    reasoning) is affected, scope the env var to that role's invocation rather than all
    agents.
