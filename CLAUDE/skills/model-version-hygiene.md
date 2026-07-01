@@ -4,7 +4,7 @@ triggers:
   - Updating model references in team definitions or config files
   - Diagnosing API errors from retired model identifiers
   - Migrating from budget_tokens to the effort parameter
-summary: "Current and retired model IDs, shorthand resolution, and effort parameter reference (Fable 5/Mythos 5 are suspended)."
+summary: "Current and retired model IDs, shorthand resolution, and effort parameter reference (Fable 5/Mythos 5 are suspended; claude-sonnet-5 is the new CLI default as of v2.1.197 but is intentionally absent from availableModels pending a sampling-param audit — see sonnet-5-default-breaking-changes.md)."
 ---
 
 # Skill: Model Version Hygiene
@@ -23,8 +23,14 @@ When updating model references in team definitions, config files, or server code
 | Shorthand | Full Model ID | Notes |
 |-----------|---------------|-------|
 | `opus` | `claude-opus-4-8` | Most capable Opus, highest cost (launched May 28 2026) |
-| `sonnet` | `claude-sonnet-4-6` | Balanced capability and speed |
+| `sonnet` | `claude-sonnet-4-6` | Balanced capability and speed. NOTE: `claude-sonnet-5` is the new **CLI default** as of v2.1.197, but KlodTalk keeps the `sonnet` alias pinned to `claude-sonnet-4-6` and Sonnet 5 is intentionally absent from `availableModels` pending a sampling-param audit — see `sonnet-5-default-breaking-changes.md`. |
 | `haiku` | `claude-haiku-4-5-20251001` | Fastest and cheapest |
+
+## New Default (Not Yet in Allowlist)
+
+| Full Model ID | Status | Notes |
+|---------------|--------|-------|
+| `claude-sonnet-5` | New Claude Code CLI default as of v2.1.197 (2026-07-01); **NOT in `availableModels`** | 1M context, 128k output, promo $2/$10 per MTok through Aug 31 2026. Breaking vs Sonnet 4.6: adaptive thinking always-on, manual `budget_tokens` → HTTP 400, non-default `temperature`/`top_p`/`top_k` → HTTP 400, ~30% tokenizer inflation. Run the reinstatement checklist in `sonnet-5-default-breaking-changes.md` before adding it to the allowlist. |
 
 > **`claude-fable-5` and `claude-mythos-5` are SUSPENDED** (launched ~2026-06-09,
 > suspended ~2026-06-12 by a US government export-control directive). Do NOT add

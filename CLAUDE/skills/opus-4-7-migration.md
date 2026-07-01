@@ -14,6 +14,7 @@ summary: Behavioral migration guide for Opus 4.6 to Opus 4.7 — tokenizer infla
 - Tokenizer inflation: same input maps to 1.0x to 1.35x more tokens (content-type dependent)
 - Higher output volume at `effort: high`
 - Stricter literal instruction interpretation — loose phrasing now taken at face value
+- Fast mode (`speed: "fast"`) is deprecated on Opus 4.7; hard removal July 24, 2026. Only Opus 4.8 retains it. See `opus-fast-mode-removal.md`.
 - Deadline: before June 15 2026 (Opus 4.6 retirement)
 - Source: https://www.anthropic.com/news/claude-opus-4-7 (2026-04-16)
 
